@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordType {
+  exequente
+  executado
+}
+
+enum TaxTargetField {
+  iva
+  retencao
+  meu5
+  outrasTaxas
+}
+
+enum TaxBaseField {
+  valorIndicado
+  valorSemIva
+  valorEmissao
+}
+
+model Status {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  icon      String
+  color     String
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  records Record[]
+}
+
+model Record {
+  id              String    @id @default(cuid())
+  tipo            RecordType
+  mes             Int
+  ano             Int
+  processo        String?
+  pe              String?
+  reciboNumero    String?
+  dataLevantamento DateTime?
+  dataRecibo      DateTime?
+  valorIndicado   Decimal?  @db.Decimal(14, 2)
+  valorSemIva     Decimal?  @db.Decimal(14, 2)
+  iva             Decimal?  @db.Decimal(14, 2)
+  retencao        Decimal?  @db.Decimal(14, 2)
+  valorEmissao    Decimal?  @db.Decimal(14, 2)
+  meu5            Decimal?  @db.Decimal(14, 2)
+  outrasTaxas     Decimal?  @db.Decimal(14, 2)
+  gestor          String?
+  exequente       String?
+  descricaoValor  String?
+  indicacoes      String?
+  sourceColor     String?
+  sourceSheet     String?
+
+  statusId String
+  status   Status @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  history   RecordHistory[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([ano, mes])
+  @@index([tipo])
+  @@index([statusId])
+  @@index([gestor])
+  @@index([exequente])
+  @@unique([tipo, ano, mes, processo, pe, reciboNumero], map: "record_unique_key")
+}
+
+model RecordHistory {
+  id        String   @id @default(cuid())
+  recordId  String
+  message   String
+  createdAt DateTime @default(now())
+
+  record Record @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId, createdAt])
+}
+
+model CalculationSettings {
+  id                    String   @id @default("default")
+  autoApplyRules        Boolean  @default(true)
+  autoComputeValorSemIva Boolean @default(true)
+  autoComputeValorEmissao Boolean @default(false)
+  roundTo               Int      @default(2)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model TaxRule {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  label       String
+  rate        Decimal        @db.Decimal(8, 5)
+  enabled     Boolean        @default(true)
+  targetField TaxTargetField
+  baseField   TaxBaseField
+  order       Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model SavedView {
+  id        String   @id @default(cuid())
+  name      String
+  scope     String
+  filters   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope])
+}

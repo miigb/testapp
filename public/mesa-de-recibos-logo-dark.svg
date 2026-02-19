@@ -1,0 +1,26 @@
+<svg width="760" height="200" viewBox="0 0 760 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="b-ring" x1="46" y1="26" x2="170" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5C77FF"/>
+      <stop offset="1" stop-color="#4ED5F8"/>
+    </linearGradient>
+    <linearGradient id="b-core" x1="62" y1="40" x2="152" y2="156" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A2F73"/>
+      <stop offset="1" stop-color="#23449C"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="100" cy="100" r="74" fill="url(#b-ring)"/>
+  <circle cx="100" cy="100" r="58" fill="url(#b-core)"/>
+  <path d="M70 68H130" stroke="#D9ECFF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M70 86H118" stroke="#9CC8FF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M70 104H123" stroke="#7FB4FF" stroke-width="7" stroke-linecap="round"/>
+  <path d="M72 132L84 144L128 98" stroke="#9FE8FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="194" y="92" font-family="Manrope, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="-0.6" fill="#E5EEFF">
+    Mesa de Recibos
+  </text>
+  <text x="196" y="128" font-family="Manrope, Arial, sans-serif" font-size="22" font-weight="600" fill="#AFC4E8">
+    gestao simples e profissional
+  </text>
+</svg>
