@@ -4,7 +4,7 @@ import cors from 'cors'
 import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus, type SavedView, type Status, type TaxRule } from '@prisma/client'
+import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus, type Status, type TaxRule } from '@prisma/client'
 import { z } from 'zod'
 
 import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES, DEFAULT_STATUSES, DEFAULT_TAX_RULES } from './defaults'
@@ -405,6 +405,25 @@ function toStatusDto(status: { id: string; key: string; label: string; icon: str
     color: status.color,
     active: status.active,
     order: status.order,
+  }
+}
+
+/** Alias for recibos status records */
+const statusDto = toStatusDto
+/** Alias for DS status records */
+const dsStatusDto = toStatusDto
+/** Alias for penhoras status records */
+const penhorasStatusDto = toStatusDto
+
+/** Maps a SavedView record to a DTO. */
+function savedViewDto(view: { id: string; name: string; scope: string; filters: unknown; createdAt: Date; updatedAt: Date }) {
+  return {
+    id: view.id,
+    name: view.name,
+    scope: view.scope,
+    filters: view.filters,
+    createdAt: view.createdAt.toISOString(),
+    updatedAt: view.updatedAt.toISOString(),
   }
 }
 
@@ -867,7 +886,7 @@ function toPrismaDsRecordData(input: DsInputData): Prisma.DsRecordUncheckedCreat
     sourceSheet: input.sourceSheet ?? null,
     sourceRowNumber: typeof input.sourceRowNumber === 'number' ? Math.round(input.sourceRowNumber) : null,
     importBatchId: input.importBatchId ?? null,
-    rawPayload: input.rawPayload ?? null,
+    rawPayload: input.rawPayload ?? undefined,
     statusId: input.statusId ?? '',
   }
 }
@@ -1005,7 +1024,7 @@ function buildDsRecordWhere(query: Record<string, unknown>): Prisma.DsRecordWher
   const reciboEstado = queryValue(query, 'reciboEstado')?.trim()
   if (reciboEstado === 'com-recibo') where.recibo = { not: null }
   if (reciboEstado === 'sem-recibo') {
-    where.AND = [...(where.AND ?? []), { OR: [{ recibo: null }, { recibo: '' }] }]
+    where.AND = [...((where.AND as DsRecordWhereInput[]) ?? []), { OR: [{ recibo: null }, { recibo: '' }] }]
   }
 
   const ano = Number(queryValue(query, 'ano'))
@@ -1087,7 +1106,7 @@ function toPrismaPenhorasRecordData(input: PenhorasInputData): Prisma.PenhorasRe
     sourceSheet: input.sourceSheet ?? null,
     sourceRowNumber: typeof input.sourceRowNumber === 'number' ? Math.round(input.sourceRowNumber) : null,
     importBatchId: input.importBatchId ?? null,
-    rawPayload: input.rawPayload ?? null,
+    rawPayload: input.rawPayload ?? undefined,
     statusId: input.statusId ?? '',
   }
 }
@@ -1669,17 +1688,19 @@ app.post('/api/ds/import/preview', async (req, res) => {
     ]),
   )
 
+  const dsDefaults = await ensureDsDefaults()
+
   const items = parsed.data.rows.map((raw, index) => {
     const input = asDsRecordInput(raw)
     if (!input) {
       return { index, valid: false, action: 'error', reason: 'Linha DS sem dados mínimos.' }
     }
 
-    const fallbackStatusId = getDefaultDsStatusId(defaults)
+    const fallbackStatusId = getDefaultDsStatusId(dsDefaults)
     if (!fallbackStatusId) {
       return { index, valid: false, action: 'error', reason: 'Estado DS padrão indisponível.' }
     }
-    const statusId = resolveDsStatusId(input.statusId, defaults, fallbackStatusId, input)
+    const statusId = resolveDsStatusId(input.statusId, dsDefaults, fallbackStatusId, input)
     const key = buildDsRecordKey(input)
     const existingId = existingByKey.get(key)
     return {
@@ -2771,7 +2792,7 @@ app.post('/api/saved-views', async (req, res) => {
     return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
   }
 
-  const created = await prisma.savedView.create({ data: parsed.data })
+  const created = await prisma.savedView.create({ data: { ...parsed.data, filters: parsed.data.filters as Prisma.InputJsonValue } })
   res.status(201).json(savedViewDto(created))
 })
 
@@ -2781,7 +2802,12 @@ app.patch('/api/saved-views/:id', async (req, res) => {
     return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
   }
 
-  const updated = await prisma.savedView.update({ where: { id: req.params.id }, data: parsed.data })
+  const updated = await prisma.savedView.update({
+    where: { id: req.params.id },
+    data: parsed.data.filters !== undefined
+      ? { ...parsed.data, filters: parsed.data.filters as Prisma.InputJsonValue }
+      : { name: parsed.data.name, scope: parsed.data.scope },
+  })
   res.json(savedViewDto(updated))
 })
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+
 import { jsPDF } from 'jspdf'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -56,15 +57,24 @@ import type {
   PenhorasRecord,
   PenhorasRecordFilters,
   ParsedImport,
-  RecordSuggestions,
   ReceiptRecord,
   RecordFilters,
   RecordType,
-  SavedView,
   StatusDefinition,
   TabId,
   TaxRule,
 } from './types'
+
+import { useTheme } from './hooks/useTheme'
+import { useUndoStack } from './hooks/useUndoStack'
+import { useQuickTools } from './hooks/useQuickTools'
+import { useRecords } from './hooks/useRecords'
+import { useDsRecords } from './hooks/useDsRecords'
+import { usePenhorasRecords } from './hooks/usePenhorasRecords'
+import { useSmartNotes } from './hooks/useSmartNotes'
+import { useSavedViews } from './hooks/useSavedViews'
+import { useDashboard } from './hooks/useDashboard'
+import { useBootstrap } from './hooks/useBootstrap'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'entrada', label: 'Entrada' },
@@ -74,14 +84,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'configuracao', label: 'Configuração' },
 ]
 
-const DEFAULT_TABLE_FILTERS: RecordFilters = {
-  tipo: 'todos',
-  estadoId: 'todos',
-  mes: 'todos',
-  ano: 'todos',
-  page: 1,
-  pageSize: 300,
-}
 
 const DEFAULT_DASHBOARD_FILTERS: RecordFilters = {
   tipo: 'todos',
@@ -94,22 +96,7 @@ const DEFAULT_DASHBOARD_FILTERS: RecordFilters = {
   pageSize: 300,
 }
 
-const DEFAULT_DS_FILTERS: DsRecordFilters = {
-  estadoId: 'todos',
-  reciboEstado: 'todos',
-  ano: 'todos',
-  mes: 'todos',
-  page: 1,
-  pageSize: 300,
-}
 
-const DEFAULT_PENHORAS_FILTERS: PenhorasRecordFilters = {
-  estadoId: 'todos',
-  ano: 'todos',
-  mes: 'todos',
-  page: 1,
-  pageSize: 300,
-}
 
 type DashboardWidgetType =
   | 'kpi-registos'
@@ -125,7 +112,6 @@ type DashboardWidgetType =
 
 type DashboardWidgetSize = 'kpi' | 'normal' | 'wide'
 type DashboardWidgetColumn = 'main' | 'side'
-type DashboardWidgetScope = 'recibos' | 'ds' | 'penhoras'
 
 type DashboardWidget = {
   id: string
@@ -136,8 +122,6 @@ type DashboardWidget = {
   colSpan: number
 }
 
-const DASHBOARD_WIDGET_MIN_HEIGHT = 96
-const DASHBOARD_WIDGET_MAX_HEIGHT = 2200
 const DASHBOARD_WIDGET_MIN_COL_SPAN = 1
 const DASHBOARD_WIDGET_MAX_COL_SPAN = 3
 
@@ -239,18 +223,6 @@ type SmartNotesResultRow = {
   result: number
   signature: string
 }
-type SmartNotesErrorRow = {
-  lineNumber: number
-  source: string
-  error: string
-}
-type SavedSmartNotesEntry = {
-  signature: string
-  expression: string
-  result: number
-  source: string
-  savedAt: string
-}
 type TotalMetricKey =
   | 'registos'
   | 'valorIndicado'
@@ -320,204 +292,22 @@ function formatSmartNotesValue(value: number): string {
   return SMART_NOTES_NUMBER_FORMATTER.format(value)
 }
 
-function resolveInitialTheme(): ThemeId {
-  const stored = localStorage.getItem('mesa-recibos-theme')
-  const validThemeIds = new Set<string>(THEME_OPTIONS.map((t) => t.id))
-  if (stored && validThemeIds.has(stored)) {
-    return stored as ThemeId
-  }
-  return 'github-light'
-}
 
 function resolveInitialLayoutMode(): LayoutMode {
   return 'wide'
 }
 
-function resolveInitialDisabledSavedViewIds(): string[] {
-  try {
-    const stored = localStorage.getItem('mesa-recibos-disabled-saved-views')
-    if (!stored) return []
-    const parsed = JSON.parse(stored) as unknown
-    if (Array.isArray(parsed)) {
-      return parsed.filter((value): value is string => typeof value === 'string')
-    }
-  } catch {
-    // no-op
-  }
-  return []
-}
 
 function resolveInitialQuickNotes(): string {
   const stored = localStorage.getItem('mesa-recibos-quick-notes')
   return typeof stored === 'string' ? stored : ''
 }
 
-function resolveInitialSmartNotes(): string {
-  const stored = localStorage.getItem('mesa-recibos-smart-notes')
-  return typeof stored === 'string' ? stored : ''
-}
 
-function resolveInitialSmartNotesPinnedSignatures(): string[] {
-  try {
-    const stored = localStorage.getItem('mesa-recibos-smart-notes-pinned')
-    if (!stored) return []
-    const parsed = JSON.parse(stored) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((value): value is string => typeof value === 'string').slice(0, 200)
-  } catch {
-    return []
-  }
-}
 
-function resolveInitialSmartNotesSavedEntries(): SavedSmartNotesEntry[] {
-  try {
-    const stored = localStorage.getItem('mesa-recibos-smart-notes-saved')
-    if (!stored) return []
-    const parsed = JSON.parse(stored) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((item): item is SavedSmartNotesEntry => {
-        if (!item || typeof item !== 'object') return false
-        const candidate = item as Partial<SavedSmartNotesEntry>
-        return (
-          typeof candidate.signature === 'string' &&
-          typeof candidate.expression === 'string' &&
-          typeof candidate.result === 'number' &&
-          typeof candidate.source === 'string' &&
-          typeof candidate.savedAt === 'string'
-        )
-      })
-      .slice(0, 200)
-  } catch {
-    return []
-  }
-}
 
-function parseSmartNumber(value: string): number | null {
-  const scaleMatch = value.trim().match(/^(-?\d+(?:[.,]\d+)?)\s*([kKmMbB])?$/)
-  if (!scaleMatch) return null
-  const normalized = scaleMatch[1].replace(/\s+/g, '').replace(',', '.')
-  const parsed = Number(normalized)
-  if (!Number.isFinite(parsed)) return null
-  const suffix = scaleMatch[2]?.toLowerCase()
-  if (!suffix) return parsed
-  if (suffix === 'k') return parsed * 1_000
-  if (suffix === 'm') return parsed * 1_000_000
-  if (suffix === 'b') return parsed * 1_000_000_000
-  return parsed
-}
 
-function buildSmartNotesSignature(expression: string, result: number): string {
-  return `${expression.trim().toLowerCase()}::${result.toFixed(6)}`
-}
 
-function evaluateSmartNotesLine(
-  line: string,
-  context: { previousResults: number[]; variables: Map<string, number> },
-): { expression: string; result: number; signature: string; variableKey?: string } | { error: string } | null {
-  const trimmed = line.trim()
-  if (!trimmed || trimmed.startsWith('#')) return null
-
-  const assignmentMatch = trimmed.match(/^([A-Za-zÀ-ÿ_][\wÀ-ÿ ]{0,40})\s*=\s*(.+)$/)
-  const rawExpression = assignmentMatch ? assignmentMatch[2].trim() : trimmed.includes('=') ? trimmed.split('=').slice(1).join('=').trim() : trimmed
-  if (!rawExpression) return null
-
-  const totalLineMatch = rawExpression.match(/\b(total|subtotal|soma|sum)\b/i)
-  if (totalLineMatch && !/[0-9+\-*/%]/.test(rawExpression)) {
-    if (context.previousResults.length === 0) {
-      return { error: 'Sem valores anteriores para total.' }
-    }
-    const total = context.previousResults.reduce((sum, value) => sum + value, 0)
-    return {
-      expression: 'total',
-      result: total,
-      signature: buildSmartNotesSignature('total', total),
-      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
-    }
-  }
-
-  const percentOfMatch = rawExpression.match(/(-?\d+(?:[.,]\d+)?)\s*%\s*(?:de|do|da|sobre)\s*(-?\d+(?:[.,]\d+)?)/i)
-  if (percentOfMatch) {
-    const percent = parseSmartNumber(percentOfMatch[1])
-    const base = parseSmartNumber(percentOfMatch[2])
-    if (percent === null || base === null) {
-      return { error: 'Percentagem inválida.' }
-    }
-    const computed = (base * percent) / 100
-    return {
-      expression: `${percentOfMatch[1]}% de ${percentOfMatch[2]}`,
-      result: computed,
-      signature: buildSmartNotesSignature(`${percentOfMatch[1]}% de ${percentOfMatch[2]}`, computed),
-      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
-    }
-  }
-
-  const totalReplacement =
-    context.previousResults.length > 0 ? String(context.previousResults.reduce((sum, value) => sum + value, 0)) : '0'
-
-  const withScaledNumbers = rawExpression.replace(/(-?\d+(?:[.,]\d+)?)\s*([kKmMbB])\b/g, (_, amount: string, suffix: string) => {
-    const parsed = parseSmartNumber(`${amount}${suffix}`)
-    return parsed === null ? `${amount}${suffix}` : String(parsed)
-  })
-
-  const withVariables = withScaledNumbers.replace(/\b([A-Za-zÀ-ÿ_][\wÀ-ÿ]*)\b/g, (token) => {
-    const mapped = context.variables.get(token.toLowerCase())
-    return mapped === undefined ? token : String(mapped)
-  })
-
-  const normalized = withVariables
-    .replace(/\b(total|subtotal|soma|sum)\b/gi, totalReplacement)
-    .replace(/[€$£]/g, ' ')
-    .replace(/\b(eur|euro|euros|usd|dolar|dólar|dolares|dólares)\b/gi, ' ')
-    .replace(/[×x]/g, '*')
-    .replace(/[÷]/g, '/')
-    .replace(/\b(dividido\s+por|sobre|per)\b/gi, ' / ')
-    .replace(/\b(vezes|multiplicado\s+por)\b/gi, ' * ')
-    .replace(/\b(mais|plus)\b/gi, ' + ')
-    .replace(/\b(menos|minus)\b/gi, ' - ')
-    .replace(/&/g, ' + ')
-    .replace(/\be\b/gi, ' + ')
-    .replace(/,/g, '.')
-    .replace(/[^0-9+\-*/().% ]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (!normalized) return null
-  if (!/^[0-9+\-*/().%\s]+$/.test(normalized)) {
-    return { error: 'Expressão não suportada.' }
-  }
-
-  const numberTokens = normalized.match(/-?\d+(?:\.\d+)?/g) ?? []
-  const hasOperator = /[+\-*/()%]/.test(normalized)
-  let finalExpression = normalized
-
-  if (!hasOperator) {
-    if (numberTokens.length === 0) return null
-    finalExpression = numberTokens.join(' + ')
-  }
-
-  finalExpression = finalExpression.replace(/^[+*/\s]+|[+\-*/\s]+$/g, '').trim()
-  if (!finalExpression) {
-    return { error: 'Não foi possível interpretar.' }
-  }
-
-  const expressionWithPercent = finalExpression.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)')
-
-  try {
-    const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
-    if (typeof computed !== 'number' || !Number.isFinite(computed)) {
-      return { error: 'Resultado inválido.' }
-    }
-    return {
-      expression: finalExpression,
-      result: computed,
-      signature: buildSmartNotesSignature(finalExpression, computed),
-      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
-    }
-  } catch {
-    return { error: 'Não foi possível interpretar.' }
-  }
-}
 
 function isDarkLikeTheme(theme: ThemeId): boolean {
   return (
@@ -530,7 +320,6 @@ function isDarkLikeTheme(theme: ThemeId): boolean {
   )
 }
 
-
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
 const EMPTY_CALC_SETTINGS: CalculationSettings = {
@@ -542,13 +331,6 @@ const EMPTY_CALC_SETTINGS: CalculationSettings = {
   taxRules: [],
 }
 
-const EMPTY_RECORD_SUGGESTIONS: RecordSuggestions = {
-  processo: [],
-  pe: [],
-  reciboNumero: [],
-  gestor: [],
-  exequente: [],
-}
 
 const LOGO_DEV_TOKEN = (import.meta.env.VITE_LOGO_DEV_TOKEN as string | undefined) ?? 'pk_J_6gnc2JTzKtdVlXmGyzvA'
 
@@ -808,213 +590,28 @@ function penhorasRecordToForm(record: PenhorasRecord): PenhorasEntryForm {
   }
 }
 
-function sanitizeDsFilters(input: unknown): DsRecordFilters {
-  const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
-  const parseNumeric = (value: unknown, min: number, max: number) => {
-    const numeric = Number(value)
-    if (!Number.isFinite(numeric) || numeric < min || numeric > max) return 'todos' as const
-    return numeric
-  }
 
-  return {
-    estadoId: typeof payload.estadoId === 'string' && payload.estadoId.trim() ? payload.estadoId : 'todos',
-    gestora: typeof payload.gestora === 'string' ? payload.gestora : '',
-    entidadeBancaria: typeof payload.entidadeBancaria === 'string' ? payload.entidadeBancaria : '',
-    produto: typeof payload.produto === 'string' ? payload.produto : '',
-    reciboEstado:
-      payload.reciboEstado === 'com-recibo' || payload.reciboEstado === 'sem-recibo' ? payload.reciboEstado : 'todos',
-    ano: parseNumeric(payload.ano, 2000, 9999),
-    mes: parseNumeric(payload.mes, 1, 12),
-    page: 1,
-    pageSize: 300,
-  }
-}
 
-function sanitizePenhorasFilters(input: unknown): PenhorasRecordFilters {
-  const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
-  const parseNumeric = (value: unknown, min: number, max: number) => {
-    const numeric = Number(value)
-    if (!Number.isFinite(numeric) || numeric < min || numeric > max) return 'todos' as const
-    return numeric
-  }
 
-  return {
-    estadoId: typeof payload.estadoId === 'string' && payload.estadoId.trim() ? payload.estadoId : 'todos',
-    gestor: typeof payload.gestor === 'string' ? payload.gestor : '',
-    acto: typeof payload.acto === 'string' ? payload.acto : '',
-    ano: parseNumeric(payload.ano, 2000, 9999),
-    mes: parseNumeric(payload.mes, 1, 12),
-    page: 1,
-    pageSize: 300,
-  }
-}
 
-function sanitizeDashboardFilters(input: unknown): RecordFilters {
-  const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
-  const parseNumeric = (value: unknown, min: number, max: number) => {
-    const numeric = Number(value)
-    if (!Number.isFinite(numeric) || numeric < min || numeric > max) return 'todos' as const
-    return numeric
-  }
 
-  return {
-    tipo: payload.tipo === 'exequente' || payload.tipo === 'executado' ? payload.tipo : 'todos',
-    estadoId: typeof payload.estadoId === 'string' && payload.estadoId.trim() ? payload.estadoId : 'todos',
-    mes: parseNumeric(payload.mes, 1, 12),
-    ano: parseNumeric(payload.ano, 2000, 9999),
-    exequente: typeof payload.exequente === 'string' ? payload.exequente : '',
-    gestor: typeof payload.gestor === 'string' ? payload.gestor : '',
-    page: 1,
-    pageSize: 300,
-  }
-}
 
-function defaultDashboardWidgetLayout(type: DashboardWidgetType): {
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-} {
-  if (type.startsWith('kpi-')) {
-    return { size: 'kpi', minHeight: 110, column: 'side', colSpan: 1 }
-  }
-  if (type === 'chart-mensal-emissao' || type === 'chart-status' || type === 'chart-tipo') {
-    return { size: 'wide', minHeight: 210, column: 'main', colSpan: 2 }
-  }
-  return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
-}
 
-function defaultDsDashboardWidgetLayout(type: DsDashboardWidgetType): {
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-} {
-  const found = DEFAULT_DS_DASHBOARD_WIDGETS.find((widget) => widget.type === type)
-  if (found) {
-    return {
-      size: found.size,
-      minHeight: found.minHeight,
-      column: found.column,
-      colSpan: found.colSpan,
-    }
-  }
-  return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
-}
 
-function defaultPenhorasDashboardWidgetLayout(type: PenhorasDashboardWidgetType): {
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-} {
-  const found = DEFAULT_PENHORAS_DASHBOARD_WIDGETS.find((widget) => widget.type === type)
-  if (found) {
-    return {
-      size: found.size,
-      minHeight: found.minHeight,
-      column: found.column,
-      colSpan: found.colSpan,
-    }
-  }
-  return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
-}
 
-function sanitizeDashboardWidgetSize(value: unknown, fallback: DashboardWidgetSize): DashboardWidgetSize {
-  if (value === 'kpi' || value === 'normal' || value === 'wide') {
-    return value
-  }
-  return fallback
-}
 
-function sanitizeDashboardWidgetColumn(value: unknown, fallback: DashboardWidgetColumn): DashboardWidgetColumn {
-  if (value === 'main' || value === 'side') {
-    return value
-  }
-  return fallback
-}
 
-function clampDashboardWidgetHeight(value: number): number {
-  if (!Number.isFinite(value)) return DASHBOARD_WIDGET_MIN_HEIGHT
-  return Math.min(DASHBOARD_WIDGET_MAX_HEIGHT, Math.max(DASHBOARD_WIDGET_MIN_HEIGHT, Math.round(value)))
-}
 
 function clampDashboardWidgetColSpan(value: number): number {
   if (!Number.isFinite(value)) return DASHBOARD_WIDGET_MIN_COL_SPAN
   return Math.min(DASHBOARD_WIDGET_MAX_COL_SPAN, Math.max(DASHBOARD_WIDGET_MIN_COL_SPAN, Math.round(value)))
 }
 
-function parseDashboardWidgets(input: unknown): DashboardWidget[] {
-  if (!Array.isArray(input)) return []
-  const allowed = new Set<DashboardWidgetType>(DASHBOARD_WIDGET_LIBRARY.map((widget) => widget.type))
-  return input
-    .map((item) => {
-      if (typeof item !== 'object' || item === null) return null
-      const widget = item as { id?: unknown; type?: unknown; size?: unknown; minHeight?: unknown; column?: unknown; colSpan?: unknown }
-      if (typeof widget.type !== 'string' || !allowed.has(widget.type as DashboardWidgetType)) return null
-      const baseLayout = defaultDashboardWidgetLayout(widget.type as DashboardWidgetType)
-      const numericHeight = Number(widget.minHeight)
-      const numericColSpan = Number(widget.colSpan)
-      const parsedColumn = sanitizeDashboardWidgetColumn(widget.column, baseLayout.column)
-      return {
-        id: typeof widget.id === 'string' && widget.id.trim() ? widget.id : crypto.randomUUID(),
-        type: widget.type as DashboardWidgetType,
-        size: sanitizeDashboardWidgetSize(widget.size, baseLayout.size),
-        minHeight: clampDashboardWidgetHeight(Number.isFinite(numericHeight) ? numericHeight : baseLayout.minHeight),
-        column: parsedColumn,
-        colSpan: parsedColumn === 'side' ? 1 : clampDashboardWidgetColSpan(Number.isFinite(numericColSpan) ? numericColSpan : baseLayout.colSpan),
-      }
-    })
-    .filter((widget): widget is DashboardWidget => Boolean(widget))
-}
 
-function parseDsDashboardWidgets(input: unknown): DsDashboardWidget[] {
-  if (!Array.isArray(input)) return []
-  const allowed = new Set<DsDashboardWidgetType>(DEFAULT_DS_DASHBOARD_WIDGETS.map((widget) => widget.type))
-  return input
-    .map((item) => {
-      if (typeof item !== 'object' || item === null) return null
-      const widget = item as { id?: unknown; type?: unknown; size?: unknown; minHeight?: unknown; column?: unknown; colSpan?: unknown }
-      if (typeof widget.type !== 'string' || !allowed.has(widget.type as DsDashboardWidgetType)) return null
-      const baseLayout = defaultDsDashboardWidgetLayout(widget.type as DsDashboardWidgetType)
-      const numericHeight = Number(widget.minHeight)
-      const numericColSpan = Number(widget.colSpan)
-      const parsedColumn = sanitizeDashboardWidgetColumn(widget.column, baseLayout.column)
-      return {
-        id: typeof widget.id === 'string' && widget.id.trim() ? widget.id : crypto.randomUUID(),
-        type: widget.type as DsDashboardWidgetType,
-        size: sanitizeDashboardWidgetSize(widget.size, baseLayout.size),
-        minHeight: clampDashboardWidgetHeight(Number.isFinite(numericHeight) ? numericHeight : baseLayout.minHeight),
-        column: parsedColumn,
-        colSpan: parsedColumn === 'side' ? 1 : clampDashboardWidgetColSpan(Number.isFinite(numericColSpan) ? numericColSpan : baseLayout.colSpan),
-      }
-    })
-    .filter((widget): widget is DsDashboardWidget => Boolean(widget))
-}
 
-function parsePenhorasDashboardWidgets(input: unknown): PenhorasDashboardWidget[] {
-  if (!Array.isArray(input)) return []
-  const allowed = new Set<PenhorasDashboardWidgetType>(DEFAULT_PENHORAS_DASHBOARD_WIDGETS.map((widget) => widget.type))
-  return input
-    .map((item) => {
-      if (typeof item !== 'object' || item === null) return null
-      const widget = item as { id?: unknown; type?: unknown; size?: unknown; minHeight?: unknown; column?: unknown; colSpan?: unknown }
-      if (typeof widget.type !== 'string' || !allowed.has(widget.type as PenhorasDashboardWidgetType)) return null
-      const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type as PenhorasDashboardWidgetType)
-      const numericHeight = Number(widget.minHeight)
-      const numericColSpan = Number(widget.colSpan)
-      const parsedColumn = sanitizeDashboardWidgetColumn(widget.column, baseLayout.column)
-      return {
-        id: typeof widget.id === 'string' && widget.id.trim() ? widget.id : crypto.randomUUID(),
-        type: widget.type as PenhorasDashboardWidgetType,
-        size: sanitizeDashboardWidgetSize(widget.size, baseLayout.size),
-        minHeight: clampDashboardWidgetHeight(Number.isFinite(numericHeight) ? numericHeight : baseLayout.minHeight),
-        column: parsedColumn,
-        colSpan: parsedColumn === 'side' ? 1 : clampDashboardWidgetColSpan(Number.isFinite(numericColSpan) ? numericColSpan : baseLayout.colSpan),
-      }
-    })
-    .filter((widget): widget is PenhorasDashboardWidget => Boolean(widget))
-}
+
+
+
 
 function extractGpeSeFromIndicacoes(indicacoes?: string): { gpeSe: string; text: string } {
   if (!indicacoes) return { gpeSe: '', text: '' }
@@ -1055,11 +652,6 @@ function composeIndicacoes(gpeSe: string, indicacoes: string): string | undefine
   return chunks.length > 0 ? chunks.join(' | ') : undefined
 }
 
-type UndoAction = {
-  id: string
-  label: string
-  run: () => Promise<void>
-}
 
 function formToPayload(form: EntryForm): Partial<ReceiptRecord> & { tipo: RecordType; mes: number; ano: number } {
   return {
@@ -1192,17 +784,22 @@ function getExequenteLogoUrl(name?: string): string | undefined {
 }
 
 function App() {
+  const { theme, setTheme } = useTheme()
+  const { undoStack, pushUndo, handleUndo } = useUndoStack({
+    onUndoSuccess: async (label) => {
+      await refreshRecords()
+      setFeedback(`Anulado: ${label}.`)
+    },
+    onUndoError: (error) => {
+      setFeedback(error.message || 'Falha ao anular a última ação.')
+    }
+  })
+
   const [activeModule, setActiveModule] = useState<ModuleId>('recibos')
   const [activeTab, setActiveTab] = useState<TabId>('entrada')
   const [statuses, setStatuses] = useState<StatusDefinition[]>([])
-  const [records, setRecords] = useState<ReceiptRecord[]>([])
-  const [totalRecords, setTotalRecords] = useState(0)
-  const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [calculationSettings, setCalculationSettings] = useState<CalculationSettings>(EMPTY_CALC_SETTINGS)
 
-  const [bootstrapLoading, setBootstrapLoading] = useState(true)
-  const [recordsLoading, setRecordsLoading] = useState(false)
-  const [pageError, setPageError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [feedbackClosing, setFeedbackClosing] = useState(false)
 
@@ -1211,46 +808,22 @@ function App() {
   const [selectedRecord, setSelectedRecord] = useState<ReceiptRecord | null>(null)
   const [selectedRecordEdit, setSelectedRecordEdit] = useState<EntryForm | null>(null)
   const [isRecordEditing, setIsRecordEditing] = useState(false)
+
   const [selectedDsRecordId, setSelectedDsRecordId] = useState<string | null>(null)
   const [selectedDsRecord, setSelectedDsRecord] = useState<DsRecord | null>(null)
   const [selectedDsRecordEdit, setSelectedDsRecordEdit] = useState<DsEntryForm | null>(null)
   const [isDsRecordEditing, setIsDsRecordEditing] = useState(false)
+
   const [selectedPenhorasRecordId, setSelectedPenhorasRecordId] = useState<string | null>(null)
   const [selectedPenhorasRecord, setSelectedPenhorasRecord] = useState<PenhorasRecord | null>(null)
   const [selectedPenhorasRecordEdit, setSelectedPenhorasRecordEdit] = useState<PenhorasEntryForm | null>(null)
   const [isPenhorasRecordEditing, setIsPenhorasRecordEditing] = useState(false)
-  const [undoStack, setUndoStack] = useState<UndoAction[]>([])
-  const [theme, setTheme] = useState<ThemeId>(resolveInitialTheme)
+
   const [layoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
-  const [toolsExpanded, setToolsExpanded] = useState(false)
-  const [notesOpen, setNotesOpen] = useState(false)
-  const [calculatorOpen, setCalculatorOpen] = useState(false)
-  const [smartNotesOpen, setSmartNotesOpen] = useState(false)
-  const [toolPinned, setToolPinned] = useState<Record<QuickToolId, boolean>>({
-    notes: false,
-    calculator: false,
-    'smart-notes': false,
-  })
-  const [toolLayers, setToolLayers] = useState<Record<QuickToolId, number>>({
-    notes: 1,
-    calculator: 2,
-    'smart-notes': 3,
-  })
-  const [toolPositions, setToolPositions] = useState<Record<QuickToolId, { x: number; y: number } | null>>({
-    notes: null,
-    calculator: null,
-    'smart-notes': null,
-  })
-  const [draggingTool, setDraggingTool] = useState<QuickToolId | null>(null)
   const [quickNotes, setQuickNotes] = useState(resolveInitialQuickNotes)
-  const [smartNotesText, setSmartNotesText] = useState(resolveInitialSmartNotes)
-  const [smartNotesPinnedSignatures, setSmartNotesPinnedSignatures] = useState<string[]>(resolveInitialSmartNotesPinnedSignatures)
-  const [smartNotesSavedEntries, setSmartNotesSavedEntries] = useState<SavedSmartNotesEntry[]>(resolveInitialSmartNotesSavedEntries)
   const [calculatorExpression, setCalculatorExpression] = useState('')
   const [calculatorResult, setCalculatorResult] = useState<string | null>(null)
   const [calculatorError, setCalculatorError] = useState('')
-  const [disabledSavedViewIds, setDisabledSavedViewIds] = useState<string[]>(resolveInitialDisabledSavedViewIds)
-  const [activeSavedViewId, setActiveSavedViewId] = useState<string | null>(null)
   const [totalsHoverOpen, setTotalsHoverOpen] = useState(false)
   const [selectedTotalMetrics, setSelectedTotalMetrics] = useState<TotalMetricKey[]>([
     'registos',
@@ -1259,33 +832,8 @@ function App() {
     'levantadoComIva',
   ])
 
-  const [filters, setFilters] = useState<RecordFilters>(DEFAULT_TABLE_FILTERS)
-  const [dashboardFilters, setDashboardFilters] = useState<RecordFilters>(DEFAULT_DASHBOARD_FILTERS)
-  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([])
-  const [dashboardName, setDashboardName] = useState('Dashboard')
-  const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null)
-  const [dashboardSummary, setDashboardSummary] = useState<AnalyticsSummary | null>(null)
-  const [dashboardLoading, setDashboardLoading] = useState(false)
-  const [dashboardFocusMode, setDashboardFocusMode] = useState(false)
-  const [dashboardConfigOpen, setDashboardConfigOpen] = useState(true)
-  const [dashboardPickerOpen, setDashboardPickerOpen] = useState(false)
-  const [dashboardFiltersOpen, setDashboardFiltersOpen] = useState(false)
-  const [dsDashboardWidgets, setDsDashboardWidgets] = useState<DsDashboardWidget[]>(cloneDefaultDsDashboardWidgets)
-  const [penhorasDashboardWidgets, setPenhorasDashboardWidgets] = useState<PenhorasDashboardWidget[]>(cloneDefaultPenhorasDashboardWidgets)
-  const [dsDashboardConfigOpen, setDsDashboardConfigOpen] = useState(true)
-  const [dsDashboardPickerOpen, setDsDashboardPickerOpen] = useState(false)
-  const [dsDashboardWidgetsOpen, setDsDashboardWidgetsOpen] = useState(true)
-  const [penhorasDashboardConfigOpen, setPenhorasDashboardConfigOpen] = useState(true)
-  const [penhorasDashboardPickerOpen, setPenhorasDashboardPickerOpen] = useState(false)
-  const [penhorasDashboardWidgetsOpen, setPenhorasDashboardWidgetsOpen] = useState(true)
-  const [draggedDashboardWidgetId, setDraggedDashboardWidgetId] = useState<string | null>(null)
-  const [dropDashboardWidgetId, setDropDashboardWidgetId] = useState<string | null>(null)
-  const [resizingDashboardWidgetId, setResizingDashboardWidgetId] = useState<string | null>(null)
-
   const [entryForm, setEntryForm] = useState<EntryForm>(getInitialEntryForm(''))
-
   const [bulkStatusId, setBulkStatusId] = useState('')
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkGestor, setBulkGestor] = useState('')
   const [bulkExequente, setBulkExequente] = useState('')
   const [bulkIndicacoes, setBulkIndicacoes] = useState('')
@@ -1301,37 +849,240 @@ function App() {
   const [importForceRecalculate, setImportForceRecalculate] = useState(false)
 
   const [dsStatuses, setDsStatuses] = useState<StatusDefinition[]>([])
-  const [dsRecords, setDsRecords] = useState<DsRecord[]>([])
-  const [dsTotalRecords, setDsTotalRecords] = useState(0)
-  const [dsFilters, setDsFilters] = useState<DsRecordFilters>(DEFAULT_DS_FILTERS)
-  const [dsRecordsLoading, setDsRecordsLoading] = useState(false)
   const [dsImportLoading, setDsImportLoading] = useState(false)
   const [dsImportPreview, setDsImportPreview] = useState<DsParsedImport | null>(null)
   const [dsImportServerPreview, setDsImportServerPreview] = useState<ImportPreviewResponse | null>(null)
   const [dsImportStrategy, setDsImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [dsEntryForm, setDsEntryForm] = useState<DsEntryForm>(getInitialDsEntryForm(''))
-  const [activeDsSavedViewId, setActiveDsSavedViewId] = useState<string | null>(null)
 
   const [penhorasStatuses, setPenhorasStatuses] = useState<StatusDefinition[]>([])
-  const [penhorasRecords, setPenhorasRecords] = useState<PenhorasRecord[]>([])
-  const [penhorasTotalRecords, setPenhorasTotalRecords] = useState(0)
-  const [penhorasFilters, setPenhorasFilters] = useState<PenhorasRecordFilters>(DEFAULT_PENHORAS_FILTERS)
-  const [penhorasRecordsLoading, setPenhorasRecordsLoading] = useState(false)
   const [penhorasImportLoading, setPenhorasImportLoading] = useState(false)
   const [penhorasImportPreview, setPenhorasImportPreview] = useState<PenhorasParsedImport | null>(null)
   const [penhorasImportServerPreview, setPenhorasImportServerPreview] = useState<ImportPreviewResponse | null>(null)
   const [penhorasImportStrategy, setPenhorasImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
-  const [activePenhorasSavedViewId, setActivePenhorasSavedViewId] = useState<string | null>(null)
 
   const [settingsDraft, setSettingsDraft] = useState<CalculationSettings>(EMPTY_CALC_SETTINGS)
-  const [recordSuggestions, setRecordSuggestions] = useState<RecordSuggestions>(EMPTY_RECORD_SUGGESTIONS)
-  const widgetResizeRef = useRef<{ scope: DashboardWidgetScope; widgetId: string; startY: number; startHeight: number } | null>(null)
-  const toolLayerRef = useRef(4)
-  const toolDragRef = useRef<{ tool: QuickToolId; pointerOffsetX: number; pointerOffsetY: number } | null>(null)
-  const notesWindowRef = useRef<HTMLDivElement | null>(null)
-  const calculatorWindowRef = useRef<HTMLDivElement | null>(null)
-  const smartNotesWindowRef = useRef<HTMLDivElement | null>(null)
+
+  // HOOKS
+  const {
+    records,
+    totalRecords,
+    recordsLoading,
+    pageError,
+    filters,
+    setFilters,
+    selectedIds,
+    setSelectedIds,
+    recordSuggestions,
+    refreshRecords,
+  } = useRecords(globalSearch)
+
+  const {
+    dsRecords,
+    dsTotalRecords,
+    dsRecordsLoading,
+    dsFilters,
+    setDsFilters,
+    refreshDsRecords,
+  } = useDsRecords(globalSearch, setFeedback)
+
+  const {
+    penhorasRecords,
+    penhorasTotalRecords,
+    penhorasRecordsLoading,
+    penhorasFilters,
+    setPenhorasFilters,
+    refreshPenhorasRecords,
+  } = usePenhorasRecords(globalSearch, penhorasStatuses, setPenhorasStatuses, setFeedback)
+
+  const {
+    smartNotesText,
+    setSmartNotesText,
+    setSmartNotesPinnedSignatures,
+    smartNotesSavedEntries,
+    setSmartNotesSavedEntries,
+    smartNotesResults,
+    smartNotesErrors,
+    smartNotesPinnedSet,
+    smartNotesSavedSet,
+    smartNotesDisplayResults,
+  } = useSmartNotes()
+
+  const {
+    dashboardWidgets,
+    setDashboardWidgets,
+    dsDashboardWidgets,
+    setDsDashboardWidgets,
+    penhorasDashboardWidgets,
+    setPenhorasDashboardWidgets,
+    dsDashboardWidgetsOpen,
+    setDsDashboardWidgetsOpen,
+    penhorasDashboardWidgetsOpen,
+    setPenhorasDashboardWidgetsOpen,
+    dashboardFocusMode,
+    setDashboardFocusMode,
+    resizingDashboardWidgetId,
+    startDashboardWidgetResize,
+    addDashboardWidget,
+    removeDashboardWidget,
+    moveDashboardWidget,
+    reorderDashboardWidgets,
+    adjustDashboardWidgetWidth,
+    toggleDashboardWidgetColumn,
+    adjustDashboardWidgetHeight,
+    addDsDashboardWidget,
+    removeDsDashboardWidget,
+    moveDsDashboardWidget,
+    reorderDsDashboardWidgets,
+    adjustDsDashboardWidgetWidth,
+    toggleDsDashboardWidgetColumn,
+    adjustDsDashboardWidgetHeight,
+    addPenhorasDashboardWidget,
+    removePenhorasDashboardWidget,
+    movePenhorasDashboardWidget,
+    reorderPenhorasDashboardWidgets,
+    adjustPenhorasDashboardWidgetWidth,
+    togglePenhorasDashboardWidgetColumn,
+    adjustPenhorasDashboardWidgetHeight,
+  } = useDashboard(activeTab)
+
+  const [dashboardName, setDashboardName] = useState('Dashboard')
+  const [activeDashboardId, setActiveDashboardId] = useState<string | null>(null)
+  const [dashboardSummary, setDashboardSummary] = useState<AnalyticsSummary | null>(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+  const [dashboardConfigOpen, setDashboardConfigOpen] = useState(true)
+  const [dashboardPickerOpen, setDashboardPickerOpen] = useState(false)
+  const [dashboardFilters, setDashboardFilters] = useState<RecordFilters>(DEFAULT_DASHBOARD_FILTERS)
+  const [dashboardFiltersOpen, setDashboardFiltersOpen] = useState(false)
+  const [dsDashboardConfigOpen, setDsDashboardConfigOpen] = useState(true)
+  const [dsDashboardPickerOpen, setDsDashboardPickerOpen] = useState(false)
+  const [penhorasDashboardConfigOpen, setPenhorasDashboardConfigOpen] = useState(true)
+  const [penhorasDashboardPickerOpen, setPenhorasDashboardPickerOpen] = useState(false)
+  const [draggedDashboardWidgetId, setDraggedDashboardWidgetId] = useState<string | null>(null)
+  const [dropDashboardWidgetId, setDropDashboardWidgetId] = useState<string | null>(null)
+
+  const {
+    savedViews,
+    setSavedViews,
+    disabledSavedViewIds,
+    activeSavedViewId,
+    setActiveSavedViewId,
+    activeDsSavedViewId,
+    setActiveDsSavedViewId,
+    activePenhorasSavedViewId,
+    setActivePenhorasSavedViewId,
+    saveCurrentView,
+    deleteSavedView,
+    toggleSavedViewDisabled,
+    clearTableFilters,
+    applyView,
+    deleteDsSavedView,
+    toggleDsSavedViewDisabled,
+    clearDsFilters,
+    applyDsView,
+    deletePenhorasSavedView,
+    togglePenhorasSavedViewDisabled,
+    clearPenhorasFilters,
+    applyPenhorasView,
+    loadDashboardView,
+  } = useSavedViews({
+    setFilters,
+    setGlobalSearch,
+    setFeedback,
+    setDsFilters,
+    setDsDashboardWidgets,
+    setPenhorasFilters,
+    setPenhorasDashboardWidgets,
+    setDashboardFilters,
+    setDashboardWidgets,
+    setActiveDashboardId,
+    setDashboardName,
+  })
+
+  // We declare evaluateCalculator here first to pass to useQuickTools, but we need it to see setCalculatorResult etc
+  const evaluateCalculator = useCallback(() => {
+    const normalized = calculatorExpression
+      .replace(/,/g, '.')
+      .replace(/[×x]/g, '*')
+      .replace(/[÷]/g, '/')
+      .trim()
+
+    if (!normalized) {
+      setCalculatorResult(null)
+      setCalculatorError('')
+      return
+    }
+
+    if (!/^[0-9+\-*/().\s%]+$/.test(normalized)) {
+      setCalculatorError('Expressão inválida.')
+      setCalculatorResult(null)
+      return
+    }
+
+    const expressionWithPercent = normalized.replace(/(\d+(\.\d+)?)%/g, '($1/100)')
+
+    try {
+      const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
+      if (typeof computed !== 'number' || !Number.isFinite(computed)) {
+        setCalculatorError('Resultado inválido.')
+        setCalculatorResult(null)
+        return
+      }
+      setCalculatorError('')
+      setCalculatorResult(
+        new Intl.NumberFormat('pt-PT', {
+          maximumFractionDigits: 6,
+        }).format(computed),
+      )
+    } catch {
+      setCalculatorError('Não foi possível calcular.')
+      setCalculatorResult(null)
+    }
+  }, [calculatorExpression])
+
+  const {
+    toolsExpanded,
+    setToolsExpanded,
+    notesOpen,
+    setNotesOpen,
+    calculatorOpen,
+    setCalculatorOpen,
+    smartNotesOpen,
+    setSmartNotesOpen,
+    toolPinned,
+    toolLayers,
+    toolPositions,
+    draggingTool,
+    notesWindowRef,
+    calculatorWindowRef,
+    smartNotesWindowRef,
+    bringToolToFront,
+    toggleQuickTool,
+    toggleQuickToolPinned,
+    startToolWindowDrag,
+    notesWindowZIndex,
+    calculatorWindowZIndex,
+    smartNotesWindowZIndex,
+  } = useQuickTools(evaluateCalculator)
+
+  const { bootstrapLoading } = useBootstrap({
+    setStatuses,
+    setSavedViews,
+    setCalculationSettings,
+    setSettingsDraft,
+    setDsStatuses,
+    setPenhorasStatuses,
+    setEntryForm,
+    setBulkStatusId,
+    setDsEntryForm,
+    setPenhorasEntryForm,
+    setFeedback,
+    refreshRecords,
+    refreshDsRecords,
+    refreshPenhorasRecords,
+  })
+
 
   const orderedStatuses = useMemo(
     () => [...statuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
@@ -1815,80 +1566,6 @@ function App() {
   )
 
   const latestUndo = useMemo(() => undoStack[undoStack.length - 1], [undoStack])
-  const smartNotesEvaluation = useMemo(() => {
-    const context = {
-      previousResults: [] as number[],
-      variables: new Map<string, number>(),
-    }
-    const results: SmartNotesResultRow[] = []
-    const errors: SmartNotesErrorRow[] = []
-
-    for (const [index, line] of smartNotesText.split('\n').entries()) {
-      const parsed = evaluateSmartNotesLine(line, context)
-      if (!parsed) continue
-
-      if ('error' in parsed) {
-        errors.push({
-          lineNumber: index + 1,
-          source: line.trim(),
-          error: parsed.error,
-        })
-        continue
-      }
-
-      context.previousResults.push(parsed.result)
-      if (parsed.variableKey) {
-        context.variables.set(parsed.variableKey, parsed.result)
-      }
-
-      results.push({
-        lineNumber: index + 1,
-        source: line.trim(),
-        expression: parsed.expression,
-        result: parsed.result,
-        signature: parsed.signature,
-      })
-    }
-
-    return { results, errors }
-  }, [smartNotesText])
-  const smartNotesResults = smartNotesEvaluation.results
-  const smartNotesErrors = smartNotesEvaluation.errors
-  const smartNotesPinnedSet = useMemo(() => new Set(smartNotesPinnedSignatures), [smartNotesPinnedSignatures])
-  const smartNotesSavedSet = useMemo(() => new Set(smartNotesSavedEntries.map((entry) => entry.signature)), [smartNotesSavedEntries])
-  const smartNotesDisplayResults = useMemo(() => {
-    return [...smartNotesResults].sort((a, b) => {
-      const aPinned = smartNotesPinnedSet.has(a.signature) ? 1 : 0
-      const bPinned = smartNotesPinnedSet.has(b.signature) ? 1 : 0
-      if (aPinned !== bPinned) return bPinned - aPinned
-      return a.lineNumber - b.lineNumber
-    })
-  }, [smartNotesResults, smartNotesPinnedSet])
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('mesa-recibos-theme', theme)
-  }, [theme])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-layout', layoutMode)
-  }, [layoutMode])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-quick-notes', quickNotes)
-  }, [quickNotes])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-smart-notes', smartNotesText)
-  }, [smartNotesText])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-smart-notes-pinned', JSON.stringify(smartNotesPinnedSignatures))
-  }, [smartNotesPinnedSignatures])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-smart-notes-saved', JSON.stringify(smartNotesSavedEntries.slice(0, 200)))
-  }, [smartNotesSavedEntries])
 
   useEffect(() => {
     function handleQuickToolShortcuts(event: KeyboardEvent) {
@@ -1901,30 +1578,21 @@ function App() {
         event.preventDefault()
         setToolsExpanded(true)
         setNotesOpen(true)
-        setToolLayers((current) => {
-          const nextLayer = toolLayerRef.current++
-          return { ...current, notes: nextLayer }
-        })
+        bringToolToFront('notes')
         return
       }
       if (event.key.toLowerCase() === 'c') {
         event.preventDefault()
         setToolsExpanded(true)
         setCalculatorOpen(true)
-        setToolLayers((current) => {
-          const nextLayer = toolLayerRef.current++
-          return { ...current, calculator: nextLayer }
-        })
+        bringToolToFront('calculator')
         return
       }
       if (event.key.toLowerCase() === 's') {
         event.preventDefault()
         setToolsExpanded(true)
         setSmartNotesOpen(true)
-        setToolLayers((current) => {
-          const nextLayer = toolLayerRef.current++
-          return { ...current, 'smart-notes': nextLayer }
-        })
+        bringToolToFront('smart-notes')
       }
     }
 
@@ -1932,11 +1600,8 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleQuickToolShortcuts)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    localStorage.setItem('mesa-recibos-disabled-saved-views', JSON.stringify(disabledSavedViewIds))
-  }, [disabledSavedViewIds])
 
   useEffect(() => {
     if (!feedback) {
@@ -1966,65 +1631,6 @@ function App() {
       window.clearTimeout(clearTimer)
     }
   }, [feedbackClosing])
-
-  useEffect(() => {
-    void (async () => {
-      setBootstrapLoading(true)
-      setPageError('')
-      try {
-        const [bootstrap, dsBootstrap, penhorasBootstrap] = await Promise.all([
-          api.bootstrap(),
-          api.dsBootstrap().catch(() => null),
-          api.penhorasBootstrap().catch(() => null),
-        ])
-        setStatuses(bootstrap.statuses)
-        const combinedSavedViews = [...bootstrap.savedViews, ...(dsBootstrap?.savedViews ?? []), ...(penhorasBootstrap?.savedViews ?? [])]
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-          .filter((view, index, list) => list.findIndex((candidate) => candidate.id === view.id) === index)
-        setSavedViews(combinedSavedViews)
-        setCalculationSettings(bootstrap.calculationSettings)
-        setSettingsDraft(bootstrap.calculationSettings)
-        if (dsBootstrap) {
-          setDsStatuses(dsBootstrap.statuses)
-        }
-        if (penhorasBootstrap) {
-          setPenhorasStatuses(penhorasBootstrap.statuses)
-        }
-
-        const fallbackStatus = bootstrap.statuses.find((status) => status.active) ?? bootstrap.statuses[0]
-        if (fallbackStatus) {
-          setEntryForm(getInitialEntryForm(fallbackStatus.id))
-          setBulkStatusId(fallbackStatus.id)
-        }
-
-        const dsFallbackStatus = dsBootstrap?.statuses.find((status) => status.active) ?? dsBootstrap?.statuses[0]
-        if (dsFallbackStatus) {
-          setDsEntryForm(getInitialDsEntryForm(dsFallbackStatus.id))
-        }
-
-        const penhorasFallbackStatus = penhorasBootstrap?.statuses.find((status) => status.active) ?? penhorasBootstrap?.statuses[0]
-        if (penhorasFallbackStatus) {
-          setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasFallbackStatus.id))
-        }
-
-        await migrateLegacyLocalStorageIfPresent()
-
-        if (bootstrap.recordCount === 0) {
-          const seed = await api.seedDatabase(false)
-          setFeedback(`Dados base carregados: ${seed.created} novos registos.`)
-        }
-
-        await refreshRecords()
-        await refreshDsRecords()
-        await refreshPenhorasRecords()
-      } catch (error) {
-        setPageError(error instanceof Error ? error.message : 'Falha ao carregar aplicação.')
-      } finally {
-        setBootstrapLoading(false)
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   useEffect(() => {
     if (!bootstrapLoading && activeModule === 'recibos') {
@@ -2162,7 +1768,7 @@ function App() {
       setDashboardFilters(DEFAULT_DASHBOARD_FILTERS)
       setDashboardWidgets([])
     }
-  }, [activeDashboardId, dashboardViews])
+  }, [activeDashboardId, dashboardViews, setDashboardWidgets])
 
   useEffect(() => {
     if (!activeDsSavedViewId) return
@@ -2170,7 +1776,7 @@ function App() {
     if (!viewStillExists) {
       setActiveDsSavedViewId(null)
     }
-  }, [activeDsSavedViewId, savedViews])
+  }, [activeDsSavedViewId, savedViews, setActiveDsSavedViewId])
 
   useEffect(() => {
     if (!activePenhorasSavedViewId) return
@@ -2178,7 +1784,7 @@ function App() {
     if (!viewStillExists) {
       setActivePenhorasSavedViewId(null)
     }
-  }, [activePenhorasSavedViewId, savedViews])
+  }, [activePenhorasSavedViewId, savedViews, setActivePenhorasSavedViewId])
 
   useEffect(() => {
     if (!dsDefaultStatus) return
@@ -2211,150 +1817,6 @@ function App() {
     void refreshDashboardSummary()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, activeTab, dashboardFilters, globalSearch])
-
-  useEffect(() => {
-    if (activeTab !== 'dashboards' && dashboardFocusMode) {
-      setDashboardFocusMode(false)
-    }
-  }, [activeTab, dashboardFocusMode])
-
-  useEffect(() => {
-    if (!resizingDashboardWidgetId) return
-
-    function onPointerMove(event: MouseEvent) {
-      const resizeState = widgetResizeRef.current
-      if (!resizeState) return
-      const deltaY = event.clientY - resizeState.startY
-      const nextHeight = clampDashboardWidgetHeight(resizeState.startHeight + deltaY)
-      if (resizeState.scope === 'recibos') {
-        setDashboardWidgets((current) =>
-          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
-        )
-      } else if (resizeState.scope === 'ds') {
-        setDsDashboardWidgets((current) =>
-          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
-        )
-      } else {
-        setPenhorasDashboardWidgets((current) =>
-          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
-        )
-      }
-    }
-
-    function stopResize() {
-      widgetResizeRef.current = null
-      setResizingDashboardWidgetId(null)
-    }
-
-    window.addEventListener('mousemove', onPointerMove)
-    window.addEventListener('mouseup', stopResize, { once: true })
-    return () => {
-      window.removeEventListener('mousemove', onPointerMove)
-      window.removeEventListener('mouseup', stopResize)
-    }
-  }, [resizingDashboardWidgetId])
-
-  function pushUndo(label: string, run: () => Promise<void>) {
-    setUndoStack((current) => {
-      const next = [...current, { id: crypto.randomUUID(), label, run }]
-      return next.slice(-20)
-    })
-  }
-
-  async function runUndo() {
-    const action = latestUndo
-    if (!action) return
-
-    setUndoStack((current) => current.slice(0, -1))
-    try {
-      await action.run()
-      await refreshRecords()
-      setFeedback(`Anulado: ${action.label}.`)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao anular a última ação.')
-    }
-  }
-
-  async function migrateLegacyLocalStorageIfPresent() {
-    const rawRecords = localStorage.getItem('mesa-recibos-records')
-    const rawStatuses = localStorage.getItem('mesa-recibos-statuses')
-
-    if (!rawRecords && !rawStatuses) {
-      return
-    }
-
-    try {
-      const recordsPayload = rawRecords ? (JSON.parse(rawRecords) as unknown[]) : undefined
-      const statusesPayload = rawStatuses ? (JSON.parse(rawStatuses) as unknown[]) : undefined
-      const response = await api.migrateLocalStorage({ records: recordsPayload, statuses: statusesPayload })
-      setFeedback(`Migração concluída: ${response.migrated} registos transferidos do armazenamento local.`)
-      localStorage.removeItem('mesa-recibos-records')
-      localStorage.removeItem('mesa-recibos-statuses')
-      localStorage.removeItem('mesa-recibos-seed-v1')
-    } catch {
-      setFeedback('Não foi possível migrar automaticamente dados antigos do browser.')
-    }
-  }
-
-  async function refreshRecords() {
-    setRecordsLoading(true)
-    setPageError('')
-    try {
-      const [recordsResult, suggestionsResult] = await Promise.allSettled([
-        api.getRecords({ ...filters, q: globalSearch }),
-        api.getRecordSuggestions(),
-      ])
-
-      if (recordsResult.status === 'rejected') {
-        throw recordsResult.reason
-      }
-
-      const response = recordsResult.value
-      setRecords(response.items)
-      setTotalRecords(response.total)
-      setSelectedIds((current) => current.filter((id) => response.items.some((record) => record.id === id)))
-
-      if (suggestionsResult.status === 'fulfilled') {
-        setRecordSuggestions(suggestionsResult.value)
-      }
-    } catch (error) {
-      setPageError(error instanceof Error ? error.message : 'Falha ao carregar registos.')
-    } finally {
-      setRecordsLoading(false)
-    }
-  }
-
-  async function refreshDsRecords() {
-    setDsRecordsLoading(true)
-    try {
-      const response = await api.getDsRecords({ ...dsFilters, q: globalSearch })
-      setDsRecords(response.items)
-      setDsTotalRecords(response.total)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar registos DS.')
-    } finally {
-      setDsRecordsLoading(false)
-    }
-  }
-
-  async function refreshPenhorasRecords() {
-    setPenhorasRecordsLoading(true)
-    try {
-      const [response, fallbackStatuses] = await Promise.all([
-        api.getPenhorasRecords({ ...penhorasFilters, q: globalSearch }),
-        penhorasStatuses.length === 0 ? api.getPenhorasStatuses().catch(() => []) : Promise.resolve([] as StatusDefinition[]),
-      ])
-      setPenhorasRecords(response.items)
-      setPenhorasTotalRecords(response.total)
-      if (fallbackStatuses.length > 0) {
-        setPenhorasStatuses(fallbackStatuses)
-      }
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar registos Penhoras.')
-    } finally {
-      setPenhorasRecordsLoading(false)
-    }
-  }
 
   async function refreshDashboardSummary() {
     setDashboardLoading(true)
@@ -2444,306 +1906,6 @@ function App() {
     setDashboardFilters(DEFAULT_DASHBOARD_FILTERS)
     setDashboardWidgets([])
     setDashboardConfigOpen(true)
-  }
-
-  function loadDashboardView(view: SavedView) {
-    const payload = (view.filters ?? {}) as Record<string, unknown>
-    const viewFilters = payload.filters && typeof payload.filters === 'object' ? payload.filters : payload
-    setActiveDashboardId(view.id)
-    setDashboardName(view.name || 'Dashboard')
-    setDashboardFilters(sanitizeDashboardFilters(viewFilters))
-    setDashboardWidgets(parseDashboardWidgets(payload.widgets))
-  }
-
-  function addDashboardWidget(type: DashboardWidgetType) {
-    const baseLayout = defaultDashboardWidgetLayout(type)
-    setDashboardWidgets((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        type,
-        size: baseLayout.size,
-        minHeight: baseLayout.minHeight,
-        column: baseLayout.column,
-        colSpan: baseLayout.column === 'side' ? 1 : baseLayout.colSpan,
-      },
-    ])
-  }
-
-  function addDsDashboardWidget(type: DsDashboardWidgetType) {
-    const baseLayout = defaultDsDashboardWidgetLayout(type)
-    setDsDashboardWidgets((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        type,
-        size: baseLayout.size,
-        minHeight: baseLayout.minHeight,
-        column: baseLayout.column,
-        colSpan: baseLayout.column === 'side' ? 1 : baseLayout.colSpan,
-      },
-    ])
-  }
-
-  function addPenhorasDashboardWidget(type: PenhorasDashboardWidgetType) {
-    const baseLayout = defaultPenhorasDashboardWidgetLayout(type)
-    setPenhorasDashboardWidgets((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID(),
-        type,
-        size: baseLayout.size,
-        minHeight: baseLayout.minHeight,
-        column: baseLayout.column,
-        colSpan: baseLayout.column === 'side' ? 1 : baseLayout.colSpan,
-      },
-    ])
-  }
-
-  function removeDashboardWidget(widgetId: string) {
-    setDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
-  }
-
-  function moveDashboardWidget(widgetId: string, direction: -1 | 1) {
-    setDashboardWidgets((current) => {
-      const index = current.findIndex((widget) => widget.id === widgetId)
-      if (index < 0) return current
-      const nextIndex = index + direction
-      if (nextIndex < 0 || nextIndex >= current.length) return current
-      const next = [...current]
-      const [item] = next.splice(index, 1)
-      next.splice(nextIndex, 0, item)
-      return next
-    })
-  }
-
-  function reorderDashboardWidgets(sourceWidgetId: string, targetWidgetId: string) {
-    if (sourceWidgetId === targetWidgetId) return
-    setDashboardWidgets((current) => {
-      const sourceIndex = current.findIndex((widget) => widget.id === sourceWidgetId)
-      const targetIndex = current.findIndex((widget) => widget.id === targetWidgetId)
-      if (sourceIndex < 0 || targetIndex < 0) return current
-
-      const next = [...current]
-      const [source] = next.splice(sourceIndex, 1)
-      next.splice(targetIndex, 0, source)
-      return next
-    })
-  }
-
-  function adjustDashboardWidgetWidth(widgetId: string, delta: number) {
-    setDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        if (widget.column === 'side') return widget
-        const baseLayout = defaultDashboardWidgetLayout(widget.type)
-        const nextColSpan = clampDashboardWidgetColSpan((widget.colSpan || baseLayout.colSpan) + delta)
-        return {
-          ...widget,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : widget.type.startsWith('kpi-') ? 'kpi' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function toggleDashboardWidgetColumn(widgetId: string) {
-    setDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        const baseLayout = defaultDashboardWidgetLayout(widget.type)
-        const nextColumn = widget.column === 'side' ? 'main' : 'side'
-        const nextColSpan = nextColumn === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || baseLayout.colSpan)
-        return {
-          ...widget,
-          column: nextColumn,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : widget.type.startsWith('kpi-') ? 'kpi' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function adjustDashboardWidgetHeight(widgetId: string, delta: number) {
-    setDashboardWidgets((current) =>
-      current.map((widget) =>
-        widget.id === widgetId
-          ? {
-            ...widget,
-            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
-          }
-          : widget,
-      ),
-    )
-  }
-
-  function removeDsDashboardWidget(widgetId: string) {
-    setDsDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
-  }
-
-  function moveDsDashboardWidget(widgetId: string, direction: -1 | 1) {
-    setDsDashboardWidgets((current) => {
-      const index = current.findIndex((widget) => widget.id === widgetId)
-      if (index < 0) return current
-      const nextIndex = index + direction
-      if (nextIndex < 0 || nextIndex >= current.length) return current
-      const next = [...current]
-      const [item] = next.splice(index, 1)
-      next.splice(nextIndex, 0, item)
-      return next
-    })
-  }
-
-  function reorderDsDashboardWidgets(sourceWidgetId: string, targetWidgetId: string) {
-    if (sourceWidgetId === targetWidgetId) return
-    setDsDashboardWidgets((current) => {
-      const sourceIndex = current.findIndex((widget) => widget.id === sourceWidgetId)
-      const targetIndex = current.findIndex((widget) => widget.id === targetWidgetId)
-      if (sourceIndex < 0 || targetIndex < 0) return current
-      const next = [...current]
-      const [source] = next.splice(sourceIndex, 1)
-      next.splice(targetIndex, 0, source)
-      return next
-    })
-  }
-
-  function adjustDsDashboardWidgetWidth(widgetId: string, delta: number) {
-    setDsDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        if (widget.column === 'side') return widget
-        const baseLayout = defaultDsDashboardWidgetLayout(widget.type)
-        const nextColSpan = clampDashboardWidgetColSpan((widget.colSpan || baseLayout.colSpan) + delta)
-        return {
-          ...widget,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : widget.type === 'ds-recibos' ? 'kpi' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function toggleDsDashboardWidgetColumn(widgetId: string) {
-    setDsDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        const baseLayout = defaultDsDashboardWidgetLayout(widget.type)
-        const nextColumn = widget.column === 'side' ? 'main' : 'side'
-        const nextColSpan = nextColumn === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || baseLayout.colSpan)
-        return {
-          ...widget,
-          column: nextColumn,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : widget.type === 'ds-recibos' ? 'kpi' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function adjustDsDashboardWidgetHeight(widgetId: string, delta: number) {
-    setDsDashboardWidgets((current) =>
-      current.map((widget) =>
-        widget.id === widgetId
-          ? {
-            ...widget,
-            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
-          }
-          : widget,
-      ),
-    )
-  }
-
-  function removePenhorasDashboardWidget(widgetId: string) {
-    setPenhorasDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
-  }
-
-  function movePenhorasDashboardWidget(widgetId: string, direction: -1 | 1) {
-    setPenhorasDashboardWidgets((current) => {
-      const index = current.findIndex((widget) => widget.id === widgetId)
-      if (index < 0) return current
-      const nextIndex = index + direction
-      if (nextIndex < 0 || nextIndex >= current.length) return current
-      const next = [...current]
-      const [item] = next.splice(index, 1)
-      next.splice(nextIndex, 0, item)
-      return next
-    })
-  }
-
-  function reorderPenhorasDashboardWidgets(sourceWidgetId: string, targetWidgetId: string) {
-    if (sourceWidgetId === targetWidgetId) return
-    setPenhorasDashboardWidgets((current) => {
-      const sourceIndex = current.findIndex((widget) => widget.id === sourceWidgetId)
-      const targetIndex = current.findIndex((widget) => widget.id === targetWidgetId)
-      if (sourceIndex < 0 || targetIndex < 0) return current
-      const next = [...current]
-      const [source] = next.splice(sourceIndex, 1)
-      next.splice(targetIndex, 0, source)
-      return next
-    })
-  }
-
-  function adjustPenhorasDashboardWidgetWidth(widgetId: string, delta: number) {
-    setPenhorasDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        if (widget.column === 'side') return widget
-        const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type)
-        const nextColSpan = clampDashboardWidgetColSpan((widget.colSpan || baseLayout.colSpan) + delta)
-        return {
-          ...widget,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function togglePenhorasDashboardWidgetColumn(widgetId: string) {
-    setPenhorasDashboardWidgets((current) =>
-      current.map((widget) => {
-        if (widget.id !== widgetId) return widget
-        const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type)
-        const nextColumn = widget.column === 'side' ? 'main' : 'side'
-        const nextColSpan = nextColumn === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || baseLayout.colSpan)
-        return {
-          ...widget,
-          column: nextColumn,
-          colSpan: nextColSpan,
-          size: nextColSpan >= 2 ? 'wide' : 'normal',
-        }
-      }),
-    )
-  }
-
-  function adjustPenhorasDashboardWidgetHeight(widgetId: string, delta: number) {
-    setPenhorasDashboardWidgets((current) =>
-      current.map((widget) =>
-        widget.id === widgetId
-          ? {
-            ...widget,
-            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
-          }
-          : widget,
-      ),
-    )
-  }
-
-  function startDashboardWidgetResize(
-    event: ReactMouseEvent<HTMLButtonElement>,
-    scope: DashboardWidgetScope,
-    widgetId: string,
-    currentHeight: number,
-  ) {
-    event.preventDefault()
-    event.stopPropagation()
-    widgetResizeRef.current = {
-      scope,
-      widgetId,
-      startY: event.clientY,
-      startHeight: currentHeight,
-    }
-    setResizingDashboardWidgetId(widgetId)
   }
 
   function handleEntryInput<K extends keyof EntryForm>(key: K, value: EntryForm[K]) {
@@ -2900,8 +2062,10 @@ function App() {
     try {
       await api.updateRecordStatus(recordId, statusId)
       if (registerUndo && previous) {
-        pushUndo(`estado de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, async () => {
-          await updateRecordStatus(recordId, previous.estadoId, { registerUndo: false })
+        pushUndo({
+          label: `estado de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, run: async () => {
+            await updateRecordStatus(recordId, previous.estadoId, { registerUndo: false })
+          }
         })
       }
       await refreshRecords()
@@ -2951,8 +2115,10 @@ function App() {
         .map((record) => ({ id: record.id, estadoId: record.estadoId }))
       const result = await api.bulkStatus(selectedIds, bulkStatusId)
       if (before.length > 0) {
-        pushUndo('alteração de estado em lote', async () => {
-          await Promise.all(before.map((item) => api.updateRecordStatus(item.id, item.estadoId)))
+        pushUndo({
+          label: 'alteração de estado em lote', run: async () => {
+            await Promise.all(before.map((item) => api.updateRecordStatus(item.id, item.estadoId)))
+          }
         })
       }
       setFeedback(`Atualização em lote concluída: ${result.updated} registos.`)
@@ -2981,8 +2147,10 @@ function App() {
     try {
       const result = await api.bulkUpdate(selectedIds, patch, { forceRecalculate: bulkForceRecalculate })
       if (before.length > 0) {
-        pushUndo('edição em lote', async () => {
-          await Promise.all(before.map((record) => api.patchRecord(record.id, recordToPatchPayload(record))))
+        pushUndo({
+          label: 'edição em lote', run: async () => {
+            await Promise.all(before.map((record) => api.patchRecord(record.id, recordToPatchPayload(record))))
+          }
         })
       }
       setFeedback(`Edição em lote concluída: ${result.updated} registos.`)
@@ -3000,8 +2168,10 @@ function App() {
 
     try {
       await api.patchRecord(selectedRecord.id, formToPayload(selectedRecordEdit))
-      pushUndo(`edição de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, async () => {
-        await api.patchRecord(previous.id, recordToPatchPayload(previous))
+      pushUndo({
+        label: `edição de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, run: async () => {
+          await api.patchRecord(previous.id, recordToPatchPayload(previous))
+        }
       })
       setIsRecordEditing(false)
       await refreshRecords()
@@ -3693,265 +2863,6 @@ function App() {
     }
   }
 
-  async function saveCurrentView(
-    scope: 'tabela' | 'ds-tabela' | 'ds-dashboard' | 'penhoras-tabela' | 'penhoras-dashboard',
-    filtersPayload: Record<string, unknown>,
-  ) {
-    const name = window.prompt('Nome da vista')
-    if (!name) return
-
-    try {
-      const created = await api.createSavedView({ name, scope, filters: filtersPayload })
-      setSavedViews((current) => [created, ...current])
-      setFeedback(scope.startsWith('ds-') ? 'Vista DS guardada.' : scope.startsWith('penhoras-') ? 'Vista Penhoras guardada.' : 'Vista guardada.')
-    } catch (error) {
-      setFeedback(
-        error instanceof Error
-          ? error.message
-          : scope.startsWith('ds-')
-            ? 'Falha ao guardar vista DS.'
-            : scope.startsWith('penhoras-')
-              ? 'Falha ao guardar vista Penhoras.'
-              : 'Falha ao guardar vista.',
-      )
-    }
-  }
-
-  async function deleteSavedView(viewId: string) {
-    const confirmed = window.confirm('Eliminar esta vista guardada?')
-    if (!confirmed) return
-
-    try {
-      await api.deleteSavedView(viewId)
-      const nextSavedViews = savedViews.filter((view) => view.id !== viewId)
-      const nextDisabledIds = disabledSavedViewIds.filter((id) => id !== viewId)
-      setSavedViews(nextSavedViews)
-      setDisabledSavedViewIds(nextDisabledIds)
-      if (activeSavedViewId === viewId) {
-        const fallbackView = nextSavedViews
-          .filter((view) => view.scope === 'tabela')
-          .find((view) => !nextDisabledIds.includes(view.id))
-        if (fallbackView) {
-          applyView(fallbackView, { enableIfDisabled: false })
-        } else {
-          clearTableFilters({ silent: true })
-        }
-      }
-      setFeedback('Vista eliminada.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar vista.')
-    }
-  }
-
-  function toggleSavedViewDisabled(viewId: string) {
-    const isDisabled = disabledSavedViewIds.includes(viewId)
-
-    if (isDisabled) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== viewId))
-      const view = tableViews.find((item) => item.id === viewId)
-      if (view) {
-        applyView(view, { enableIfDisabled: false })
-      }
-      return
-    }
-
-    const nextDisabledIds = [...disabledSavedViewIds, viewId]
-    setDisabledSavedViewIds(nextDisabledIds)
-
-    if (activeSavedViewId === viewId) {
-      const fallbackView = tableViews.find((view) => view.id !== viewId && !nextDisabledIds.includes(view.id))
-      if (fallbackView) {
-        applyView(fallbackView, { enableIfDisabled: false })
-      } else {
-        clearTableFilters({ silent: true })
-      }
-    }
-  }
-
-  function clearTableFilters(options?: { silent?: boolean }) {
-    setFilters(DEFAULT_TABLE_FILTERS)
-    setGlobalSearch('')
-    setActiveSavedViewId(null)
-    if (!options?.silent) {
-      setFeedback('Filtros limpos.')
-    }
-  }
-
-  function applyView(view: SavedView, options?: { enableIfDisabled?: boolean }) {
-    const payload = view.filters
-    setActiveSavedViewId(view.id)
-    if (options?.enableIfDisabled ?? true) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== view.id))
-    }
-    setFilters((current) => ({
-      ...current,
-      tipo: (payload.tipo as RecordFilters['tipo']) ?? 'todos',
-      estadoId: (payload.estadoId as RecordFilters['estadoId']) ?? 'todos',
-      mes: (payload.mes as RecordFilters['mes']) ?? 'todos',
-      ano: (payload.ano as RecordFilters['ano']) ?? 'todos',
-      exequente: (payload.exequente as RecordFilters['exequente']) ?? '',
-      gestor: (payload.gestor as RecordFilters['gestor']) ?? '',
-      page: 1,
-    }))
-    setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
-  }
-
-  async function deleteDsSavedView(viewId: string) {
-    const confirmed = window.confirm('Eliminar esta vista DS guardada?')
-    if (!confirmed) return
-
-    try {
-      await api.deleteSavedView(viewId)
-      const nextSavedViews = savedViews.filter((view) => view.id !== viewId)
-      const nextDisabledIds = disabledSavedViewIds.filter((id) => id !== viewId)
-      setSavedViews(nextSavedViews)
-      setDisabledSavedViewIds(nextDisabledIds)
-
-      if (activeDsSavedViewId === viewId) {
-        const fallbackView = nextSavedViews
-          .filter((view) => (view.scope === 'ds-tabela' || view.scope === 'ds-dashboard') && !nextDisabledIds.includes(view.id))
-          .find(Boolean)
-        if (fallbackView) {
-          applyDsView(fallbackView, { enableIfDisabled: false })
-        } else {
-          clearDsFilters({ silent: true })
-        }
-      }
-      setFeedback('Vista DS eliminada.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar vista DS.')
-    }
-  }
-
-  function toggleDsSavedViewDisabled(viewId: string) {
-    const isDisabled = disabledSavedViewIds.includes(viewId)
-    const dsViews = savedViews.filter((view) => view.scope === 'ds-tabela' || view.scope === 'ds-dashboard')
-
-    if (isDisabled) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== viewId))
-      const view = dsViews.find((item) => item.id === viewId)
-      if (view) {
-        applyDsView(view, { enableIfDisabled: false })
-      }
-      return
-    }
-
-    const nextDisabledIds = [...disabledSavedViewIds, viewId]
-    setDisabledSavedViewIds(nextDisabledIds)
-
-    if (activeDsSavedViewId === viewId) {
-      const fallbackView = dsViews.find((view) => view.id !== viewId && !nextDisabledIds.includes(view.id))
-      if (fallbackView) {
-        applyDsView(fallbackView, { enableIfDisabled: false })
-      } else {
-        clearDsFilters({ silent: true })
-      }
-    }
-  }
-
-  function clearDsFilters(options?: { silent?: boolean }) {
-    setDsFilters(DEFAULT_DS_FILTERS)
-    setGlobalSearch('')
-    setActiveDsSavedViewId(null)
-    if (!options?.silent) {
-      setFeedback('Filtros DS limpos.')
-    }
-  }
-
-  function applyDsView(view: SavedView, options?: { enableIfDisabled?: boolean }) {
-    const payload = view.filters
-    setActiveDsSavedViewId(view.id)
-    if (options?.enableIfDisabled ?? true) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== view.id))
-    }
-    setDsFilters(sanitizeDsFilters(payload))
-    if (view.scope === 'ds-dashboard') {
-      const parsedWidgets = parseDsDashboardWidgets((payload as Record<string, unknown>).widgets)
-      if (parsedWidgets.length > 0) {
-        setDsDashboardWidgets(parsedWidgets)
-      }
-    }
-    setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
-  }
-
-  async function deletePenhorasSavedView(viewId: string) {
-    const confirmed = window.confirm('Eliminar esta vista Penhoras guardada?')
-    if (!confirmed) return
-
-    try {
-      await api.deleteSavedView(viewId)
-      const nextSavedViews = savedViews.filter((view) => view.id !== viewId)
-      const nextDisabledIds = disabledSavedViewIds.filter((id) => id !== viewId)
-      setSavedViews(nextSavedViews)
-      setDisabledSavedViewIds(nextDisabledIds)
-
-      if (activePenhorasSavedViewId === viewId) {
-        const fallbackView = nextSavedViews
-          .filter((view) => (view.scope === 'penhoras-tabela' || view.scope === 'penhoras-dashboard') && !nextDisabledIds.includes(view.id))
-          .find(Boolean)
-        if (fallbackView) {
-          applyPenhorasView(fallbackView, { enableIfDisabled: false })
-        } else {
-          clearPenhorasFilters({ silent: true })
-        }
-      }
-      setFeedback('Vista Penhoras eliminada.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar vista Penhoras.')
-    }
-  }
-
-  function togglePenhorasSavedViewDisabled(viewId: string) {
-    const isDisabled = disabledSavedViewIds.includes(viewId)
-    const penhorasViews = savedViews.filter((view) => view.scope === 'penhoras-tabela' || view.scope === 'penhoras-dashboard')
-
-    if (isDisabled) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== viewId))
-      const view = penhorasViews.find((item) => item.id === viewId)
-      if (view) {
-        applyPenhorasView(view, { enableIfDisabled: false })
-      }
-      return
-    }
-
-    const nextDisabledIds = [...disabledSavedViewIds, viewId]
-    setDisabledSavedViewIds(nextDisabledIds)
-
-    if (activePenhorasSavedViewId === viewId) {
-      const fallbackView = penhorasViews.find((view) => view.id !== viewId && !nextDisabledIds.includes(view.id))
-      if (fallbackView) {
-        applyPenhorasView(fallbackView, { enableIfDisabled: false })
-      } else {
-        clearPenhorasFilters({ silent: true })
-      }
-    }
-  }
-
-  function clearPenhorasFilters(options?: { silent?: boolean }) {
-    setPenhorasFilters(DEFAULT_PENHORAS_FILTERS)
-    setGlobalSearch('')
-    setActivePenhorasSavedViewId(null)
-    if (!options?.silent) {
-      setFeedback('Filtros Penhoras limpos.')
-    }
-  }
-
-  function applyPenhorasView(view: SavedView, options?: { enableIfDisabled?: boolean }) {
-    const payload = view.filters
-    setActivePenhorasSavedViewId(view.id)
-    if (options?.enableIfDisabled ?? true) {
-      setDisabledSavedViewIds((current) => current.filter((id) => id !== view.id))
-    }
-    setPenhorasFilters(sanitizePenhorasFilters(payload))
-    if (view.scope === 'penhoras-dashboard') {
-      const parsedWidgets = parsePenhorasDashboardWidgets((payload as Record<string, unknown>).widgets)
-      if (parsedWidgets.length > 0) {
-        setPenhorasDashboardWidgets(parsedWidgets)
-      }
-    }
-    setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
-  }
-
   function toggleTotalMetric(metric: TotalMetricKey) {
     setSelectedTotalMetrics((current) => {
       if (current.includes(metric)) {
@@ -4526,76 +3437,6 @@ function App() {
     )
   }
 
-  function toggleQuickTool(tool: QuickToolId) {
-    setToolsExpanded(true)
-    const isOpen = tool === 'notes' ? notesOpen : tool === 'calculator' ? calculatorOpen : smartNotesOpen
-    if (isOpen) {
-      if (tool === 'notes') {
-        setNotesOpen(false)
-      } else if (tool === 'calculator') {
-        setCalculatorOpen(false)
-      } else {
-        setSmartNotesOpen(false)
-      }
-      if (draggingTool === tool) {
-        toolDragRef.current = null
-        setDraggingTool(null)
-      }
-      return
-    }
-
-    if (tool === 'notes') {
-      setNotesOpen(true)
-    } else if (tool === 'calculator') {
-      setCalculatorOpen(true)
-    } else {
-      setSmartNotesOpen(true)
-    }
-
-    setToolLayers((current) => {
-      const nextLayer = toolLayerRef.current++
-      return { ...current, [tool]: nextLayer }
-    })
-  }
-
-  function toggleQuickToolPinned(tool: QuickToolId) {
-    setToolPinned((current) => ({ ...current, [tool]: !current[tool] }))
-    setToolLayers((current) => {
-      const nextLayer = toolLayerRef.current++
-      return { ...current, [tool]: nextLayer }
-    })
-  }
-
-  function bringToolToFront(tool: QuickToolId) {
-    setToolLayers((current) => {
-      const nextLayer = toolLayerRef.current++
-      return { ...current, [tool]: nextLayer }
-    })
-  }
-
-  function getToolWindowElement(tool: QuickToolId): HTMLDivElement | null {
-    if (tool === 'notes') return notesWindowRef.current
-    if (tool === 'calculator') return calculatorWindowRef.current
-    return smartNotesWindowRef.current
-  }
-
-  function startToolWindowDrag(tool: QuickToolId, event: ReactMouseEvent<HTMLDivElement>) {
-    if (event.button !== 0) return
-    const element = getToolWindowElement(tool)
-    if (!element) return
-
-    bringToolToFront(tool)
-    const rect = element.getBoundingClientRect()
-    setToolPositions((current) => ({ ...current, [tool]: { x: rect.left, y: rect.top } }))
-    toolDragRef.current = {
-      tool,
-      pointerOffsetX: event.clientX - rect.left,
-      pointerOffsetY: event.clientY - rect.top,
-    }
-    setDraggingTool(tool)
-    event.preventDefault()
-  }
-
   function clearCalculator() {
     setCalculatorExpression('')
     setCalculatorResult(null)
@@ -4611,46 +3452,6 @@ function App() {
     setCalculatorExpression((current) => current.slice(0, -1))
     setCalculatorError('')
   }
-
-  const evaluateCalculator = useCallback(() => {
-    const normalized = calculatorExpression
-      .replace(/,/g, '.')
-      .replace(/[×x]/g, '*')
-      .replace(/[÷]/g, '/')
-      .trim()
-
-    if (!normalized) {
-      setCalculatorResult(null)
-      setCalculatorError('')
-      return
-    }
-
-    if (!/^[0-9+\-*/().\s%]+$/.test(normalized)) {
-      setCalculatorError('Expressão inválida.')
-      setCalculatorResult(null)
-      return
-    }
-
-    const expressionWithPercent = normalized.replace(/(\d+(\.\d+)?)%/g, '($1/100)')
-
-    try {
-      const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
-      if (typeof computed !== 'number' || !Number.isFinite(computed)) {
-        setCalculatorError('Resultado inválido.')
-        setCalculatorResult(null)
-        return
-      }
-      setCalculatorError('')
-      setCalculatorResult(
-        new Intl.NumberFormat('pt-PT', {
-          maximumFractionDigits: 6,
-        }).format(computed),
-      )
-    } catch {
-      setCalculatorError('Não foi possível calcular.')
-      setCalculatorResult(null)
-    }
-  }, [calculatorExpression])
 
   function handleCalculatorKeyPress(key: CalculatorKey) {
     if (key.action === 'clear') {
@@ -4669,41 +3470,6 @@ function App() {
       appendCalculatorValue(key.value)
     }
   }
-
-  useEffect(() => {
-    if (!draggingTool) return
-
-    function handleToolWindowMouseMove(event: MouseEvent) {
-      const dragState = toolDragRef.current
-      if (!dragState) return
-      const element = getToolWindowElement(dragState.tool)
-      if (!element) return
-
-      const margin = 10
-      const width = element.offsetWidth
-      const height = element.offsetHeight
-      const maxX = Math.max(margin, window.innerWidth - width - margin)
-      const maxY = Math.max(margin, window.innerHeight - height - margin)
-      const rawX = event.clientX - dragState.pointerOffsetX
-      const rawY = event.clientY - dragState.pointerOffsetY
-      const nextX = Math.min(maxX, Math.max(margin, rawX))
-      const nextY = Math.min(maxY, Math.max(margin, rawY))
-
-      setToolPositions((current) => ({ ...current, [dragState.tool]: { x: nextX, y: nextY } }))
-    }
-
-    function stopToolWindowDrag() {
-      toolDragRef.current = null
-      setDraggingTool(null)
-    }
-
-    window.addEventListener('mousemove', handleToolWindowMouseMove)
-    window.addEventListener('mouseup', stopToolWindowDrag, { once: true })
-    return () => {
-      window.removeEventListener('mousemove', handleToolWindowMouseMove)
-      window.removeEventListener('mouseup', stopToolWindowDrag)
-    }
-  }, [draggingTool])
 
   useEffect(() => {
     if (!notesOpen && !calculatorOpen && !smartNotesOpen) return
@@ -4740,6 +3506,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleQuickToolKeyboard)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notesOpen, calculatorOpen, smartNotesOpen, evaluateCalculator, toolLayers])
 
   function switchModule(nextModule: ModuleId) {
@@ -4756,7 +3523,7 @@ function App() {
         className="subtle-btn icon-btn"
         type="button"
         disabled={!latestUndo}
-        onClick={() => void runUndo()}
+        onClick={() => void handleUndo()}
         title={latestUndo ? `Anular: ${latestUndo.label}` : 'Sem ações para anular'}
         aria-label={latestUndo ? `Anular: ${latestUndo.label}` : 'Sem ações para anular'}
       >
@@ -4830,9 +3597,6 @@ function App() {
   ))
 
   const isDashboardFocusMode = activeTab === 'dashboards' && dashboardFocusMode
-  const notesWindowZIndex = (toolPinned.notes ? 2600 : 1700) + toolLayers.notes
-  const calculatorWindowZIndex = (toolPinned.calculator ? 2600 : 1700) + toolLayers.calculator
-  const smartNotesWindowZIndex = (toolPinned['smart-notes'] ? 2600 : 1700) + toolLayers['smart-notes']
 
   if (bootstrapLoading) {
     return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">A carregar aplicação...</div></div>
