@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 
 import { jsPDF } from 'jspdf'
-import type { LucideIcon } from 'lucide-react'
 import {
   AlertTriangle,
   Ban,
@@ -10,7 +9,6 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
-  Download,
   Eye,
   EyeOff,
   FilterX,
@@ -75,6 +73,12 @@ import { useSmartNotes } from './hooks/useSmartNotes'
 import { useSavedViews } from './hooks/useSavedViews'
 import { useDashboard } from './hooks/useDashboard'
 import { useBootstrap } from './hooks/useBootstrap'
+import { DsConfiguracao } from './components/ds/DsConfiguracao'
+import { PenhorasConfiguracao } from './components/penhoras/PenhorasConfiguracao'
+import { RecibosConfiguracao } from './components/recibos/RecibosConfiguracao'
+import { DsImportar } from './components/ds/DsImportar'
+import { PenhorasImportar } from './components/penhoras/PenhorasImportar'
+import { RecibosImportar } from './components/recibos/RecibosImportar'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'entrada', label: 'Entrada' },
@@ -234,20 +238,6 @@ type TotalMetricKey =
   | 'outrasTaxas'
   | 'levantadoComIva'
 
-const THEME_OPTIONS: Array<{ id: ThemeId; label: string }> = [
-  { id: 'light', label: 'Claro (Legacy)' },
-  { id: 'dark', label: 'Escuro (Legacy)' },
-  { id: 'tokyo-day', label: 'Tokio Day (Legacy)' },
-  { id: 'tokyo-night', label: 'Tokio Night (Legacy)' },
-  { id: 'synthwave-84', label: "SynthWave '84 (Legacy)" },
-  { id: 'one-dark-pro', label: 'One Dark Pro' },
-  { id: 'night-owl', label: 'Night Owl' },
-  { id: 'atom-one-light', label: 'Atom One Light' },
-  { id: 'github-light', label: 'GitHub Light' },
-  { id: 'github-dark', label: 'GitHub Dark' },
-  { id: 'github-gray', label: 'GitHub Gray' },
-]
-
 const TOTAL_METRIC_OPTIONS: Array<{ key: TotalMetricKey; label: string; currency?: boolean }> = [
   { key: 'registos', label: 'N.º de registos' },
   { key: 'valorIndicado', label: 'Valor indicado', currency: true },
@@ -383,20 +373,7 @@ const EXEQUENTE_KEYWORD_DOMAIN: Array<{ keyword: string; domain: string }> = [
   { keyword: 'NOS', domain: 'nos.pt' },
 ]
 
-const STATUS_ICON_OPTIONS: { value: string; label: string; icon: LucideIcon }[] = [
-  { value: 'hammer', label: 'Martelo', icon: Hammer },
-  { value: 'clock3', label: 'Relógio', icon: Clock3 },
-  { value: 'search-check', label: 'Validação', icon: SearchCheck },
-  { value: 'receipt-text', label: 'Recibo', icon: ReceiptText },
-  { value: 'octagon-alert', label: 'Bloqueado', icon: OctagonAlert },
-  { value: 'check-circle2', label: 'Concluído', icon: CheckCircle2 },
-  { value: 'shield-alert', label: 'Alerta', icon: ShieldAlert },
-  { value: 'file-search', label: 'Pesquisa', icon: FileSearch },
-  { value: 'file-clock', label: 'Pendente', icon: FileClock },
-  { value: 'ban', label: 'Cancelado', icon: Ban },
-  { value: 'alert-triangle', label: 'Aviso', icon: AlertTriangle },
-  { value: 'circle', label: 'Sem estado', icon: Circle },
-]
+
 
 function normalizeText(value: unknown): string {
   if (value === null || value === undefined) return ''
@@ -4566,79 +4543,27 @@ function App() {
         )}
 
         {activeModule === 'ds' && activeTab === 'importar' && (
-          <section className="panel ds-panel ds-import-panel">
-            <h2>Importar DS</h2>
-            <p className="small-note">Importação da folha de escrituras concretizadas com preview e conflitos.</p>
-            <div className="import-box">
-              <input type="file" accept=".xlsx" onChange={(event) => void handleDsImportFile(event)} />
-              <div className="actions-row start">
-                <button className="subtle-btn" type="button" onClick={() => void refreshDsImportPreview()}>
-                  Rever conflitos DS
-                </button>
-                <LabeledSelect
-                  label="Estratégia"
-                  value={dsImportStrategy}
-                  onChange={(value) => setDsImportStrategy(value as 'skip' | 'update' | 'duplicate')}
-                  options={[
-                    { value: 'update', label: 'Atualizar existentes' },
-                    { value: 'skip', label: 'Ignorar duplicados' },
-                    { value: 'duplicate', label: 'Criar duplicado' },
-                  ]}
-                />
-                <button className="primary-btn" type="button" onClick={() => void runDsImportCommit()} disabled={!dsImportPreview || dsImportLoading}>
-                  Confirmar importação DS
-                </button>
-              </div>
-              {dsImportLoading && <div className="small-note">A processar ficheiro DS...</div>}
-            </div>
-            {dsImportServerPreview && (
-              <div className="import-summary">
-                <span>Total: {dsImportServerPreview.summary.total}</span>
-                <span>Válidas: {dsImportServerPreview.summary.valid}</span>
-                <span>Conflitos: {dsImportServerPreview.summary.conflicts}</span>
-                <span>Novas: {dsImportServerPreview.summary.creates}</span>
-                <span>Inválidas: {dsImportServerPreview.summary.invalid}</span>
-              </div>
-            )}
-          </section>
+          <DsImportar
+            handleDsImportFile={handleDsImportFile}
+            refreshDsImportPreview={refreshDsImportPreview}
+            runDsImportCommit={runDsImportCommit}
+            dsImportLoading={dsImportLoading}
+            dsImportStrategy={dsImportStrategy}
+            setDsImportStrategy={setDsImportStrategy}
+            dsImportPreview={dsImportPreview}
+            dsImportServerPreview={dsImportServerPreview}
+          />
         )}
 
         {activeModule === 'ds' && activeTab === 'configuracao' && (
-          <section className="panel ds-panel ds-settings-panel">
-            <h2>Configuração DS</h2>
-            <p className="small-note">Estados independentes do módulo de recibos.</p>
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => setActiveTab('importar')}>
-                Importar DS
-              </button>
-            </div>
-            <div className="status-list">
-              {dsOrderedStatuses.map((status) => (
-                <div key={status.id} className="status-item">
-                  <span className="status-icon-preview">
-                    <StatusIcon name={status.icon} size={16} />
-                  </span>
-                  <select className="status-icon" value={status.icon} onChange={(event) => updateDsStatusLocal(status.id, { icon: event.target.value })}>
-                    {STATUS_ICON_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <input value={status.label} onChange={(event) => updateDsStatusLocal(status.id, { label: event.target.value })} />
-                  <input type="color" value={toColor(status.color)} onChange={(event) => updateDsStatusLocal(status.id, { color: event.target.value })} />
-                  <input type="number" className="small-number" value={status.order} onChange={(event) => updateDsStatusLocal(status.id, { order: Number(event.target.value) || 0 })} />
-                  <label className="inline-check">
-                    <input type="checkbox" checked={status.active} onChange={(event) => updateDsStatusLocal(status.id, { active: event.target.checked })} />
-                    Ativo
-                  </label>
-                  <button className="danger-link" type="button" onClick={() => void removeDsStatus(status.id)}>Remover</button>
-                </div>
-              ))}
-            </div>
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => void addDsStatus()}>Novo estado DS</button>
-              <button className="subtle-btn" type="button" onClick={() => void saveDsStatuses()}>Guardar estados DS</button>
-            </div>
-          </section>
+          <DsConfiguracao
+            dsOrderedStatuses={dsOrderedStatuses}
+            updateDsStatusLocal={updateDsStatusLocal}
+            removeDsStatus={removeDsStatus}
+            addDsStatus={addDsStatus}
+            saveDsStatuses={saveDsStatuses}
+            setActiveTab={setActiveTab}
+          />
         )}
 
         {activeModule === 'penhoras' && activeTab === 'entrada' && (
@@ -5190,95 +5115,27 @@ function App() {
         )}
 
         {activeModule === 'penhoras' && activeTab === 'importar' && (
-          <section className="panel ds-panel penhoras-panel ds-import-panel">
-            <h2>Importar Penhoras</h2>
-            <p className="small-note">Importação dedicada de penhoras com pré-visualização e resolução de conflitos.</p>
-            <div className="import-box">
-              <input type="file" accept=".xlsx" onChange={(event) => void handlePenhorasImportFile(event)} />
-              <div className="actions-row start">
-                <button className="subtle-btn" type="button" onClick={() => void refreshPenhorasImportPreview()}>
-                  Rever conflitos Penhoras
-                </button>
-                <LabeledSelect
-                  label="Estratégia"
-                  value={penhorasImportStrategy}
-                  onChange={(value) => setPenhorasImportStrategy(value as 'skip' | 'update' | 'duplicate')}
-                  options={[
-                    { value: 'update', label: 'Atualizar existentes' },
-                    { value: 'skip', label: 'Ignorar duplicados' },
-                    { value: 'duplicate', label: 'Criar duplicado' },
-                  ]}
-                />
-                <button
-                  className="primary-btn"
-                  type="button"
-                  onClick={() => void runPenhorasImportCommit()}
-                  disabled={!penhorasImportPreview || penhorasImportLoading}
-                >
-                  Confirmar importação Penhoras
-                </button>
-              </div>
-              {penhorasImportLoading && <div className="small-note">A processar ficheiro Penhoras...</div>}
-            </div>
-            {penhorasImportPreview && (
-              <div className="import-summary">
-                <span>Ficheiro: {penhorasImportPreview.fileName}</span>
-                <span>Linhas: {penhorasImportPreview.rows.length}</span>
-              </div>
-            )}
-            {penhorasImportServerPreview && (
-              <div className="import-summary">
-                <span>Total: {penhorasImportServerPreview.summary.total}</span>
-                <span>Válidas: {penhorasImportServerPreview.summary.valid}</span>
-                <span>Conflitos: {penhorasImportServerPreview.summary.conflicts}</span>
-                <span>Novas: {penhorasImportServerPreview.summary.creates}</span>
-                <span>Inválidas: {penhorasImportServerPreview.summary.invalid}</span>
-              </div>
-            )}
-          </section>
+          <PenhorasImportar
+            handlePenhorasImportFile={handlePenhorasImportFile}
+            refreshPenhorasImportPreview={refreshPenhorasImportPreview}
+            runPenhorasImportCommit={runPenhorasImportCommit}
+            penhorasImportLoading={penhorasImportLoading}
+            penhorasImportStrategy={penhorasImportStrategy}
+            setPenhorasImportStrategy={setPenhorasImportStrategy}
+            penhorasImportPreview={penhorasImportPreview}
+            penhorasImportServerPreview={penhorasImportServerPreview}
+          />
         )}
 
         {activeModule === 'penhoras' && activeTab === 'configuracao' && (
-          <section className="panel ds-panel penhoras-panel ds-settings-panel">
-            <h2>Configuração Penhoras</h2>
-            <p className="small-note">Estados e importação dedicados ao módulo Penhoras.</p>
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => setActiveTab('importar')}>
-                Importar Penhoras
-              </button>
-            </div>
-            <div className="status-list">
-              {penhorasOrderedStatuses.map((status) => (
-                <div key={status.id} className="status-item">
-                  <span className="status-icon-preview">
-                    <StatusIcon name={status.icon} size={16} />
-                  </span>
-                  <select className="status-icon" value={status.icon} onChange={(event) => updatePenhorasStatusLocal(status.id, { icon: event.target.value })}>
-                    {STATUS_ICON_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <input value={status.label} onChange={(event) => updatePenhorasStatusLocal(status.id, { label: event.target.value })} />
-                  <input type="color" value={toColor(status.color)} onChange={(event) => updatePenhorasStatusLocal(status.id, { color: event.target.value })} />
-                  <input
-                    type="number"
-                    className="small-number"
-                    value={status.order}
-                    onChange={(event) => updatePenhorasStatusLocal(status.id, { order: Number(event.target.value) || 0 })}
-                  />
-                  <label className="inline-check">
-                    <input type="checkbox" checked={status.active} onChange={(event) => updatePenhorasStatusLocal(status.id, { active: event.target.checked })} />
-                    Ativo
-                  </label>
-                  <button className="danger-link" type="button" onClick={() => void removePenhorasStatus(status.id)}>Remover</button>
-                </div>
-              ))}
-            </div>
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => void addPenhorasStatus()}>Novo estado Penhoras</button>
-              <button className="subtle-btn" type="button" onClick={() => void savePenhorasStatuses()}>Guardar estados Penhoras</button>
-            </div>
-          </section>
+          <PenhorasConfiguracao
+            penhorasOrderedStatuses={penhorasOrderedStatuses}
+            updatePenhorasStatusLocal={updatePenhorasStatusLocal}
+            removePenhorasStatus={removePenhorasStatus}
+            addPenhorasStatus={addPenhorasStatus}
+            savePenhorasStatuses={savePenhorasStatuses}
+            setActiveTab={setActiveTab}
+          />
         )}
 
         {activeModule === 'recibos' && activeTab === 'entrada' && (
@@ -5985,209 +5842,41 @@ function App() {
         )}
 
         {activeModule === 'recibos' && activeTab === 'importar' && (
-          <section className="panel">
-            <h2>Importar ficheiro</h2>
-            <p className="small-note">Preview com conflitos e estratégia: ignorar, atualizar ou duplicar.</p>
-
-            <div className="import-box">
-              <input type="file" accept=".xlsx" onChange={(event) => void handleImportFile(event)} />
-              <div className="actions-row start">
-                <button className="subtle-btn" type="button" onClick={() => void exportCurrentSnapshot()}>
-                  <Download size={15} />
-                  Exportar snapshot atual
-                </button>
-                <button className="subtle-btn" type="button" onClick={() => void loadSeed(false)}>Carregar seed sem substituir</button>
-                <button className="subtle-btn" type="button" onClick={() => void loadSeed(true)}>Substituir por seed</button>
-              </div>
-              {importLoading && <div className="small-note">A processar ficheiro...</div>}
-            </div>
-
-            {importPreview && (
-              <>
-                <div className="import-meta">
-                  <div><strong>Ficheiro:</strong> {importPreview.fileName}</div>
-                  <div><strong>Linhas:</strong> {importPreview.rows.length}</div>
-                  <div><strong>Cores:</strong> {Object.keys(importPreview.colorCount).length}</div>
-                </div>
-
-                <div className="import-map-list">
-                  {Object.entries(importPreview.colorCount).map(([colorKey, count]) => (
-                    <div key={colorKey} className="import-map-item">
-                      <div className="color-cell">
-                        <span className="color-dot" style={{ backgroundColor: colorKey.startsWith('#') ? colorKey : '#BFC4CC' }} />
-                        <span>{colorKey}</span>
-                        <span className="muted">{count} linhas</span>
-                      </div>
-                      <select
-                        value={importColorMapping[colorKey] ?? defaultStatus?.id ?? ''}
-                        onChange={(event) => setImportColorMapping((current) => ({ ...current, [colorKey]: event.target.value }))}
-                      >
-                        {orderedStatuses.map((status) => (
-                          <option key={status.id} value={status.id}>{status.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="actions-row start wrap">
-                  <button className="subtle-btn" type="button" onClick={() => void refreshImportConflictPreview()}>
-                    Rever conflitos
-                  </button>
-                  <label className="inline-check">
-                    <input type="checkbox" checked={importForceRecalculate} onChange={(event) => setImportForceRecalculate(event.target.checked)} />
-                    Forçar recálculo fiscal
-                  </label>
-                  <LabeledSelect
-                    label="Estratégia de conflito"
-                    value={importStrategy}
-                    onChange={(value) => setImportStrategy(value as 'skip' | 'update' | 'duplicate')}
-                    options={[
-                      { value: 'update', label: 'Atualizar existentes' },
-                      { value: 'skip', label: 'Ignorar duplicados' },
-                      { value: 'duplicate', label: 'Criar duplicado' },
-                    ]}
-                  />
-                  <button className="primary-btn" type="button" onClick={() => void runImportCommit()}>
-                    Confirmar importação
-                  </button>
-                </div>
-
-                {importServerPreview && (
-                  <div className="import-summary">
-                    <span>Total: {importServerPreview.summary.total}</span>
-                    <span>Válidas: {importServerPreview.summary.valid}</span>
-                    <span>Conflitos: {importServerPreview.summary.conflicts}</span>
-                    <span>Novas: {importServerPreview.summary.creates}</span>
-                    <span>Inválidas: {importServerPreview.summary.invalid}</span>
-                  </div>
-                )}
-              </>
-            )}
-          </section>
+          <RecibosImportar
+            handleImportFile={handleImportFile}
+            exportCurrentSnapshot={exportCurrentSnapshot}
+            loadSeed={loadSeed}
+            refreshImportConflictPreview={refreshImportConflictPreview}
+            runImportCommit={runImportCommit}
+            importLoading={importLoading}
+            importForceRecalculate={importForceRecalculate}
+            setImportForceRecalculate={setImportForceRecalculate}
+            importStrategy={importStrategy}
+            setImportStrategy={setImportStrategy}
+            importPreview={importPreview}
+            importServerPreview={importServerPreview}
+            importColorMapping={importColorMapping}
+            setImportColorMapping={setImportColorMapping}
+            orderedStatuses={orderedStatuses}
+            defaultStatus={defaultStatus}
+          />
         )}
 
         {activeModule === 'recibos' && activeTab === 'configuracao' && (
-          <section className="panel">
-            <h2>Configuração</h2>
-            <p className="small-note">Estados, regras de cálculo fiscal e comissões configuráveis.</p>
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => setActiveTab('importar')}>
-                Importar ficheiro
-              </button>
-            </div>
-
-            <h3>Tema</h3>
-            <div className="theme-select-wrap">
-              <label className="field">
-                <span>Selecionar tema</span>
-                <select value={theme} onChange={(event) => setTheme(event.target.value as ThemeId)}>
-                  {THEME_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <h3>Estados</h3>
-            <div className="status-list">
-              {orderedStatuses.map((status) => (
-                <div key={status.id} className="status-item">
-                  <span className="status-icon-preview">
-                    <StatusIcon name={status.icon} size={16} />
-                  </span>
-                  <select className="status-icon" value={status.icon} onChange={(event) => updateStatusLocal(status.id, { icon: event.target.value })}>
-                    {STATUS_ICON_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  <input value={status.label} onChange={(event) => updateStatusLocal(status.id, { label: event.target.value })} />
-                  <input type="color" value={toColor(status.color)} onChange={(event) => updateStatusLocal(status.id, { color: event.target.value })} />
-                  <input type="number" className="small-number" value={status.order} onChange={(event) => updateStatusLocal(status.id, { order: Number(event.target.value) || 0 })} />
-                  <label className="inline-check">
-                    <input type="checkbox" checked={status.active} onChange={(event) => updateStatusLocal(status.id, { active: event.target.checked })} />
-                    Ativo
-                  </label>
-                  <button className="danger-link" type="button" onClick={() => void removeStatus(status.id)}>Remover</button>
-                </div>
-              ))}
-            </div>
-
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={() => void addStatus()}>Novo estado</button>
-              <button className="subtle-btn" type="button" onClick={() => void saveStatuses()}>Guardar estados</button>
-            </div>
-
-            <h3>Auto-cálculo</h3>
-            <div className="field-grid four">
-              <label className="inline-check">
-                <input type="checkbox" checked={settingsDraft.autoApplyRules} onChange={(event) => updateSettingsDraft({ autoApplyRules: event.target.checked })} />
-                Aplicar regras automaticamente
-              </label>
-              <label className="inline-check">
-                <input type="checkbox" checked={settingsDraft.autoComputeValorSemIva} onChange={(event) => updateSettingsDraft({ autoComputeValorSemIva: event.target.checked })} />
-                Calcular valor sem IVA
-              </label>
-              <label className="inline-check">
-                <input type="checkbox" checked={settingsDraft.autoComputeValorEmissao} onChange={(event) => updateSettingsDraft({ autoComputeValorEmissao: event.target.checked })} />
-                Calcular valor emissão
-              </label>
-              <label className="field">
-                <span>Casas decimais</span>
-                <input type="number" value={settingsDraft.roundTo} onChange={(event) => updateSettingsDraft({ roundTo: Number(event.target.value) || 2 })} />
-              </label>
-            </div>
-
-            <div className="rules-table">
-              <table className="rules-grid-table">
-                <thead>
-                  <tr>
-                    <th>Regra</th>
-                    <th>Taxa</th>
-                    <th>Campo base</th>
-                    <th>Campo destino</th>
-                    <th>Ativa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {settingsDraft.taxRules.map((rule) => (
-                    <tr key={rule.id}>
-                      <td>
-                        <input value={rule.label} onChange={(event) => updateTaxRule(rule.id, { label: event.target.value })} />
-                      </td>
-                      <td>
-                        <input type="number" step="0.0001" value={rule.rate} onChange={(event) => updateTaxRule(rule.id, { rate: Number(event.target.value) || 0 })} />
-                      </td>
-                      <td>
-                        <select value={rule.baseField} onChange={(event) => updateTaxRule(rule.id, { baseField: event.target.value as TaxRule['baseField'] })}>
-                          <option value="valorSemIva">Valor sem IVA</option>
-                          <option value="valorIndicado">Valor indicado</option>
-                          <option value="valorEmissao">Valor emissão</option>
-                        </select>
-                      </td>
-                      <td>
-                        <select value={rule.targetField} onChange={(event) => updateTaxRule(rule.id, { targetField: event.target.value as TaxRule['targetField'] })}>
-                          <option value="iva">IVA</option>
-                          <option value="retencao">Retenção</option>
-                          <option value="meu5">Meu 5%</option>
-                          <option value="outrasTaxas">Outras taxas</option>
-                        </select>
-                      </td>
-                      <td>
-                        <input type="checkbox" checked={rule.enabled} onChange={(event) => updateTaxRule(rule.id, { enabled: event.target.checked })} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="actions-row start">
-              <button className="primary-btn" type="button" onClick={() => void saveCalculationSettings()}>Guardar cálculos</button>
-            </div>
-          </section>
+          <RecibosConfiguracao
+            theme={theme}
+            setTheme={setTheme}
+            orderedStatuses={orderedStatuses}
+            updateStatusLocal={updateStatusLocal}
+            removeStatus={removeStatus}
+            addStatus={addStatus}
+            saveStatuses={saveStatuses}
+            settingsDraft={settingsDraft}
+            updateSettingsDraft={updateSettingsDraft}
+            updateTaxRule={updateTaxRule}
+            saveCalculationSettings={saveCalculationSettings}
+            setActiveTab={setActiveTab}
+          />
         )}
 
         {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
@@ -6788,14 +6477,6 @@ function StatusPill({ status, compact }: StatusPillProps) {
   )
 }
 
-type StatusIconProps = {
-  name: string
-  size?: number
-}
-
-function StatusIcon({ name, size = 14 }: StatusIconProps) {
-  return renderStatusIcon(name, size)
-}
 
 type ExequenteLogoProps = {
   name?: string
