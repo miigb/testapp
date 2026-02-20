@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import { jsPDF } from 'jspdf'
 import type { LucideIcon } from 'lucide-react'
 import {
   AlertTriangle,
   Ban,
+  Calculator,
   CheckCircle2,
   Circle,
   Clock3,
@@ -17,6 +19,8 @@ import {
   GripVertical,
   Maximize2,
   Minimize2,
+  Pin,
+  PinOff,
   Plus,
   Minus,
   OctagonAlert,
@@ -25,20 +29,32 @@ import {
   Save,
   SearchCheck,
   ShieldAlert,
+  SquareFunction,
+  StickyNote,
   Trash2,
   Undo2,
   UserRound,
+  Wrench,
   X,
 } from 'lucide-react'
 
 import { api } from './api'
 import { applyFormAutoCalculations, parseFormNumber } from './lib/calculations'
-import { parseImportedWorkbook } from './lib/importParser'
+import { parseDsWorkbook, parseImportedWorkbook, parsePenhorasWorkbook } from './lib/importParser'
 import type {
   AnalyticsSummary,
   CalculationSettings,
+  DsEntryForm,
+  DsParsedImport,
+  DsRecord,
+  DsRecordFilters,
   EntryForm,
   ImportPreviewResponse,
+  ModuleId,
+  PenhorasEntryForm,
+  PenhorasParsedImport,
+  PenhorasRecord,
+  PenhorasRecordFilters,
   ParsedImport,
   RecordSuggestions,
   ReceiptRecord,
@@ -78,6 +94,23 @@ const DEFAULT_DASHBOARD_FILTERS: RecordFilters = {
   pageSize: 300,
 }
 
+const DEFAULT_DS_FILTERS: DsRecordFilters = {
+  estadoId: 'todos',
+  reciboEstado: 'todos',
+  ano: 'todos',
+  mes: 'todos',
+  page: 1,
+  pageSize: 300,
+}
+
+const DEFAULT_PENHORAS_FILTERS: PenhorasRecordFilters = {
+  estadoId: 'todos',
+  ano: 'todos',
+  mes: 'todos',
+  page: 1,
+  pageSize: 300,
+}
+
 type DashboardWidgetType =
   | 'kpi-registos'
   | 'kpi-valor-sem-iva'
@@ -92,6 +125,7 @@ type DashboardWidgetType =
 
 type DashboardWidgetSize = 'kpi' | 'normal' | 'wide'
 type DashboardWidgetColumn = 'main' | 'side'
+type DashboardWidgetScope = 'recibos' | 'ds' | 'penhoras'
 
 type DashboardWidget = {
   id: string
@@ -120,6 +154,63 @@ const DASHBOARD_WIDGET_LIBRARY: Array<{ type: DashboardWidgetType; label: string
   { type: 'list-top-exequentes', label: 'Top exequentes', hint: 'Ranking' },
 ]
 
+type DsDashboardWidgetType = 'ds-status' | 'ds-top-gestoras' | 'ds-top-entidades' | 'ds-mensal' | 'ds-recibos'
+type PenhorasDashboardWidgetType = 'penhoras-status' | 'penhoras-top-gestores' | 'penhoras-mensal'
+
+const DS_DASHBOARD_WIDGET_LIBRARY: Array<{ type: DsDashboardWidgetType; label: string; hint: string }> = [
+  { type: 'ds-status', label: 'Estado DS', hint: 'Distribuição por estado' },
+  { type: 'ds-top-gestoras', label: 'Top gestoras', hint: 'Ranking por volume' },
+  { type: 'ds-top-entidades', label: 'Top entidades', hint: 'Ranking por volume' },
+  { type: 'ds-mensal', label: 'Tendência mensal', hint: 'Últimos 12 meses' },
+  { type: 'ds-recibos', label: 'Recibos', hint: 'KPI de recibos/comissões' },
+]
+
+const PENHORAS_DASHBOARD_WIDGET_LIBRARY: Array<{ type: PenhorasDashboardWidgetType; label: string; hint: string }> = [
+  { type: 'penhoras-status', label: 'Estado Penhoras', hint: 'Distribuição por estado' },
+  { type: 'penhoras-top-gestores', label: 'Top gestores', hint: 'Ranking por volume' },
+  { type: 'penhoras-mensal', label: 'Tendência mensal', hint: 'Últimos 12 meses' },
+]
+
+type DsDashboardWidget = {
+  id: string
+  type: DsDashboardWidgetType
+  size: DashboardWidgetSize
+  minHeight: number
+  column: DashboardWidgetColumn
+  colSpan: number
+}
+
+type PenhorasDashboardWidget = {
+  id: string
+  type: PenhorasDashboardWidgetType
+  size: DashboardWidgetSize
+  minHeight: number
+  column: DashboardWidgetColumn
+  colSpan: number
+}
+
+const DEFAULT_DS_DASHBOARD_WIDGETS: DsDashboardWidget[] = [
+  { id: 'ds-status', type: 'ds-status', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
+  { id: 'ds-top-gestoras', type: 'ds-top-gestoras', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
+  { id: 'ds-top-entidades', type: 'ds-top-entidades', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
+  { id: 'ds-mensal', type: 'ds-mensal', size: 'wide', minHeight: 220, column: 'main', colSpan: 2 },
+  { id: 'ds-recibos', type: 'ds-recibos', size: 'kpi', minHeight: 180, column: 'side', colSpan: 1 },
+]
+
+const DEFAULT_PENHORAS_DASHBOARD_WIDGETS: PenhorasDashboardWidget[] = [
+  { id: 'penhoras-status', type: 'penhoras-status', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
+  { id: 'penhoras-top-gestores', type: 'penhoras-top-gestores', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
+  { id: 'penhoras-mensal', type: 'penhoras-mensal', size: 'wide', minHeight: 220, column: 'main', colSpan: 2 },
+]
+
+function cloneDefaultDsDashboardWidgets(): DsDashboardWidget[] {
+  return DEFAULT_DS_DASHBOARD_WIDGETS.map((widget) => ({ ...widget }))
+}
+
+function cloneDefaultPenhorasDashboardWidgets(): PenhorasDashboardWidget[] {
+  return DEFAULT_PENHORAS_DASHBOARD_WIDGETS.map((widget) => ({ ...widget }))
+}
+
 type ThemeId =
   | 'light'
   | 'dark'
@@ -133,6 +224,33 @@ type ThemeId =
   | 'github-dark'
   | 'github-gray'
 type LayoutMode = 'narrow' | 'wide'
+type QuickToolId = 'notes' | 'calculator' | 'smart-notes'
+type CalculatorKey = {
+  label: string
+  value?: string
+  action?: 'clear' | 'backspace' | 'equals'
+  tone?: 'default' | 'muted' | 'accent'
+  wide?: boolean
+}
+type SmartNotesResultRow = {
+  lineNumber: number
+  source: string
+  expression: string
+  result: number
+  signature: string
+}
+type SmartNotesErrorRow = {
+  lineNumber: number
+  source: string
+  error: string
+}
+type SavedSmartNotesEntry = {
+  signature: string
+  expression: string
+  result: number
+  source: string
+  savedAt: string
+}
 type TotalMetricKey =
   | 'registos'
   | 'valorIndicado'
@@ -170,33 +288,49 @@ const TOTAL_METRIC_OPTIONS: Array<{ key: TotalMetricKey; label: string; currency
   { key: 'levantadoComIva', label: 'Levantado c/ IVA', currency: true },
 ]
 
+const CALCULATOR_KEYS: CalculatorKey[] = [
+  { label: 'AC', action: 'clear', tone: 'muted' },
+  { label: '⌫', action: 'backspace', tone: 'muted' },
+  { label: '%', value: '%', tone: 'muted' },
+  { label: '÷', value: '/', tone: 'muted' },
+  { label: '7', value: '7' },
+  { label: '8', value: '8' },
+  { label: '9', value: '9' },
+  { label: '×', value: '*', tone: 'muted' },
+  { label: '4', value: '4' },
+  { label: '5', value: '5' },
+  { label: '6', value: '6' },
+  { label: '-', value: '-', tone: 'muted' },
+  { label: '1', value: '1' },
+  { label: '2', value: '2' },
+  { label: '3', value: '3' },
+  { label: '+', value: '+', tone: 'muted' },
+  { label: '(', value: '(', tone: 'muted' },
+  { label: '0', value: '0' },
+  { label: ',', value: ',', tone: 'muted' },
+  { label: ')', value: ')', tone: 'muted' },
+  { label: '=', action: 'equals', tone: 'accent', wide: true },
+]
+
+const SMART_NOTES_NUMBER_FORMATTER = new Intl.NumberFormat('pt-PT', {
+  maximumFractionDigits: 6,
+})
+
+function formatSmartNotesValue(value: number): string {
+  return SMART_NOTES_NUMBER_FORMATTER.format(value)
+}
+
 function resolveInitialTheme(): ThemeId {
   const stored = localStorage.getItem('mesa-recibos-theme')
-  if (
-    stored === 'light' ||
-    stored === 'dark' ||
-    stored === 'tokyo-day' ||
-    stored === 'tokyo-night' ||
-    stored === 'synthwave-84' ||
-    stored === 'one-dark-pro' ||
-    stored === 'night-owl' ||
-    stored === 'atom-one-light' ||
-    stored === 'github-light' ||
-    stored === 'github-dark' ||
-    stored === 'github-gray'
-  ) {
-    return stored
+  const validThemeIds = new Set<string>(THEME_OPTIONS.map((t) => t.id))
+  if (stored && validThemeIds.has(stored)) {
+    return stored as ThemeId
   }
-
   return 'github-light'
 }
 
 function resolveInitialLayoutMode(): LayoutMode {
-  const stored = localStorage.getItem('mesa-recibos-layout')
-  if (stored === 'wide' || stored === 'narrow') {
-    return stored
-  }
-  return 'narrow'
+  return 'wide'
 }
 
 function resolveInitialDisabledSavedViewIds(): string[] {
@@ -213,6 +347,178 @@ function resolveInitialDisabledSavedViewIds(): string[] {
   return []
 }
 
+function resolveInitialQuickNotes(): string {
+  const stored = localStorage.getItem('mesa-recibos-quick-notes')
+  return typeof stored === 'string' ? stored : ''
+}
+
+function resolveInitialSmartNotes(): string {
+  const stored = localStorage.getItem('mesa-recibos-smart-notes')
+  return typeof stored === 'string' ? stored : ''
+}
+
+function resolveInitialSmartNotesPinnedSignatures(): string[] {
+  try {
+    const stored = localStorage.getItem('mesa-recibos-smart-notes-pinned')
+    if (!stored) return []
+    const parsed = JSON.parse(stored) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((value): value is string => typeof value === 'string').slice(0, 200)
+  } catch {
+    return []
+  }
+}
+
+function resolveInitialSmartNotesSavedEntries(): SavedSmartNotesEntry[] {
+  try {
+    const stored = localStorage.getItem('mesa-recibos-smart-notes-saved')
+    if (!stored) return []
+    const parsed = JSON.parse(stored) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item): item is SavedSmartNotesEntry => {
+        if (!item || typeof item !== 'object') return false
+        const candidate = item as Partial<SavedSmartNotesEntry>
+        return (
+          typeof candidate.signature === 'string' &&
+          typeof candidate.expression === 'string' &&
+          typeof candidate.result === 'number' &&
+          typeof candidate.source === 'string' &&
+          typeof candidate.savedAt === 'string'
+        )
+      })
+      .slice(0, 200)
+  } catch {
+    return []
+  }
+}
+
+function parseSmartNumber(value: string): number | null {
+  const scaleMatch = value.trim().match(/^(-?\d+(?:[.,]\d+)?)\s*([kKmMbB])?$/)
+  if (!scaleMatch) return null
+  const normalized = scaleMatch[1].replace(/\s+/g, '').replace(',', '.')
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) return null
+  const suffix = scaleMatch[2]?.toLowerCase()
+  if (!suffix) return parsed
+  if (suffix === 'k') return parsed * 1_000
+  if (suffix === 'm') return parsed * 1_000_000
+  if (suffix === 'b') return parsed * 1_000_000_000
+  return parsed
+}
+
+function buildSmartNotesSignature(expression: string, result: number): string {
+  return `${expression.trim().toLowerCase()}::${result.toFixed(6)}`
+}
+
+function evaluateSmartNotesLine(
+  line: string,
+  context: { previousResults: number[]; variables: Map<string, number> },
+): { expression: string; result: number; signature: string; variableKey?: string } | { error: string } | null {
+  const trimmed = line.trim()
+  if (!trimmed || trimmed.startsWith('#')) return null
+
+  const assignmentMatch = trimmed.match(/^([A-Za-zÀ-ÿ_][\wÀ-ÿ ]{0,40})\s*=\s*(.+)$/)
+  const rawExpression = assignmentMatch ? assignmentMatch[2].trim() : trimmed.includes('=') ? trimmed.split('=').slice(1).join('=').trim() : trimmed
+  if (!rawExpression) return null
+
+  const totalLineMatch = rawExpression.match(/\b(total|subtotal|soma|sum)\b/i)
+  if (totalLineMatch && !/[0-9+\-*/%]/.test(rawExpression)) {
+    if (context.previousResults.length === 0) {
+      return { error: 'Sem valores anteriores para total.' }
+    }
+    const total = context.previousResults.reduce((sum, value) => sum + value, 0)
+    return {
+      expression: 'total',
+      result: total,
+      signature: buildSmartNotesSignature('total', total),
+      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
+    }
+  }
+
+  const percentOfMatch = rawExpression.match(/(-?\d+(?:[.,]\d+)?)\s*%\s*(?:de|do|da|sobre)\s*(-?\d+(?:[.,]\d+)?)/i)
+  if (percentOfMatch) {
+    const percent = parseSmartNumber(percentOfMatch[1])
+    const base = parseSmartNumber(percentOfMatch[2])
+    if (percent === null || base === null) {
+      return { error: 'Percentagem inválida.' }
+    }
+    const computed = (base * percent) / 100
+    return {
+      expression: `${percentOfMatch[1]}% de ${percentOfMatch[2]}`,
+      result: computed,
+      signature: buildSmartNotesSignature(`${percentOfMatch[1]}% de ${percentOfMatch[2]}`, computed),
+      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
+    }
+  }
+
+  const totalReplacement =
+    context.previousResults.length > 0 ? String(context.previousResults.reduce((sum, value) => sum + value, 0)) : '0'
+
+  const withScaledNumbers = rawExpression.replace(/(-?\d+(?:[.,]\d+)?)\s*([kKmMbB])\b/g, (_, amount: string, suffix: string) => {
+    const parsed = parseSmartNumber(`${amount}${suffix}`)
+    return parsed === null ? `${amount}${suffix}` : String(parsed)
+  })
+
+  const withVariables = withScaledNumbers.replace(/\b([A-Za-zÀ-ÿ_][\wÀ-ÿ]*)\b/g, (token) => {
+    const mapped = context.variables.get(token.toLowerCase())
+    return mapped === undefined ? token : String(mapped)
+  })
+
+  const normalized = withVariables
+    .replace(/\b(total|subtotal|soma|sum)\b/gi, totalReplacement)
+    .replace(/[€$£]/g, ' ')
+    .replace(/\b(eur|euro|euros|usd|dolar|dólar|dolares|dólares)\b/gi, ' ')
+    .replace(/[×x]/g, '*')
+    .replace(/[÷]/g, '/')
+    .replace(/\b(dividido\s+por|sobre|per)\b/gi, ' / ')
+    .replace(/\b(vezes|multiplicado\s+por)\b/gi, ' * ')
+    .replace(/\b(mais|plus)\b/gi, ' + ')
+    .replace(/\b(menos|minus)\b/gi, ' - ')
+    .replace(/&/g, ' + ')
+    .replace(/\be\b/gi, ' + ')
+    .replace(/,/g, '.')
+    .replace(/[^0-9+\-*/().% ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!normalized) return null
+  if (!/^[0-9+\-*/().%\s]+$/.test(normalized)) {
+    return { error: 'Expressão não suportada.' }
+  }
+
+  const numberTokens = normalized.match(/-?\d+(?:\.\d+)?/g) ?? []
+  const hasOperator = /[+\-*/()%]/.test(normalized)
+  let finalExpression = normalized
+
+  if (!hasOperator) {
+    if (numberTokens.length === 0) return null
+    finalExpression = numberTokens.join(' + ')
+  }
+
+  finalExpression = finalExpression.replace(/^[+*/\s]+|[+\-*/\s]+$/g, '').trim()
+  if (!finalExpression) {
+    return { error: 'Não foi possível interpretar.' }
+  }
+
+  const expressionWithPercent = finalExpression.replace(/(\d+(?:\.\d+)?)%/g, '($1/100)')
+
+  try {
+    const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
+    if (typeof computed !== 'number' || !Number.isFinite(computed)) {
+      return { error: 'Resultado inválido.' }
+    }
+    return {
+      expression: finalExpression,
+      result: computed,
+      signature: buildSmartNotesSignature(finalExpression, computed),
+      variableKey: assignmentMatch?.[1]?.trim().toLowerCase().replace(/\s+/g, '_'),
+    }
+  } catch {
+    return { error: 'Não foi possível interpretar.' }
+  }
+}
+
 function isDarkLikeTheme(theme: ThemeId): boolean {
   return (
     theme === 'dark' ||
@@ -224,10 +530,6 @@ function isDarkLikeTheme(theme: ThemeId): boolean {
   )
 }
 
-// Quick rollback switch for the new integrated header bar layout.
-const ENABLE_UNIFIED_HEADER_LAYOUT = true
-// Quick rollback switch for the experimental visual redesign pass.
-const ENABLE_NEO_REDESIGN_EXPERIMENT = false
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -394,6 +696,159 @@ function getInitialEntryForm(defaultStatusId: string): EntryForm {
   }
 }
 
+function getInitialDsEntryForm(defaultStatusId: string): DsEntryForm {
+  const now = new Date()
+  return {
+    gestora: '',
+    proponentes: '',
+    referencia: '',
+    produto: '',
+    entidadeBancaria: '',
+    liderCalculo: '',
+    recibo: '',
+    faltaReciboGestora: '',
+    valor: '',
+    dataEscritura: now.toISOString().slice(0, 10),
+    dataFechoCrm: '',
+    comissaoLoja: '',
+    ivaCgdRaw: '',
+    totalComissaoLojaCmIva: '',
+    comissaoGestor: '',
+    percentagem: '',
+    pagComissaoGestor: '',
+    estadoId: defaultStatusId,
+  }
+}
+
+function dsFormToPayload(form: DsEntryForm): Partial<DsRecord> {
+  return {
+    gestora: form.gestora.trim() || undefined,
+    proponentes: form.proponentes.trim() || undefined,
+    referencia: form.referencia.trim() || undefined,
+    produto: form.produto.trim() || undefined,
+    entidadeBancaria: form.entidadeBancaria.trim() || undefined,
+    liderCalculo: form.liderCalculo.trim() || undefined,
+    recibo: form.recibo.trim() || undefined,
+    faltaReciboGestora: form.faltaReciboGestora.trim() || undefined,
+    valorRaw: form.valor.trim() || undefined,
+    valor: parseFormNumber(form.valor),
+    dataEscritura: form.dataEscritura || undefined,
+    dataFechoCrm: form.dataFechoCrm || undefined,
+    comissaoLojaRaw: form.comissaoLoja.trim() || undefined,
+    comissaoLoja: parseFormNumber(form.comissaoLoja),
+    ivaCgdRaw: form.ivaCgdRaw.trim() || undefined,
+    totalComissaoLojaCmIvaRaw: form.totalComissaoLojaCmIva.trim() || undefined,
+    totalComissaoLojaCmIva: parseFormNumber(form.totalComissaoLojaCmIva),
+    comissaoGestorRaw: form.comissaoGestor.trim() || undefined,
+    comissaoGestor: parseFormNumber(form.comissaoGestor),
+    percentagemRaw: form.percentagem.trim() || undefined,
+    percentagem: parseFormNumber(form.percentagem),
+    pagComissaoGestor: form.pagComissaoGestor || undefined,
+    estadoId: form.estadoId,
+  }
+}
+
+function dsRecordToForm(record: DsRecord): DsEntryForm {
+  return {
+    gestora: record.gestora ?? '',
+    proponentes: record.proponentes ?? '',
+    referencia: record.referencia ?? '',
+    produto: record.produto ?? '',
+    entidadeBancaria: record.entidadeBancaria ?? '',
+    liderCalculo: record.liderCalculo ?? '',
+    recibo: record.recibo ?? '',
+    faltaReciboGestora: record.faltaReciboGestora ?? '',
+    valor: toFormNumber(record.valor),
+    dataEscritura: record.dataEscritura ?? '',
+    dataFechoCrm: record.dataFechoCrm ?? '',
+    comissaoLoja: toFormNumber(record.comissaoLoja),
+    ivaCgdRaw: record.ivaCgdRaw ?? toFormNumber(record.ivaCgdValor),
+    totalComissaoLojaCmIva: toFormNumber(record.totalComissaoLojaCmIva),
+    comissaoGestor: toFormNumber(record.comissaoGestor),
+    percentagem: toFormNumber(record.percentagem),
+    pagComissaoGestor: record.pagComissaoGestor ?? '',
+    estadoId: record.estadoId,
+  }
+}
+
+function getInitialPenhorasEntryForm(defaultStatusId: string): PenhorasEntryForm {
+  const now = new Date()
+  return {
+    pe: '',
+    acto: '',
+    dataPedido: now.toISOString().slice(0, 10),
+    identificacao: '',
+    pedido: '',
+    gestor: '',
+    estadoId: defaultStatusId,
+  }
+}
+
+function penhorasFormToPayload(form: PenhorasEntryForm): Partial<PenhorasRecord> {
+  return {
+    pe: form.pe.trim() || undefined,
+    acto: form.acto.trim() || undefined,
+    dataPedido: form.dataPedido || undefined,
+    identificacao: form.identificacao.trim() || undefined,
+    pedido: form.pedido.trim() || undefined,
+    gestor: form.gestor.trim() || undefined,
+    estadoId: form.estadoId,
+  }
+}
+
+function penhorasRecordToForm(record: PenhorasRecord): PenhorasEntryForm {
+  return {
+    pe: record.pe ?? '',
+    acto: record.acto ?? '',
+    dataPedido: record.dataPedido ?? '',
+    identificacao: record.identificacao ?? '',
+    pedido: record.pedido ?? '',
+    gestor: record.gestor ?? '',
+    estadoId: record.estadoId,
+  }
+}
+
+function sanitizeDsFilters(input: unknown): DsRecordFilters {
+  const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
+  const parseNumeric = (value: unknown, min: number, max: number) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric) || numeric < min || numeric > max) return 'todos' as const
+    return numeric
+  }
+
+  return {
+    estadoId: typeof payload.estadoId === 'string' && payload.estadoId.trim() ? payload.estadoId : 'todos',
+    gestora: typeof payload.gestora === 'string' ? payload.gestora : '',
+    entidadeBancaria: typeof payload.entidadeBancaria === 'string' ? payload.entidadeBancaria : '',
+    produto: typeof payload.produto === 'string' ? payload.produto : '',
+    reciboEstado:
+      payload.reciboEstado === 'com-recibo' || payload.reciboEstado === 'sem-recibo' ? payload.reciboEstado : 'todos',
+    ano: parseNumeric(payload.ano, 2000, 9999),
+    mes: parseNumeric(payload.mes, 1, 12),
+    page: 1,
+    pageSize: 300,
+  }
+}
+
+function sanitizePenhorasFilters(input: unknown): PenhorasRecordFilters {
+  const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
+  const parseNumeric = (value: unknown, min: number, max: number) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric) || numeric < min || numeric > max) return 'todos' as const
+    return numeric
+  }
+
+  return {
+    estadoId: typeof payload.estadoId === 'string' && payload.estadoId.trim() ? payload.estadoId : 'todos',
+    gestor: typeof payload.gestor === 'string' ? payload.gestor : '',
+    acto: typeof payload.acto === 'string' ? payload.acto : '',
+    ano: parseNumeric(payload.ano, 2000, 9999),
+    mes: parseNumeric(payload.mes, 1, 12),
+    page: 1,
+    pageSize: 300,
+  }
+}
+
 function sanitizeDashboardFilters(input: unknown): RecordFilters {
   const payload = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
   const parseNumeric = (value: unknown, min: number, max: number) => {
@@ -425,6 +880,42 @@ function defaultDashboardWidgetLayout(type: DashboardWidgetType): {
   }
   if (type === 'chart-mensal-emissao' || type === 'chart-status' || type === 'chart-tipo') {
     return { size: 'wide', minHeight: 210, column: 'main', colSpan: 2 }
+  }
+  return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
+}
+
+function defaultDsDashboardWidgetLayout(type: DsDashboardWidgetType): {
+  size: DashboardWidgetSize
+  minHeight: number
+  column: DashboardWidgetColumn
+  colSpan: number
+} {
+  const found = DEFAULT_DS_DASHBOARD_WIDGETS.find((widget) => widget.type === type)
+  if (found) {
+    return {
+      size: found.size,
+      minHeight: found.minHeight,
+      column: found.column,
+      colSpan: found.colSpan,
+    }
+  }
+  return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
+}
+
+function defaultPenhorasDashboardWidgetLayout(type: PenhorasDashboardWidgetType): {
+  size: DashboardWidgetSize
+  minHeight: number
+  column: DashboardWidgetColumn
+  colSpan: number
+} {
+  const found = DEFAULT_PENHORAS_DASHBOARD_WIDGETS.find((widget) => widget.type === type)
+  if (found) {
+    return {
+      size: found.size,
+      minHeight: found.minHeight,
+      column: found.column,
+      colSpan: found.colSpan,
+    }
   }
   return { size: 'normal', minHeight: 180, column: 'main', colSpan: 1 }
 }
@@ -475,6 +966,54 @@ function parseDashboardWidgets(input: unknown): DashboardWidget[] {
       }
     })
     .filter((widget): widget is DashboardWidget => Boolean(widget))
+}
+
+function parseDsDashboardWidgets(input: unknown): DsDashboardWidget[] {
+  if (!Array.isArray(input)) return []
+  const allowed = new Set<DsDashboardWidgetType>(DEFAULT_DS_DASHBOARD_WIDGETS.map((widget) => widget.type))
+  return input
+    .map((item) => {
+      if (typeof item !== 'object' || item === null) return null
+      const widget = item as { id?: unknown; type?: unknown; size?: unknown; minHeight?: unknown; column?: unknown; colSpan?: unknown }
+      if (typeof widget.type !== 'string' || !allowed.has(widget.type as DsDashboardWidgetType)) return null
+      const baseLayout = defaultDsDashboardWidgetLayout(widget.type as DsDashboardWidgetType)
+      const numericHeight = Number(widget.minHeight)
+      const numericColSpan = Number(widget.colSpan)
+      const parsedColumn = sanitizeDashboardWidgetColumn(widget.column, baseLayout.column)
+      return {
+        id: typeof widget.id === 'string' && widget.id.trim() ? widget.id : crypto.randomUUID(),
+        type: widget.type as DsDashboardWidgetType,
+        size: sanitizeDashboardWidgetSize(widget.size, baseLayout.size),
+        minHeight: clampDashboardWidgetHeight(Number.isFinite(numericHeight) ? numericHeight : baseLayout.minHeight),
+        column: parsedColumn,
+        colSpan: parsedColumn === 'side' ? 1 : clampDashboardWidgetColSpan(Number.isFinite(numericColSpan) ? numericColSpan : baseLayout.colSpan),
+      }
+    })
+    .filter((widget): widget is DsDashboardWidget => Boolean(widget))
+}
+
+function parsePenhorasDashboardWidgets(input: unknown): PenhorasDashboardWidget[] {
+  if (!Array.isArray(input)) return []
+  const allowed = new Set<PenhorasDashboardWidgetType>(DEFAULT_PENHORAS_DASHBOARD_WIDGETS.map((widget) => widget.type))
+  return input
+    .map((item) => {
+      if (typeof item !== 'object' || item === null) return null
+      const widget = item as { id?: unknown; type?: unknown; size?: unknown; minHeight?: unknown; column?: unknown; colSpan?: unknown }
+      if (typeof widget.type !== 'string' || !allowed.has(widget.type as PenhorasDashboardWidgetType)) return null
+      const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type as PenhorasDashboardWidgetType)
+      const numericHeight = Number(widget.minHeight)
+      const numericColSpan = Number(widget.colSpan)
+      const parsedColumn = sanitizeDashboardWidgetColumn(widget.column, baseLayout.column)
+      return {
+        id: typeof widget.id === 'string' && widget.id.trim() ? widget.id : crypto.randomUUID(),
+        type: widget.type as PenhorasDashboardWidgetType,
+        size: sanitizeDashboardWidgetSize(widget.size, baseLayout.size),
+        minHeight: clampDashboardWidgetHeight(Number.isFinite(numericHeight) ? numericHeight : baseLayout.minHeight),
+        column: parsedColumn,
+        colSpan: parsedColumn === 'side' ? 1 : clampDashboardWidgetColSpan(Number.isFinite(numericColSpan) ? numericColSpan : baseLayout.colSpan),
+      }
+    })
+    .filter((widget): widget is PenhorasDashboardWidget => Boolean(widget))
 }
 
 function extractGpeSeFromIndicacoes(indicacoes?: string): { gpeSe: string; text: string } {
@@ -653,6 +1192,7 @@ function getExequenteLogoUrl(name?: string): string | undefined {
 }
 
 function App() {
+  const [activeModule, setActiveModule] = useState<ModuleId>('recibos')
   const [activeTab, setActiveTab] = useState<TabId>('entrada')
   const [statuses, setStatuses] = useState<StatusDefinition[]>([])
   const [records, setRecords] = useState<ReceiptRecord[]>([])
@@ -671,9 +1211,44 @@ function App() {
   const [selectedRecord, setSelectedRecord] = useState<ReceiptRecord | null>(null)
   const [selectedRecordEdit, setSelectedRecordEdit] = useState<EntryForm | null>(null)
   const [isRecordEditing, setIsRecordEditing] = useState(false)
+  const [selectedDsRecordId, setSelectedDsRecordId] = useState<string | null>(null)
+  const [selectedDsRecord, setSelectedDsRecord] = useState<DsRecord | null>(null)
+  const [selectedDsRecordEdit, setSelectedDsRecordEdit] = useState<DsEntryForm | null>(null)
+  const [isDsRecordEditing, setIsDsRecordEditing] = useState(false)
+  const [selectedPenhorasRecordId, setSelectedPenhorasRecordId] = useState<string | null>(null)
+  const [selectedPenhorasRecord, setSelectedPenhorasRecord] = useState<PenhorasRecord | null>(null)
+  const [selectedPenhorasRecordEdit, setSelectedPenhorasRecordEdit] = useState<PenhorasEntryForm | null>(null)
+  const [isPenhorasRecordEditing, setIsPenhorasRecordEditing] = useState(false)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [theme, setTheme] = useState<ThemeId>(resolveInitialTheme)
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
+  const [layoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
+  const [toolsExpanded, setToolsExpanded] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
+  const [smartNotesOpen, setSmartNotesOpen] = useState(false)
+  const [toolPinned, setToolPinned] = useState<Record<QuickToolId, boolean>>({
+    notes: false,
+    calculator: false,
+    'smart-notes': false,
+  })
+  const [toolLayers, setToolLayers] = useState<Record<QuickToolId, number>>({
+    notes: 1,
+    calculator: 2,
+    'smart-notes': 3,
+  })
+  const [toolPositions, setToolPositions] = useState<Record<QuickToolId, { x: number; y: number } | null>>({
+    notes: null,
+    calculator: null,
+    'smart-notes': null,
+  })
+  const [draggingTool, setDraggingTool] = useState<QuickToolId | null>(null)
+  const [quickNotes, setQuickNotes] = useState(resolveInitialQuickNotes)
+  const [smartNotesText, setSmartNotesText] = useState(resolveInitialSmartNotes)
+  const [smartNotesPinnedSignatures, setSmartNotesPinnedSignatures] = useState<string[]>(resolveInitialSmartNotesPinnedSignatures)
+  const [smartNotesSavedEntries, setSmartNotesSavedEntries] = useState<SavedSmartNotesEntry[]>(resolveInitialSmartNotesSavedEntries)
+  const [calculatorExpression, setCalculatorExpression] = useState('')
+  const [calculatorResult, setCalculatorResult] = useState<string | null>(null)
+  const [calculatorError, setCalculatorError] = useState('')
   const [disabledSavedViewIds, setDisabledSavedViewIds] = useState<string[]>(resolveInitialDisabledSavedViewIds)
   const [activeSavedViewId, setActiveSavedViewId] = useState<string | null>(null)
   const [totalsHoverOpen, setTotalsHoverOpen] = useState(false)
@@ -695,6 +1270,14 @@ function App() {
   const [dashboardConfigOpen, setDashboardConfigOpen] = useState(true)
   const [dashboardPickerOpen, setDashboardPickerOpen] = useState(false)
   const [dashboardFiltersOpen, setDashboardFiltersOpen] = useState(false)
+  const [dsDashboardWidgets, setDsDashboardWidgets] = useState<DsDashboardWidget[]>(cloneDefaultDsDashboardWidgets)
+  const [penhorasDashboardWidgets, setPenhorasDashboardWidgets] = useState<PenhorasDashboardWidget[]>(cloneDefaultPenhorasDashboardWidgets)
+  const [dsDashboardConfigOpen, setDsDashboardConfigOpen] = useState(true)
+  const [dsDashboardPickerOpen, setDsDashboardPickerOpen] = useState(false)
+  const [dsDashboardWidgetsOpen, setDsDashboardWidgetsOpen] = useState(true)
+  const [penhorasDashboardConfigOpen, setPenhorasDashboardConfigOpen] = useState(true)
+  const [penhorasDashboardPickerOpen, setPenhorasDashboardPickerOpen] = useState(false)
+  const [penhorasDashboardWidgetsOpen, setPenhorasDashboardWidgetsOpen] = useState(true)
   const [draggedDashboardWidgetId, setDraggedDashboardWidgetId] = useState<string | null>(null)
   const [dropDashboardWidgetId, setDropDashboardWidgetId] = useState<string | null>(null)
   const [resizingDashboardWidgetId, setResizingDashboardWidgetId] = useState<string | null>(null)
@@ -717,9 +1300,38 @@ function App() {
   const [importStrategy, setImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [importForceRecalculate, setImportForceRecalculate] = useState(false)
 
+  const [dsStatuses, setDsStatuses] = useState<StatusDefinition[]>([])
+  const [dsRecords, setDsRecords] = useState<DsRecord[]>([])
+  const [dsTotalRecords, setDsTotalRecords] = useState(0)
+  const [dsFilters, setDsFilters] = useState<DsRecordFilters>(DEFAULT_DS_FILTERS)
+  const [dsRecordsLoading, setDsRecordsLoading] = useState(false)
+  const [dsImportLoading, setDsImportLoading] = useState(false)
+  const [dsImportPreview, setDsImportPreview] = useState<DsParsedImport | null>(null)
+  const [dsImportServerPreview, setDsImportServerPreview] = useState<ImportPreviewResponse | null>(null)
+  const [dsImportStrategy, setDsImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
+  const [dsEntryForm, setDsEntryForm] = useState<DsEntryForm>(getInitialDsEntryForm(''))
+  const [activeDsSavedViewId, setActiveDsSavedViewId] = useState<string | null>(null)
+
+  const [penhorasStatuses, setPenhorasStatuses] = useState<StatusDefinition[]>([])
+  const [penhorasRecords, setPenhorasRecords] = useState<PenhorasRecord[]>([])
+  const [penhorasTotalRecords, setPenhorasTotalRecords] = useState(0)
+  const [penhorasFilters, setPenhorasFilters] = useState<PenhorasRecordFilters>(DEFAULT_PENHORAS_FILTERS)
+  const [penhorasRecordsLoading, setPenhorasRecordsLoading] = useState(false)
+  const [penhorasImportLoading, setPenhorasImportLoading] = useState(false)
+  const [penhorasImportPreview, setPenhorasImportPreview] = useState<PenhorasParsedImport | null>(null)
+  const [penhorasImportServerPreview, setPenhorasImportServerPreview] = useState<ImportPreviewResponse | null>(null)
+  const [penhorasImportStrategy, setPenhorasImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
+  const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
+  const [activePenhorasSavedViewId, setActivePenhorasSavedViewId] = useState<string | null>(null)
+
   const [settingsDraft, setSettingsDraft] = useState<CalculationSettings>(EMPTY_CALC_SETTINGS)
   const [recordSuggestions, setRecordSuggestions] = useState<RecordSuggestions>(EMPTY_RECORD_SUGGESTIONS)
-  const widgetResizeRef = useRef<{ widgetId: string; startY: number; startHeight: number } | null>(null)
+  const widgetResizeRef = useRef<{ scope: DashboardWidgetScope; widgetId: string; startY: number; startHeight: number } | null>(null)
+  const toolLayerRef = useRef(4)
+  const toolDragRef = useRef<{ tool: QuickToolId; pointerOffsetX: number; pointerOffsetY: number } | null>(null)
+  const notesWindowRef = useRef<HTMLDivElement | null>(null)
+  const calculatorWindowRef = useRef<HTMLDivElement | null>(null)
+  const smartNotesWindowRef = useRef<HTMLDivElement | null>(null)
 
   const orderedStatuses = useMemo(
     () => [...statuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
@@ -745,6 +1357,104 @@ function App() {
     [records],
   )
 
+  const dsOrderedStatuses = useMemo(
+    () => [...dsStatuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
+    [dsStatuses],
+  )
+  const dsActiveStatuses = useMemo(() => dsOrderedStatuses.filter((status) => status.active), [dsOrderedStatuses])
+  const dsDefaultStatus = useMemo(() => dsActiveStatuses[0] ?? dsOrderedStatuses[0], [dsActiveStatuses, dsOrderedStatuses])
+
+  const dsYears = useMemo(() => {
+    const values = new Set(
+      dsRecords
+        .map((record) => (record.dataEscritura ? new Date(record.dataEscritura).getUTCFullYear() : undefined))
+        .filter((value): value is number => Number.isFinite(value)),
+    )
+    return [...values].sort((a, b) => b - a)
+  }, [dsRecords])
+
+  const dsGestoraFilterOptions = useMemo(
+    () =>
+      [...new Set(dsRecords.map((record) => record.gestora).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [dsRecords],
+  )
+
+  const dsEntidadeFilterOptions = useMemo(
+    () =>
+      [...new Set(dsRecords.map((record) => record.entidadeBancaria).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [dsRecords],
+  )
+
+  const dsProdutoFilterOptions = useMemo(
+    () =>
+      [...new Set(dsRecords.map((record) => record.produto).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [dsRecords],
+  )
+
+  const dsProponentesSuggestions = useMemo(
+    () =>
+      [...new Set(dsRecords.map((record) => record.proponentes).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [dsRecords],
+  )
+
+  const dsReferenciaSuggestions = useMemo(
+    () =>
+      [...new Set(dsRecords.map((record) => record.referencia).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [dsRecords],
+  )
+
+  const dsReciboSuggestions = useMemo(
+    () => [...new Set(dsRecords.map((record) => record.recibo).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
+    [dsRecords],
+  )
+
+  const penhorasOrderedStatuses = useMemo(
+    () => [...penhorasStatuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
+    [penhorasStatuses],
+  )
+  const penhorasActiveStatuses = useMemo(() => penhorasOrderedStatuses.filter((status) => status.active), [penhorasOrderedStatuses])
+  const penhorasDefaultStatus = useMemo(() => penhorasActiveStatuses[0] ?? penhorasOrderedStatuses[0], [penhorasActiveStatuses, penhorasOrderedStatuses])
+
+  const penhorasYears = useMemo(() => {
+    const values = new Set(
+      penhorasRecords
+        .map((record) => (record.dataPedido ? new Date(record.dataPedido).getUTCFullYear() : undefined))
+        .filter((value): value is number => Number.isFinite(value)),
+    )
+    return [...values].sort((a, b) => b - a)
+  }, [penhorasRecords])
+
+  const penhorasGestorFilterOptions = useMemo(
+    () =>
+      [...new Set(penhorasRecords.map((record) => record.gestor).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [penhorasRecords],
+  )
+
+  const penhorasActoFilterOptions = useMemo(
+    () =>
+      [...new Set(penhorasRecords.map((record) => record.acto).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [penhorasRecords],
+  )
+
+  const penhorasPeSuggestions = useMemo(
+    () => [...new Set(penhorasRecords.map((record) => record.pe).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
+    [penhorasRecords],
+  )
+
   const gestorSuggestions = useMemo(
     () => (recordSuggestions.gestor.length > 0 ? recordSuggestions.gestor : gestorFilterOptions),
     [recordSuggestions.gestor, gestorFilterOptions],
@@ -757,7 +1467,43 @@ function App() {
 
   const tableViews = useMemo(() => savedViews.filter((view) => view.scope === 'tabela'), [savedViews])
   const dashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'dashboard'), [savedViews])
-  const brandLogoSrc = isDarkLikeTheme(theme) ? '/mesa-de-recibos-logo-dark.svg' : '/mesa-de-recibos-logo.svg'
+  const dsTableViews = useMemo(() => savedViews.filter((view) => view.scope === 'ds-tabela'), [savedViews])
+  const dsDashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'ds-dashboard'), [savedViews])
+  const penhorasTableViews = useMemo(() => savedViews.filter((view) => view.scope === 'penhoras-tabela'), [savedViews])
+  const penhorasDashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'penhoras-dashboard'), [savedViews])
+  const recibosLogoSrc = isDarkLikeTheme(theme) ? '/mesa-de-recibos-logo-dark.svg' : '/mesa-de-recibos-logo.svg'
+  const dsLogoSrc = isDarkLikeTheme(theme) ? '/ds-logo-dark.svg' : '/ds-logo.svg'
+  const penhorasLogoSrc = isDarkLikeTheme(theme) ? '/penhoras-logo-dark.svg' : '/penhoras-logo.svg'
+  const moduleCards = useMemo(
+    () => [
+      {
+        id: 'recibos' as ModuleId,
+        title: 'Mesa de Recibos',
+        subtitle: 'Postgres + API · Entrada e consulta de recibos',
+        logoSrc: recibosLogoSrc,
+        showSubtitle: true,
+      },
+      {
+        id: 'ds' as ModuleId,
+        title: 'DS Intermediários de Crédito',
+        subtitle: 'Módulo operacional dedicado',
+        logoSrc: dsLogoSrc,
+        showSubtitle: false,
+      },
+      {
+        id: 'penhoras' as ModuleId,
+        title: 'Penhoras Imóveis',
+        subtitle: 'Registo operacional de penhoras',
+        logoSrc: penhorasLogoSrc,
+        showSubtitle: false,
+      },
+    ],
+    [recibosLogoSrc, dsLogoSrc, penhorasLogoSrc],
+  )
+  const activeModuleIndex = moduleCards.findIndex((item) => item.id === activeModule)
+  const safeActiveModuleIndex = activeModuleIndex >= 0 ? activeModuleIndex : 0
+  const activeModuleCard = moduleCards[safeActiveModuleIndex] ?? moduleCards[0]
+  const nextModuleCard = moduleCards[(safeActiveModuleIndex + 1) % moduleCards.length] ?? moduleCards[0]
 
   const totalsSnapshot = useMemo(() => {
     let valorIndicado = 0
@@ -798,7 +1544,222 @@ function App() {
     }
   }, [records])
 
+  const dsDashboardTotals = useMemo(() => {
+    let valor = 0
+    let comissaoLoja = 0
+    let totalComissaoLojaCmIva = 0
+    let comissaoGestor = 0
+    let comRecibo = 0
+
+    for (const record of dsRecords) {
+      if (typeof record.valor === 'number') valor += record.valor
+      if (typeof record.comissaoLoja === 'number') comissaoLoja += record.comissaoLoja
+      if (typeof record.totalComissaoLojaCmIva === 'number') totalComissaoLojaCmIva += record.totalComissaoLojaCmIva
+      if (typeof record.comissaoGestor === 'number') comissaoGestor += record.comissaoGestor
+      if (record.recibo?.trim()) comRecibo += 1
+    }
+
+    return {
+      registos: dsRecords.length,
+      valor,
+      comissaoLoja,
+      totalComissaoLojaCmIva,
+      comissaoGestor,
+      comRecibo,
+      semRecibo: Math.max(0, dsRecords.length - comRecibo),
+    }
+  }, [dsRecords])
+
+  const dsDashboardByStatus = useMemo(() => {
+    const buckets = new Map<string, { count: number; total: number }>()
+    for (const record of dsRecords) {
+      const key = record.estadoId || 'sem-estado'
+      const current = buckets.get(key) ?? { count: 0, total: 0 }
+      current.count += 1
+      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
+      if (typeof value === 'number') current.total += value
+      buckets.set(key, current)
+    }
+
+    return [...buckets.entries()]
+      .map(([statusId, bucket]) => {
+        const status = getStatus(dsStatuses, statusId)
+        return {
+          id: statusId,
+          label: status?.label ?? 'Sem estado',
+          value: bucket.count,
+          secondary: formatCurrency(bucket.total),
+        }
+      })
+      .sort((a, b) => b.value - a.value)
+  }, [dsRecords, dsStatuses])
+
+  const dsDashboardTopGestoras = useMemo(() => {
+    const buckets = new Map<string, { count: number; total: number }>()
+    for (const record of dsRecords) {
+      const key = record.gestora?.trim()
+      if (!key) continue
+      const current = buckets.get(key) ?? { count: 0, total: 0 }
+      current.count += 1
+      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
+      if (typeof value === 'number') current.total += value
+      buckets.set(key, current)
+    }
+
+    return [...buckets.entries()]
+      .map(([name, bucket]) => ({
+        id: name,
+        label: name,
+        value: bucket.count,
+        secondary: formatCurrency(bucket.total),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [dsRecords])
+
+  const dsDashboardTopEntidades = useMemo(() => {
+    const buckets = new Map<string, { count: number; total: number }>()
+    for (const record of dsRecords) {
+      const key = record.entidadeBancaria?.trim()
+      if (!key) continue
+      const current = buckets.get(key) ?? { count: 0, total: 0 }
+      current.count += 1
+      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
+      if (typeof value === 'number') current.total += value
+      buckets.set(key, current)
+    }
+
+    return [...buckets.entries()]
+      .map(([name, bucket]) => ({
+        id: name,
+        label: name,
+        value: bucket.count,
+        secondary: formatCurrency(bucket.total),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [dsRecords])
+
+  const dsDashboardByMonth = useMemo(() => {
+    const buckets = new Map<string, { ano: number; mes: number; count: number; total: number }>()
+    for (const record of dsRecords) {
+      if (!record.dataEscritura) continue
+      const date = new Date(record.dataEscritura)
+      if (Number.isNaN(date.getTime())) continue
+      const ano = date.getUTCFullYear()
+      const mes = date.getUTCMonth() + 1
+      const key = `${ano}-${mes}`
+      const current = buckets.get(key) ?? { ano, mes, count: 0, total: 0 }
+      current.count += 1
+      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
+      if (typeof value === 'number') current.total += value
+      buckets.set(key, current)
+    }
+
+    return [...buckets.values()]
+      .sort((a, b) => (a.ano === b.ano ? a.mes - b.mes : a.ano - b.ano))
+      .slice(-12)
+      .map((item) => ({
+        id: `${item.ano}-${item.mes}`,
+        label: `${MONTHS[item.mes - 1]?.slice(0, 3) ?? item.mes}/${item.ano}`,
+        value: item.total,
+        secondary: `${new Intl.NumberFormat('pt-PT').format(item.count)} registos`,
+      }))
+  }, [dsRecords])
+
+  const penhorasDashboardTotals = useMemo(() => {
+    let comDataPedido = 0
+    let recusados = 0
+    let pendentes = 0
+
+    for (const record of penhorasRecords) {
+      if (record.dataPedido) comDataPedido += 1
+      const status = getStatus(penhorasStatuses, record.estadoId)
+      const normalizedStatus = normalizeText(status?.key || status?.label || '')
+
+      if (normalizedStatus.includes('RECUS') || normalizedStatus.includes('DESIST') || normalizedStatus.includes('CANCELAMENTO')) {
+        recusados += 1
+      } else if (
+        (normalizedStatus.includes('AGUARDA') && normalizedStatus.includes('REGIST')) ||
+        normalizedStatus.includes('SEM ESTADO') ||
+        normalizedStatus.includes('SEM-ESTADO')
+      ) {
+        pendentes += 1
+      }
+    }
+
+    return {
+      registos: penhorasRecords.length,
+      comDataPedido,
+      recusados,
+      pendentes,
+    }
+  }, [penhorasRecords, penhorasStatuses])
+
+  const penhorasDashboardByStatus = useMemo(() => {
+    const buckets = new Map<string, number>()
+    for (const record of penhorasRecords) {
+      const key = record.estadoId || 'sem-estado'
+      buckets.set(key, (buckets.get(key) ?? 0) + 1)
+    }
+
+    return [...buckets.entries()]
+      .map(([statusId, count]) => {
+        const status = getStatus(penhorasStatuses, statusId)
+        return {
+          id: statusId,
+          label: status?.label ?? 'Sem estado',
+          value: count,
+        }
+      })
+      .sort((a, b) => b.value - a.value)
+  }, [penhorasRecords, penhorasStatuses])
+
+  const penhorasDashboardTopGestores = useMemo(() => {
+    const buckets = new Map<string, number>()
+    for (const record of penhorasRecords) {
+      const key = record.gestor?.trim()
+      if (!key) continue
+      buckets.set(key, (buckets.get(key) ?? 0) + 1)
+    }
+
+    return [...buckets.entries()]
+      .map(([gestor, count]) => ({
+        id: gestor,
+        label: gestor,
+        value: count,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+  }, [penhorasRecords])
+
+  const penhorasDashboardByMonth = useMemo(() => {
+    const buckets = new Map<string, { ano: number; mes: number; count: number }>()
+    for (const record of penhorasRecords) {
+      if (!record.dataPedido) continue
+      const date = new Date(record.dataPedido)
+      if (Number.isNaN(date.getTime())) continue
+      const ano = date.getUTCFullYear()
+      const mes = date.getUTCMonth() + 1
+      const key = `${ano}-${mes}`
+      const current = buckets.get(key) ?? { ano, mes, count: 0 }
+      current.count += 1
+      buckets.set(key, current)
+    }
+
+    return [...buckets.values()]
+      .sort((a, b) => (a.ano === b.ano ? a.mes - b.mes : a.ano - b.ano))
+      .slice(-12)
+      .map((item) => ({
+        id: `${item.ano}-${item.mes}`,
+        label: `${MONTHS[item.mes - 1]?.slice(0, 3) ?? item.mes}/${item.ano}`,
+        value: item.count,
+      }))
+  }, [penhorasRecords])
+
   const recentRecords = useMemo(() => [...records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12), [records])
+  const dsRecentRecords = useMemo(() => [...dsRecords].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12), [dsRecords])
+  const penhorasRecentRecords = useMemo(() => [...penhorasRecords].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12), [penhorasRecords])
 
   const dashboardSavePayload = useMemo(
     () => ({
@@ -818,6 +1779,18 @@ function App() {
   const dashboardSideWidgets = useMemo(() => dashboardWidgets.filter((widget) => widget.column === 'side'), [dashboardWidgets])
   const dashboardMainWidgets = useMemo(() => dashboardWidgets.filter((widget) => widget.column !== 'side'), [dashboardWidgets])
   const dashboardHasSideStack = dashboardSideWidgets.length > 0 && dashboardMainWidgets.length > 0
+  const dsDashboardSideWidgets = useMemo(() => dsDashboardWidgets.filter((widget) => widget.column === 'side'), [dsDashboardWidgets])
+  const dsDashboardMainWidgets = useMemo(() => dsDashboardWidgets.filter((widget) => widget.column !== 'side'), [dsDashboardWidgets])
+  const dsDashboardHasSideStack = dsDashboardSideWidgets.length > 0 && dsDashboardMainWidgets.length > 0
+  const penhorasDashboardSideWidgets = useMemo(
+    () => penhorasDashboardWidgets.filter((widget) => widget.column === 'side'),
+    [penhorasDashboardWidgets],
+  )
+  const penhorasDashboardMainWidgets = useMemo(
+    () => penhorasDashboardWidgets.filter((widget) => widget.column !== 'side'),
+    [penhorasDashboardWidgets],
+  )
+  const penhorasDashboardHasSideStack = penhorasDashboardSideWidgets.length > 0 && penhorasDashboardMainWidgets.length > 0
   const dashboardActiveFilterCount = useMemo(() => {
     let total = 0
     if (dashboardFilters.tipo && dashboardFilters.tipo !== 'todos') total += 1
@@ -842,6 +1815,55 @@ function App() {
   )
 
   const latestUndo = useMemo(() => undoStack[undoStack.length - 1], [undoStack])
+  const smartNotesEvaluation = useMemo(() => {
+    const context = {
+      previousResults: [] as number[],
+      variables: new Map<string, number>(),
+    }
+    const results: SmartNotesResultRow[] = []
+    const errors: SmartNotesErrorRow[] = []
+
+    for (const [index, line] of smartNotesText.split('\n').entries()) {
+      const parsed = evaluateSmartNotesLine(line, context)
+      if (!parsed) continue
+
+      if ('error' in parsed) {
+        errors.push({
+          lineNumber: index + 1,
+          source: line.trim(),
+          error: parsed.error,
+        })
+        continue
+      }
+
+      context.previousResults.push(parsed.result)
+      if (parsed.variableKey) {
+        context.variables.set(parsed.variableKey, parsed.result)
+      }
+
+      results.push({
+        lineNumber: index + 1,
+        source: line.trim(),
+        expression: parsed.expression,
+        result: parsed.result,
+        signature: parsed.signature,
+      })
+    }
+
+    return { results, errors }
+  }, [smartNotesText])
+  const smartNotesResults = smartNotesEvaluation.results
+  const smartNotesErrors = smartNotesEvaluation.errors
+  const smartNotesPinnedSet = useMemo(() => new Set(smartNotesPinnedSignatures), [smartNotesPinnedSignatures])
+  const smartNotesSavedSet = useMemo(() => new Set(smartNotesSavedEntries.map((entry) => entry.signature)), [smartNotesSavedEntries])
+  const smartNotesDisplayResults = useMemo(() => {
+    return [...smartNotesResults].sort((a, b) => {
+      const aPinned = smartNotesPinnedSet.has(a.signature) ? 1 : 0
+      const bPinned = smartNotesPinnedSet.has(b.signature) ? 1 : 0
+      if (aPinned !== bPinned) return bPinned - aPinned
+      return a.lineNumber - b.lineNumber
+    })
+  }, [smartNotesResults, smartNotesPinnedSet])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -851,6 +1873,66 @@ function App() {
   useEffect(() => {
     localStorage.setItem('mesa-recibos-layout', layoutMode)
   }, [layoutMode])
+
+  useEffect(() => {
+    localStorage.setItem('mesa-recibos-quick-notes', quickNotes)
+  }, [quickNotes])
+
+  useEffect(() => {
+    localStorage.setItem('mesa-recibos-smart-notes', smartNotesText)
+  }, [smartNotesText])
+
+  useEffect(() => {
+    localStorage.setItem('mesa-recibos-smart-notes-pinned', JSON.stringify(smartNotesPinnedSignatures))
+  }, [smartNotesPinnedSignatures])
+
+  useEffect(() => {
+    localStorage.setItem('mesa-recibos-smart-notes-saved', JSON.stringify(smartNotesSavedEntries.slice(0, 200)))
+  }, [smartNotesSavedEntries])
+
+  useEffect(() => {
+    function handleQuickToolShortcuts(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      const isEditableTarget =
+        target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable === true
+      if (isEditableTarget) return
+      if (!event.altKey || event.ctrlKey || event.metaKey) return
+      if (event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        setToolsExpanded(true)
+        setNotesOpen(true)
+        setToolLayers((current) => {
+          const nextLayer = toolLayerRef.current++
+          return { ...current, notes: nextLayer }
+        })
+        return
+      }
+      if (event.key.toLowerCase() === 'c') {
+        event.preventDefault()
+        setToolsExpanded(true)
+        setCalculatorOpen(true)
+        setToolLayers((current) => {
+          const nextLayer = toolLayerRef.current++
+          return { ...current, calculator: nextLayer }
+        })
+        return
+      }
+      if (event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        setToolsExpanded(true)
+        setSmartNotesOpen(true)
+        setToolLayers((current) => {
+          const nextLayer = toolLayerRef.current++
+          return { ...current, 'smart-notes': nextLayer }
+        })
+      }
+    }
+
+    window.addEventListener('keydown', handleQuickToolShortcuts)
+    return () => {
+      window.removeEventListener('keydown', handleQuickToolShortcuts)
+    }
+  }, [])
 
   useEffect(() => {
     localStorage.setItem('mesa-recibos-disabled-saved-views', JSON.stringify(disabledSavedViewIds))
@@ -890,16 +1972,39 @@ function App() {
       setBootstrapLoading(true)
       setPageError('')
       try {
-        const bootstrap = await api.bootstrap()
+        const [bootstrap, dsBootstrap, penhorasBootstrap] = await Promise.all([
+          api.bootstrap(),
+          api.dsBootstrap().catch(() => null),
+          api.penhorasBootstrap().catch(() => null),
+        ])
         setStatuses(bootstrap.statuses)
-        setSavedViews(bootstrap.savedViews)
+        const combinedSavedViews = [...bootstrap.savedViews, ...(dsBootstrap?.savedViews ?? []), ...(penhorasBootstrap?.savedViews ?? [])]
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .filter((view, index, list) => list.findIndex((candidate) => candidate.id === view.id) === index)
+        setSavedViews(combinedSavedViews)
         setCalculationSettings(bootstrap.calculationSettings)
         setSettingsDraft(bootstrap.calculationSettings)
+        if (dsBootstrap) {
+          setDsStatuses(dsBootstrap.statuses)
+        }
+        if (penhorasBootstrap) {
+          setPenhorasStatuses(penhorasBootstrap.statuses)
+        }
 
         const fallbackStatus = bootstrap.statuses.find((status) => status.active) ?? bootstrap.statuses[0]
         if (fallbackStatus) {
           setEntryForm(getInitialEntryForm(fallbackStatus.id))
           setBulkStatusId(fallbackStatus.id)
+        }
+
+        const dsFallbackStatus = dsBootstrap?.statuses.find((status) => status.active) ?? dsBootstrap?.statuses[0]
+        if (dsFallbackStatus) {
+          setDsEntryForm(getInitialDsEntryForm(dsFallbackStatus.id))
+        }
+
+        const penhorasFallbackStatus = penhorasBootstrap?.statuses.find((status) => status.active) ?? penhorasBootstrap?.statuses[0]
+        if (penhorasFallbackStatus) {
+          setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasFallbackStatus.id))
         }
 
         await migrateLegacyLocalStorageIfPresent()
@@ -910,6 +2015,8 @@ function App() {
         }
 
         await refreshRecords()
+        await refreshDsRecords()
+        await refreshPenhorasRecords()
       } catch (error) {
         setPageError(error instanceof Error ? error.message : 'Falha ao carregar aplicação.')
       } finally {
@@ -920,13 +2027,30 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!bootstrapLoading) {
+    if (!bootstrapLoading && activeModule === 'recibos') {
       void refreshRecords()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, globalSearch])
+  }, [filters, globalSearch, bootstrapLoading, activeModule])
 
   useEffect(() => {
+    if (bootstrapLoading || activeModule !== 'ds') return
+    void refreshDsRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrapLoading, activeModule, dsFilters, globalSearch])
+
+  useEffect(() => {
+    if (bootstrapLoading || activeModule !== 'penhoras') return
+    void refreshPenhorasRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrapLoading, activeModule, penhorasFilters, globalSearch])
+
+  useEffect(() => {
+    if (activeModule !== 'recibos') {
+      setSelectedRecord(null)
+      setSelectedRecordEdit(null)
+      return
+    }
     if (!selectedRecordId) {
       setSelectedRecord(null)
       setSelectedRecordEdit(null)
@@ -945,7 +2069,7 @@ function App() {
         setSelectedRecordEdit(fallback ? recordToForm(fallback) : null)
       }
     })()
-  }, [selectedRecordId, records])
+  }, [selectedRecordId, records, activeModule])
 
   useEffect(() => {
     if (!selectedRecord) {
@@ -956,6 +2080,78 @@ function App() {
 
     setSelectedRecordEdit(recordToForm(selectedRecord))
   }, [selectedRecord])
+
+  useEffect(() => {
+    if (activeModule !== 'ds') {
+      setSelectedDsRecord(null)
+      setSelectedDsRecordEdit(null)
+      return
+    }
+    if (!selectedDsRecordId) {
+      setSelectedDsRecord(null)
+      setSelectedDsRecordEdit(null)
+      setIsDsRecordEditing(false)
+      return
+    }
+
+    void (async () => {
+      try {
+        const record = await api.getDsRecord(selectedDsRecordId)
+        setSelectedDsRecord(record)
+        setSelectedDsRecordEdit(dsRecordToForm(record))
+      } catch {
+        const fallback = dsRecords.find((item) => item.id === selectedDsRecordId) ?? null
+        setSelectedDsRecord(fallback)
+        setSelectedDsRecordEdit(fallback ? dsRecordToForm(fallback) : null)
+      }
+    })()
+  }, [selectedDsRecordId, dsRecords, activeModule])
+
+  useEffect(() => {
+    if (!selectedDsRecord) {
+      setSelectedDsRecordEdit(null)
+      setIsDsRecordEditing(false)
+      return
+    }
+
+    setSelectedDsRecordEdit(dsRecordToForm(selectedDsRecord))
+  }, [selectedDsRecord])
+
+  useEffect(() => {
+    if (activeModule !== 'penhoras') {
+      setSelectedPenhorasRecord(null)
+      setSelectedPenhorasRecordEdit(null)
+      return
+    }
+    if (!selectedPenhorasRecordId) {
+      setSelectedPenhorasRecord(null)
+      setSelectedPenhorasRecordEdit(null)
+      setIsPenhorasRecordEditing(false)
+      return
+    }
+
+    void (async () => {
+      try {
+        const record = await api.getPenhorasRecord(selectedPenhorasRecordId)
+        setSelectedPenhorasRecord(record)
+        setSelectedPenhorasRecordEdit(penhorasRecordToForm(record))
+      } catch {
+        const fallback = penhorasRecords.find((item) => item.id === selectedPenhorasRecordId) ?? null
+        setSelectedPenhorasRecord(fallback)
+        setSelectedPenhorasRecordEdit(fallback ? penhorasRecordToForm(fallback) : null)
+      }
+    })()
+  }, [selectedPenhorasRecordId, penhorasRecords, activeModule])
+
+  useEffect(() => {
+    if (!selectedPenhorasRecord) {
+      setSelectedPenhorasRecordEdit(null)
+      setIsPenhorasRecordEditing(false)
+      return
+    }
+
+    setSelectedPenhorasRecordEdit(penhorasRecordToForm(selectedPenhorasRecord))
+  }, [selectedPenhorasRecord])
 
   useEffect(() => {
     if (!activeDashboardId) return
@@ -969,10 +2165,52 @@ function App() {
   }, [activeDashboardId, dashboardViews])
 
   useEffect(() => {
-    if (activeTab !== 'dashboards') return
+    if (!activeDsSavedViewId) return
+    const viewStillExists = savedViews.some((view) => view.id === activeDsSavedViewId && view.scope.startsWith('ds-'))
+    if (!viewStillExists) {
+      setActiveDsSavedViewId(null)
+    }
+  }, [activeDsSavedViewId, savedViews])
+
+  useEffect(() => {
+    if (!activePenhorasSavedViewId) return
+    const viewStillExists = savedViews.some((view) => view.id === activePenhorasSavedViewId && view.scope.startsWith('penhoras-'))
+    if (!viewStillExists) {
+      setActivePenhorasSavedViewId(null)
+    }
+  }, [activePenhorasSavedViewId, savedViews])
+
+  useEffect(() => {
+    if (!dsDefaultStatus) return
+    setDsEntryForm((current) => {
+      if (current.estadoId && dsOrderedStatuses.some((status) => status.id === current.estadoId)) {
+        return current
+      }
+      return {
+        ...current,
+        estadoId: dsDefaultStatus.id,
+      }
+    })
+  }, [dsDefaultStatus, dsOrderedStatuses])
+
+  useEffect(() => {
+    if (!penhorasDefaultStatus) return
+    setPenhorasEntryForm((current) => {
+      if (current.estadoId && penhorasOrderedStatuses.some((status) => status.id === current.estadoId)) {
+        return current
+      }
+      return {
+        ...current,
+        estadoId: penhorasDefaultStatus.id,
+      }
+    })
+  }, [penhorasDefaultStatus, penhorasOrderedStatuses])
+
+  useEffect(() => {
+    if (activeModule !== 'recibos' || activeTab !== 'dashboards') return
     void refreshDashboardSummary()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, dashboardFilters, globalSearch])
+  }, [activeModule, activeTab, dashboardFilters, globalSearch])
 
   useEffect(() => {
     if (activeTab !== 'dashboards' && dashboardFocusMode) {
@@ -988,9 +2226,19 @@ function App() {
       if (!resizeState) return
       const deltaY = event.clientY - resizeState.startY
       const nextHeight = clampDashboardWidgetHeight(resizeState.startHeight + deltaY)
-      setDashboardWidgets((current) =>
-        current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
-      )
+      if (resizeState.scope === 'recibos') {
+        setDashboardWidgets((current) =>
+          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
+        )
+      } else if (resizeState.scope === 'ds') {
+        setDsDashboardWidgets((current) =>
+          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
+        )
+      } else {
+        setPenhorasDashboardWidgets((current) =>
+          current.map((widget) => (widget.id === resizeState.widgetId ? { ...widget, minHeight: nextHeight } : widget)),
+        )
+      }
     }
 
     function stopResize() {
@@ -1076,6 +2324,38 @@ function App() {
     }
   }
 
+  async function refreshDsRecords() {
+    setDsRecordsLoading(true)
+    try {
+      const response = await api.getDsRecords({ ...dsFilters, q: globalSearch })
+      setDsRecords(response.items)
+      setDsTotalRecords(response.total)
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar registos DS.')
+    } finally {
+      setDsRecordsLoading(false)
+    }
+  }
+
+  async function refreshPenhorasRecords() {
+    setPenhorasRecordsLoading(true)
+    try {
+      const [response, fallbackStatuses] = await Promise.all([
+        api.getPenhorasRecords({ ...penhorasFilters, q: globalSearch }),
+        penhorasStatuses.length === 0 ? api.getPenhorasStatuses().catch(() => []) : Promise.resolve([] as StatusDefinition[]),
+      ])
+      setPenhorasRecords(response.items)
+      setPenhorasTotalRecords(response.total)
+      if (fallbackStatuses.length > 0) {
+        setPenhorasStatuses(fallbackStatuses)
+      }
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar registos Penhoras.')
+    } finally {
+      setPenhorasRecordsLoading(false)
+    }
+  }
+
   async function refreshDashboardSummary() {
     setDashboardLoading(true)
     try {
@@ -1094,6 +2374,16 @@ function App() {
   function dismissFeedback() {
     if (!feedback) return
     setFeedbackClosing(true)
+  }
+
+  function patchDsFilters<K extends keyof DsRecordFilters>(key: K, value: DsRecordFilters[K]) {
+    setActiveDsSavedViewId(null)
+    setDsFilters((current) => ({ ...current, [key]: value, page: 1 }))
+  }
+
+  function patchPenhorasFilters<K extends keyof PenhorasRecordFilters>(key: K, value: PenhorasRecordFilters[K]) {
+    setActivePenhorasSavedViewId(null)
+    setPenhorasFilters((current) => ({ ...current, [key]: value, page: 1 }))
   }
 
   async function saveDashboard(options?: { asNew?: boolean }) {
@@ -1180,6 +2470,36 @@ function App() {
     ])
   }
 
+  function addDsDashboardWidget(type: DsDashboardWidgetType) {
+    const baseLayout = defaultDsDashboardWidgetLayout(type)
+    setDsDashboardWidgets((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        type,
+        size: baseLayout.size,
+        minHeight: baseLayout.minHeight,
+        column: baseLayout.column,
+        colSpan: baseLayout.column === 'side' ? 1 : baseLayout.colSpan,
+      },
+    ])
+  }
+
+  function addPenhorasDashboardWidget(type: PenhorasDashboardWidgetType) {
+    const baseLayout = defaultPenhorasDashboardWidgetLayout(type)
+    setPenhorasDashboardWidgets((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        type,
+        size: baseLayout.size,
+        minHeight: baseLayout.minHeight,
+        column: baseLayout.column,
+        colSpan: baseLayout.column === 'side' ? 1 : baseLayout.colSpan,
+      },
+    ])
+  }
+
   function removeDashboardWidget(widgetId: string) {
     setDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
   }
@@ -1249,23 +2569,181 @@ function App() {
       current.map((widget) =>
         widget.id === widgetId
           ? {
-              ...widget,
-              minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
-            }
+            ...widget,
+            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
+          }
           : widget,
       ),
     )
   }
 
-  function startDashboardWidgetResize(event: ReactMouseEvent<HTMLButtonElement>, widget: DashboardWidget) {
+  function removeDsDashboardWidget(widgetId: string) {
+    setDsDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
+  }
+
+  function moveDsDashboardWidget(widgetId: string, direction: -1 | 1) {
+    setDsDashboardWidgets((current) => {
+      const index = current.findIndex((widget) => widget.id === widgetId)
+      if (index < 0) return current
+      const nextIndex = index + direction
+      if (nextIndex < 0 || nextIndex >= current.length) return current
+      const next = [...current]
+      const [item] = next.splice(index, 1)
+      next.splice(nextIndex, 0, item)
+      return next
+    })
+  }
+
+  function reorderDsDashboardWidgets(sourceWidgetId: string, targetWidgetId: string) {
+    if (sourceWidgetId === targetWidgetId) return
+    setDsDashboardWidgets((current) => {
+      const sourceIndex = current.findIndex((widget) => widget.id === sourceWidgetId)
+      const targetIndex = current.findIndex((widget) => widget.id === targetWidgetId)
+      if (sourceIndex < 0 || targetIndex < 0) return current
+      const next = [...current]
+      const [source] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, source)
+      return next
+    })
+  }
+
+  function adjustDsDashboardWidgetWidth(widgetId: string, delta: number) {
+    setDsDashboardWidgets((current) =>
+      current.map((widget) => {
+        if (widget.id !== widgetId) return widget
+        if (widget.column === 'side') return widget
+        const baseLayout = defaultDsDashboardWidgetLayout(widget.type)
+        const nextColSpan = clampDashboardWidgetColSpan((widget.colSpan || baseLayout.colSpan) + delta)
+        return {
+          ...widget,
+          colSpan: nextColSpan,
+          size: nextColSpan >= 2 ? 'wide' : widget.type === 'ds-recibos' ? 'kpi' : 'normal',
+        }
+      }),
+    )
+  }
+
+  function toggleDsDashboardWidgetColumn(widgetId: string) {
+    setDsDashboardWidgets((current) =>
+      current.map((widget) => {
+        if (widget.id !== widgetId) return widget
+        const baseLayout = defaultDsDashboardWidgetLayout(widget.type)
+        const nextColumn = widget.column === 'side' ? 'main' : 'side'
+        const nextColSpan = nextColumn === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || baseLayout.colSpan)
+        return {
+          ...widget,
+          column: nextColumn,
+          colSpan: nextColSpan,
+          size: nextColSpan >= 2 ? 'wide' : widget.type === 'ds-recibos' ? 'kpi' : 'normal',
+        }
+      }),
+    )
+  }
+
+  function adjustDsDashboardWidgetHeight(widgetId: string, delta: number) {
+    setDsDashboardWidgets((current) =>
+      current.map((widget) =>
+        widget.id === widgetId
+          ? {
+            ...widget,
+            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
+          }
+          : widget,
+      ),
+    )
+  }
+
+  function removePenhorasDashboardWidget(widgetId: string) {
+    setPenhorasDashboardWidgets((current) => current.filter((widget) => widget.id !== widgetId))
+  }
+
+  function movePenhorasDashboardWidget(widgetId: string, direction: -1 | 1) {
+    setPenhorasDashboardWidgets((current) => {
+      const index = current.findIndex((widget) => widget.id === widgetId)
+      if (index < 0) return current
+      const nextIndex = index + direction
+      if (nextIndex < 0 || nextIndex >= current.length) return current
+      const next = [...current]
+      const [item] = next.splice(index, 1)
+      next.splice(nextIndex, 0, item)
+      return next
+    })
+  }
+
+  function reorderPenhorasDashboardWidgets(sourceWidgetId: string, targetWidgetId: string) {
+    if (sourceWidgetId === targetWidgetId) return
+    setPenhorasDashboardWidgets((current) => {
+      const sourceIndex = current.findIndex((widget) => widget.id === sourceWidgetId)
+      const targetIndex = current.findIndex((widget) => widget.id === targetWidgetId)
+      if (sourceIndex < 0 || targetIndex < 0) return current
+      const next = [...current]
+      const [source] = next.splice(sourceIndex, 1)
+      next.splice(targetIndex, 0, source)
+      return next
+    })
+  }
+
+  function adjustPenhorasDashboardWidgetWidth(widgetId: string, delta: number) {
+    setPenhorasDashboardWidgets((current) =>
+      current.map((widget) => {
+        if (widget.id !== widgetId) return widget
+        if (widget.column === 'side') return widget
+        const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type)
+        const nextColSpan = clampDashboardWidgetColSpan((widget.colSpan || baseLayout.colSpan) + delta)
+        return {
+          ...widget,
+          colSpan: nextColSpan,
+          size: nextColSpan >= 2 ? 'wide' : 'normal',
+        }
+      }),
+    )
+  }
+
+  function togglePenhorasDashboardWidgetColumn(widgetId: string) {
+    setPenhorasDashboardWidgets((current) =>
+      current.map((widget) => {
+        if (widget.id !== widgetId) return widget
+        const baseLayout = defaultPenhorasDashboardWidgetLayout(widget.type)
+        const nextColumn = widget.column === 'side' ? 'main' : 'side'
+        const nextColSpan = nextColumn === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || baseLayout.colSpan)
+        return {
+          ...widget,
+          column: nextColumn,
+          colSpan: nextColSpan,
+          size: nextColSpan >= 2 ? 'wide' : 'normal',
+        }
+      }),
+    )
+  }
+
+  function adjustPenhorasDashboardWidgetHeight(widgetId: string, delta: number) {
+    setPenhorasDashboardWidgets((current) =>
+      current.map((widget) =>
+        widget.id === widgetId
+          ? {
+            ...widget,
+            minHeight: clampDashboardWidgetHeight(widget.minHeight + delta),
+          }
+          : widget,
+      ),
+    )
+  }
+
+  function startDashboardWidgetResize(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    scope: DashboardWidgetScope,
+    widgetId: string,
+    currentHeight: number,
+  ) {
     event.preventDefault()
     event.stopPropagation()
     widgetResizeRef.current = {
-      widgetId: widget.id,
+      scope,
+      widgetId,
       startY: event.clientY,
-      startHeight: widget.minHeight,
+      startHeight: currentHeight,
     }
-    setResizingDashboardWidgetId(widget.id)
+    setResizingDashboardWidgetId(widgetId)
   }
 
   function handleEntryInput<K extends keyof EntryForm>(key: K, value: EntryForm[K]) {
@@ -1286,6 +2764,28 @@ function App() {
         return applyFormAutoCalculations(next, calculationSettings, key === 'valorIndicado')
       }
       return next
+    })
+  }
+
+  function handleDsEntryInput<K extends keyof DsEntryForm>(key: K, value: DsEntryForm[K]) {
+    setDsEntryForm((current) => ({ ...current, [key]: value }))
+  }
+
+  function handleDsRecordEditInput<K extends keyof DsEntryForm>(key: K, value: DsEntryForm[K]) {
+    setSelectedDsRecordEdit((current) => {
+      if (!current) return current
+      return { ...current, [key]: value }
+    })
+  }
+
+  function handlePenhorasEntryInput<K extends keyof PenhorasEntryForm>(key: K, value: PenhorasEntryForm[K]) {
+    setPenhorasEntryForm((current) => ({ ...current, [key]: value }))
+  }
+
+  function handlePenhorasRecordEditInput<K extends keyof PenhorasEntryForm>(key: K, value: PenhorasEntryForm[K]) {
+    setSelectedPenhorasRecordEdit((current) => {
+      if (!current) return current
+      return { ...current, [key]: value }
     })
   }
 
@@ -1316,6 +2816,76 @@ function App() {
     await submitEntry(fakeEvent, 'saveNew')
   }
 
+  async function submitDsEntry(event: FormEvent<HTMLFormElement>, saveMode: 'save' | 'saveNew') {
+    event.preventDefault()
+
+    const payload = dsFormToPayload(dsEntryForm)
+    const hasMinimumData = Boolean(
+      payload.gestora ||
+      payload.proponentes ||
+      payload.referencia ||
+      payload.produto ||
+      payload.entidadeBancaria ||
+      payload.recibo ||
+      payload.valorRaw ||
+      payload.comissaoLojaRaw ||
+      payload.totalComissaoLojaCmIvaRaw,
+    )
+
+    if (!hasMinimumData) {
+      setFeedback('Preencha pelo menos Gestora, Proponentes, Referência, Produto, Entidade, Recibo ou valores.')
+      return
+    }
+
+    try {
+      await api.createDsRecord(payload)
+      setFeedback('Registo DS guardado com sucesso.')
+      if (saveMode === 'saveNew' && dsDefaultStatus) {
+        setDsEntryForm(getInitialDsEntryForm(dsDefaultStatus.id))
+      } else {
+        setActiveTab('consulta')
+      }
+      await refreshDsRecords()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar registo DS.')
+    }
+  }
+
+  async function saveNewDsEntry() {
+    const fakeEvent = { preventDefault: () => undefined } as FormEvent<HTMLFormElement>
+    await submitDsEntry(fakeEvent, 'saveNew')
+  }
+
+  async function submitPenhorasEntry(event: FormEvent<HTMLFormElement>, saveMode: 'save' | 'saveNew') {
+    event.preventDefault()
+
+    const payload = penhorasFormToPayload(penhorasEntryForm)
+    const hasMinimumData = Boolean(payload.pe || payload.acto || payload.identificacao || payload.pedido || payload.gestor || payload.dataPedido)
+
+    if (!hasMinimumData) {
+      setFeedback('Preencha pelo menos PE, Acto, Identificação, Pedido, Gestor ou Data pedido.')
+      return
+    }
+
+    try {
+      await api.createPenhorasRecord(payload)
+      setFeedback('Registo Penhoras guardado com sucesso.')
+      if (saveMode === 'saveNew' && penhorasDefaultStatus) {
+        setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasDefaultStatus.id))
+      } else {
+        setActiveTab('consulta')
+      }
+      await refreshPenhorasRecords()
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar registo Penhoras.')
+    }
+  }
+
+  async function saveNewPenhorasEntry() {
+    const fakeEvent = { preventDefault: () => undefined } as FormEvent<HTMLFormElement>
+    await submitPenhorasEntry(fakeEvent, 'saveNew')
+  }
+
   async function updateRecordStatus(
     recordId: string,
     statusId: string,
@@ -1341,6 +2911,32 @@ function App() {
       setFeedback('Estado atualizado.')
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado.')
+    }
+  }
+
+  async function updateDsRecordStatus(recordId: string, statusId: string) {
+    const previous = dsRecords.find((record) => record.id === recordId)
+    if (previous && previous.estadoId === statusId) return
+
+    try {
+      await api.updateDsRecordStatus(recordId, statusId)
+      await refreshDsRecords()
+      setFeedback('Estado DS atualizado.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado DS.')
+    }
+  }
+
+  async function updatePenhorasRecordStatus(recordId: string, statusId: string) {
+    const previous = penhorasRecords.find((record) => record.id === recordId)
+    if (previous && previous.estadoId === statusId) return
+
+    try {
+      await api.updatePenhorasRecordStatus(recordId, statusId)
+      await refreshPenhorasRecords()
+      setFeedback('Estado Penhoras atualizado.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado Penhoras.')
     }
   }
 
@@ -1416,6 +3012,34 @@ function App() {
     }
   }
 
+  async function saveSelectedDsRecordEdits() {
+    if (!selectedDsRecord || !selectedDsRecordEdit) return
+
+    try {
+      await api.patchDsRecord(selectedDsRecord.id, dsFormToPayload(selectedDsRecordEdit))
+      setIsDsRecordEditing(false)
+      await refreshDsRecords()
+      setSelectedDsRecordId(selectedDsRecord.id)
+      setFeedback('Registo DS atualizado.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar registo DS.')
+    }
+  }
+
+  async function saveSelectedPenhorasRecordEdits() {
+    if (!selectedPenhorasRecord || !selectedPenhorasRecordEdit) return
+
+    try {
+      await api.patchPenhorasRecord(selectedPenhorasRecord.id, penhorasFormToPayload(selectedPenhorasRecordEdit))
+      setIsPenhorasRecordEditing(false)
+      await refreshPenhorasRecords()
+      setSelectedPenhorasRecordId(selectedPenhorasRecord.id)
+      setFeedback('Registo Penhoras atualizado.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar registo Penhoras.')
+    }
+  }
+
   function toggleSelectRecord(recordId: string) {
     setSelectedIds((current) => (current.includes(recordId) ? current.filter((id) => id !== recordId) : [...current, recordId]))
   }
@@ -1473,6 +3097,187 @@ function App() {
       setFeedback('Snapshot atual exportado com sucesso.')
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Falha ao exportar snapshot.')
+    }
+  }
+
+  function buildQuickNotesFileName(extension: 'txt' | 'pdf'): string {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    return `mesa-recibos-notas-${stamp}.${extension}`
+  }
+
+  function buildSmartNotesFileName(extension: 'txt' | 'pdf'): string {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+    return `mesa-recibos-notas-calculo-${stamp}.${extension}`
+  }
+
+  function buildSmartNotesExportText(): string {
+    const content = smartNotesText.trim()
+    if (!content) return ''
+
+    const sections = [
+      'Notas com cálculo',
+      `Exportado: ${new Date().toLocaleString('pt-PT')}`,
+      '',
+      content,
+    ]
+
+    if (smartNotesResults.length > 0) {
+      sections.push('', 'Resultados', ...smartNotesResults.map((row) => `L${row.lineNumber}: ${row.expression} = ${formatSmartNotesValue(row.result)}`))
+    }
+
+    if (smartNotesErrors.length > 0) {
+      sections.push('', 'Linhas com erro', ...smartNotesErrors.map((row) => `L${row.lineNumber}: ${row.error}`))
+    }
+
+    return sections.join('\n')
+  }
+
+  function removeSmartNotesLine(lineNumber: number) {
+    setSmartNotesText((current) => {
+      const lines = current.split('\n')
+      if (lineNumber < 1 || lineNumber > lines.length) return current
+      lines.splice(lineNumber - 1, 1)
+      return lines.join('\n')
+    })
+  }
+
+  function toggleSmartNotesPinned(signature: string) {
+    setSmartNotesPinnedSignatures((current) => {
+      if (current.includes(signature)) {
+        return current.filter((value) => value !== signature)
+      }
+      return [signature, ...current].slice(0, 200)
+    })
+  }
+
+  function toggleSmartNotesSaved(row: SmartNotesResultRow) {
+    setSmartNotesSavedEntries((current) => {
+      const alreadySaved = current.some((entry) => entry.signature === row.signature)
+      if (alreadySaved) {
+        return current.filter((entry) => entry.signature !== row.signature)
+      }
+      return [
+        {
+          signature: row.signature,
+          expression: row.expression,
+          result: row.result,
+          source: row.source,
+          savedAt: new Date().toISOString(),
+        },
+        ...current,
+      ].slice(0, 200)
+    })
+  }
+
+  function exportQuickNotesTxt() {
+    const content = quickNotes.trim()
+    if (!content) {
+      setFeedback('Sem notas para exportar.')
+      return
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = buildQuickNotesFileName('txt')
+    link.click()
+    URL.revokeObjectURL(link.href)
+    setFeedback('Notas exportadas em TXT.')
+  }
+
+  function exportQuickNotesPdf() {
+    const content = quickNotes.trim()
+    if (!content) {
+      setFeedback('Sem notas para exportar.')
+      return
+    }
+
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+      const margin = 44
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.text('Notas rápidas', margin, 42)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text(new Date().toLocaleString('pt-PT'), margin, 58)
+
+      doc.setFontSize(12)
+      const lines = doc.splitTextToSize(content, pageWidth - margin * 2)
+      let y = 86
+
+      for (const line of lines) {
+        if (y > pageHeight - margin) {
+          doc.addPage()
+          y = margin
+        }
+        doc.text(line, margin, y)
+        y += 16
+      }
+
+      doc.save(buildQuickNotesFileName('pdf'))
+      setFeedback('Notas exportadas em PDF.')
+    } catch {
+      setFeedback('Falha ao exportar notas em PDF.')
+    }
+  }
+
+  function exportSmartNotesTxt() {
+    const content = buildSmartNotesExportText()
+    if (!content) {
+      setFeedback('Sem notas com cálculo para exportar.')
+      return
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = buildSmartNotesFileName('txt')
+    link.click()
+    URL.revokeObjectURL(link.href)
+    setFeedback('Notas com cálculo exportadas em TXT.')
+  }
+
+  function exportSmartNotesPdf() {
+    const content = buildSmartNotesExportText()
+    if (!content) {
+      setFeedback('Sem notas com cálculo para exportar.')
+      return
+    }
+
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+      const margin = 44
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.text('Notas com cálculo', margin, 42)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text(new Date().toLocaleString('pt-PT'), margin, 58)
+
+      doc.setFontSize(12)
+      const lines = doc.splitTextToSize(content, pageWidth - margin * 2)
+      let y = 86
+
+      for (const line of lines) {
+        if (y > pageHeight - margin) {
+          doc.addPage()
+          y = margin
+        }
+        doc.text(line, margin, y)
+        y += 16
+      }
+
+      doc.save(buildSmartNotesFileName('pdf'))
+      setFeedback('Notas com cálculo exportadas em PDF.')
+    } catch {
+      setFeedback('Falha ao exportar notas com cálculo em PDF.')
     }
   }
 
@@ -1538,6 +3343,108 @@ function App() {
     }
   }
 
+  async function handleDsImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setDsImportLoading(true)
+    setFeedback('')
+
+    try {
+      const parsed = await parseDsWorkbook(file.name, await file.arrayBuffer())
+      setDsImportPreview(parsed)
+      const preview = await api.previewDsImport({ rows: parsed.rows })
+      setDsImportServerPreview(preview)
+      setFeedback(`Pré-visualização DS pronta: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
+    } catch (error) {
+      setDsImportPreview(null)
+      setDsImportServerPreview(null)
+      setFeedback(error instanceof Error ? error.message : 'Falha ao processar importação DS.')
+    } finally {
+      setDsImportLoading(false)
+      event.target.value = ''
+    }
+  }
+
+  async function refreshDsImportPreview() {
+    if (!dsImportPreview) return
+    try {
+      const preview = await api.previewDsImport({ rows: dsImportPreview.rows })
+      setDsImportServerPreview(preview)
+      setFeedback(`Pré-visualização DS atualizada: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha a rever conflitos DS.')
+    }
+  }
+
+  async function runDsImportCommit() {
+    if (!dsImportPreview) return
+    try {
+      const result = await api.commitDsImport({
+        rows: dsImportPreview.rows,
+        strategy: dsImportStrategy,
+      })
+      setFeedback(`Importação DS concluída (${dsImportStrategy}): ${JSON.stringify(result.summary)}`)
+      setDsImportPreview(null)
+      setDsImportServerPreview(null)
+      await refreshDsRecords()
+      setActiveTab('tabela')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao concluir importação DS.')
+    }
+  }
+
+  async function handlePenhorasImportFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setPenhorasImportLoading(true)
+    setFeedback('')
+
+    try {
+      const parsed = await parsePenhorasWorkbook(file.name, await file.arrayBuffer())
+      setPenhorasImportPreview(parsed)
+      const preview = await api.previewPenhorasImport({ rows: parsed.rows })
+      setPenhorasImportServerPreview(preview)
+      setFeedback(`Pré-visualização Penhoras pronta: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
+    } catch (error) {
+      setPenhorasImportPreview(null)
+      setPenhorasImportServerPreview(null)
+      setFeedback(error instanceof Error ? error.message : 'Falha ao processar importação Penhoras.')
+    } finally {
+      setPenhorasImportLoading(false)
+      event.target.value = ''
+    }
+  }
+
+  async function refreshPenhorasImportPreview() {
+    if (!penhorasImportPreview) return
+    try {
+      const preview = await api.previewPenhorasImport({ rows: penhorasImportPreview.rows })
+      setPenhorasImportServerPreview(preview)
+      setFeedback(`Pré-visualização Penhoras atualizada: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha a rever conflitos Penhoras.')
+    }
+  }
+
+  async function runPenhorasImportCommit() {
+    if (!penhorasImportPreview) return
+    try {
+      const result = await api.commitPenhorasImport({
+        rows: penhorasImportPreview.rows,
+        strategy: penhorasImportStrategy,
+      })
+      setFeedback(`Importação Penhoras concluída (${penhorasImportStrategy}): ${JSON.stringify(result.summary)}`)
+      setPenhorasImportPreview(null)
+      setPenhorasImportServerPreview(null)
+      await refreshPenhorasRecords()
+      setActiveTab('tabela')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao concluir importação Penhoras.')
+    }
+  }
+
   async function loadSeed(replace = false) {
     try {
       const response = await api.seedDatabase(replace)
@@ -1591,6 +3498,46 @@ function App() {
     }
   }
 
+  async function saveDsStatuses() {
+    try {
+      for (const status of dsStatuses) {
+        await api.updateDsStatus(status.id, {
+          key: status.key,
+          label: status.label,
+          icon: status.icon,
+          color: status.color,
+          active: status.active,
+          order: status.order,
+        })
+      }
+      setFeedback('Estados DS atualizados.')
+      const refreshedStatuses = await api.getDsStatuses()
+      setDsStatuses(refreshedStatuses)
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar estados DS.')
+    }
+  }
+
+  async function savePenhorasStatuses() {
+    try {
+      for (const status of penhorasStatuses) {
+        await api.updatePenhorasStatus(status.id, {
+          key: status.key,
+          label: status.label,
+          icon: status.icon,
+          color: status.color,
+          active: status.active,
+          order: status.order,
+        })
+      }
+      setFeedback('Estados Penhoras atualizados.')
+      const refreshedStatuses = await api.getPenhorasStatuses()
+      setPenhorasStatuses(refreshedStatuses)
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar estados Penhoras.')
+    }
+  }
+
   async function addStatus() {
     try {
       const created = await api.createStatus({
@@ -1604,6 +3551,38 @@ function App() {
       setStatuses((current) => [...current, created])
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado.')
+    }
+  }
+
+  async function addDsStatus() {
+    try {
+      const created = await api.createDsStatus({
+        key: `ds-custom-${crypto.randomUUID().slice(0, 8)}`,
+        label: 'Novo estado DS',
+        icon: 'circle',
+        color: '#D9E2EC',
+        active: true,
+        order: dsStatuses.length + 1,
+      })
+      setDsStatuses((current) => [...current, created])
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado DS.')
+    }
+  }
+
+  async function addPenhorasStatus() {
+    try {
+      const created = await api.createPenhorasStatus({
+        key: `penhoras-custom-${crypto.randomUUID().slice(0, 8)}`,
+        label: 'Novo estado Penhoras',
+        icon: 'circle',
+        color: '#D9E2EC',
+        active: true,
+        order: penhorasStatuses.length + 1,
+      })
+      setPenhorasStatuses((current) => [...current, created])
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado Penhoras.')
     }
   }
 
@@ -1644,16 +3623,97 @@ function App() {
     }
   }
 
-  async function saveCurrentView(scope: 'tabela', filtersPayload: Record<string, unknown>) {
+  async function removeDsStatus(statusId: string) {
+    try {
+      await api.deleteDsStatus(statusId)
+      setDsStatuses((current) => current.filter((status) => status.id !== statusId))
+      setFeedback('Estado DS removido.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao remover estado DS.'
+      if (message.includes('Estado DS em uso')) {
+        const fallbackStatus =
+          dsOrderedStatuses.find((status) => status.id !== statusId && status.active) ??
+          dsOrderedStatuses.find((status) => status.id !== statusId)
+        if (!fallbackStatus) {
+          setFeedback('Não existe estado DS alternativo para reatribuição.')
+          return
+        }
+        const confirmed = window.confirm(
+          `Este estado DS está em uso. Pretende reatribuir os registos para "${fallbackStatus.label}" e remover mesmo assim?`,
+        )
+        if (!confirmed) return
+        try {
+          await api.deleteDsStatus(statusId, { reassignToStatusId: fallbackStatus.id })
+          const refreshedStatuses = await api.getDsStatuses()
+          setDsStatuses(refreshedStatuses)
+          await refreshDsRecords()
+          setFeedback(`Estado DS removido e registos reatribuídos para "${fallbackStatus.label}".`)
+          return
+        } catch (reassignError) {
+          setFeedback(reassignError instanceof Error ? reassignError.message : 'Falha ao remover estado DS com reatribuição.')
+          return
+        }
+      }
+      setFeedback(message)
+    }
+  }
+
+  async function removePenhorasStatus(statusId: string) {
+    try {
+      await api.deletePenhorasStatus(statusId)
+      setPenhorasStatuses((current) => current.filter((status) => status.id !== statusId))
+      setFeedback('Estado Penhoras removido.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Falha ao remover estado Penhoras.'
+      if (message.includes('Estado Penhoras em uso')) {
+        const fallbackStatus =
+          penhorasOrderedStatuses.find((status) => status.id !== statusId && status.active) ??
+          penhorasOrderedStatuses.find((status) => status.id !== statusId)
+        if (!fallbackStatus) {
+          setFeedback('Não existe estado Penhoras alternativo para reatribuição.')
+          return
+        }
+        const confirmed = window.confirm(
+          `Este estado Penhoras está em uso. Pretende reatribuir os registos para "${fallbackStatus.label}" e remover mesmo assim?`,
+        )
+        if (!confirmed) return
+        try {
+          await api.deletePenhorasStatus(statusId, { reassignToStatusId: fallbackStatus.id })
+          const refreshedStatuses = await api.getPenhorasStatuses()
+          setPenhorasStatuses(refreshedStatuses)
+          await refreshPenhorasRecords()
+          setFeedback(`Estado Penhoras removido e registos reatribuídos para "${fallbackStatus.label}".`)
+          return
+        } catch (reassignError) {
+          setFeedback(reassignError instanceof Error ? reassignError.message : 'Falha ao remover estado Penhoras com reatribuição.')
+          return
+        }
+      }
+      setFeedback(message)
+    }
+  }
+
+  async function saveCurrentView(
+    scope: 'tabela' | 'ds-tabela' | 'ds-dashboard' | 'penhoras-tabela' | 'penhoras-dashboard',
+    filtersPayload: Record<string, unknown>,
+  ) {
     const name = window.prompt('Nome da vista')
     if (!name) return
 
     try {
       const created = await api.createSavedView({ name, scope, filters: filtersPayload })
       setSavedViews((current) => [created, ...current])
-      setFeedback('Vista guardada.')
+      setFeedback(scope.startsWith('ds-') ? 'Vista DS guardada.' : scope.startsWith('penhoras-') ? 'Vista Penhoras guardada.' : 'Vista guardada.')
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar vista.')
+      setFeedback(
+        error instanceof Error
+          ? error.message
+          : scope.startsWith('ds-')
+            ? 'Falha ao guardar vista DS.'
+            : scope.startsWith('penhoras-')
+              ? 'Falha ao guardar vista Penhoras.'
+              : 'Falha ao guardar vista.',
+      )
     }
   }
 
@@ -1736,6 +3796,162 @@ function App() {
     setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
   }
 
+  async function deleteDsSavedView(viewId: string) {
+    const confirmed = window.confirm('Eliminar esta vista DS guardada?')
+    if (!confirmed) return
+
+    try {
+      await api.deleteSavedView(viewId)
+      const nextSavedViews = savedViews.filter((view) => view.id !== viewId)
+      const nextDisabledIds = disabledSavedViewIds.filter((id) => id !== viewId)
+      setSavedViews(nextSavedViews)
+      setDisabledSavedViewIds(nextDisabledIds)
+
+      if (activeDsSavedViewId === viewId) {
+        const fallbackView = nextSavedViews
+          .filter((view) => (view.scope === 'ds-tabela' || view.scope === 'ds-dashboard') && !nextDisabledIds.includes(view.id))
+          .find(Boolean)
+        if (fallbackView) {
+          applyDsView(fallbackView, { enableIfDisabled: false })
+        } else {
+          clearDsFilters({ silent: true })
+        }
+      }
+      setFeedback('Vista DS eliminada.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar vista DS.')
+    }
+  }
+
+  function toggleDsSavedViewDisabled(viewId: string) {
+    const isDisabled = disabledSavedViewIds.includes(viewId)
+    const dsViews = savedViews.filter((view) => view.scope === 'ds-tabela' || view.scope === 'ds-dashboard')
+
+    if (isDisabled) {
+      setDisabledSavedViewIds((current) => current.filter((id) => id !== viewId))
+      const view = dsViews.find((item) => item.id === viewId)
+      if (view) {
+        applyDsView(view, { enableIfDisabled: false })
+      }
+      return
+    }
+
+    const nextDisabledIds = [...disabledSavedViewIds, viewId]
+    setDisabledSavedViewIds(nextDisabledIds)
+
+    if (activeDsSavedViewId === viewId) {
+      const fallbackView = dsViews.find((view) => view.id !== viewId && !nextDisabledIds.includes(view.id))
+      if (fallbackView) {
+        applyDsView(fallbackView, { enableIfDisabled: false })
+      } else {
+        clearDsFilters({ silent: true })
+      }
+    }
+  }
+
+  function clearDsFilters(options?: { silent?: boolean }) {
+    setDsFilters(DEFAULT_DS_FILTERS)
+    setGlobalSearch('')
+    setActiveDsSavedViewId(null)
+    if (!options?.silent) {
+      setFeedback('Filtros DS limpos.')
+    }
+  }
+
+  function applyDsView(view: SavedView, options?: { enableIfDisabled?: boolean }) {
+    const payload = view.filters
+    setActiveDsSavedViewId(view.id)
+    if (options?.enableIfDisabled ?? true) {
+      setDisabledSavedViewIds((current) => current.filter((id) => id !== view.id))
+    }
+    setDsFilters(sanitizeDsFilters(payload))
+    if (view.scope === 'ds-dashboard') {
+      const parsedWidgets = parseDsDashboardWidgets((payload as Record<string, unknown>).widgets)
+      if (parsedWidgets.length > 0) {
+        setDsDashboardWidgets(parsedWidgets)
+      }
+    }
+    setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
+  }
+
+  async function deletePenhorasSavedView(viewId: string) {
+    const confirmed = window.confirm('Eliminar esta vista Penhoras guardada?')
+    if (!confirmed) return
+
+    try {
+      await api.deleteSavedView(viewId)
+      const nextSavedViews = savedViews.filter((view) => view.id !== viewId)
+      const nextDisabledIds = disabledSavedViewIds.filter((id) => id !== viewId)
+      setSavedViews(nextSavedViews)
+      setDisabledSavedViewIds(nextDisabledIds)
+
+      if (activePenhorasSavedViewId === viewId) {
+        const fallbackView = nextSavedViews
+          .filter((view) => (view.scope === 'penhoras-tabela' || view.scope === 'penhoras-dashboard') && !nextDisabledIds.includes(view.id))
+          .find(Boolean)
+        if (fallbackView) {
+          applyPenhorasView(fallbackView, { enableIfDisabled: false })
+        } else {
+          clearPenhorasFilters({ silent: true })
+        }
+      }
+      setFeedback('Vista Penhoras eliminada.')
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar vista Penhoras.')
+    }
+  }
+
+  function togglePenhorasSavedViewDisabled(viewId: string) {
+    const isDisabled = disabledSavedViewIds.includes(viewId)
+    const penhorasViews = savedViews.filter((view) => view.scope === 'penhoras-tabela' || view.scope === 'penhoras-dashboard')
+
+    if (isDisabled) {
+      setDisabledSavedViewIds((current) => current.filter((id) => id !== viewId))
+      const view = penhorasViews.find((item) => item.id === viewId)
+      if (view) {
+        applyPenhorasView(view, { enableIfDisabled: false })
+      }
+      return
+    }
+
+    const nextDisabledIds = [...disabledSavedViewIds, viewId]
+    setDisabledSavedViewIds(nextDisabledIds)
+
+    if (activePenhorasSavedViewId === viewId) {
+      const fallbackView = penhorasViews.find((view) => view.id !== viewId && !nextDisabledIds.includes(view.id))
+      if (fallbackView) {
+        applyPenhorasView(fallbackView, { enableIfDisabled: false })
+      } else {
+        clearPenhorasFilters({ silent: true })
+      }
+    }
+  }
+
+  function clearPenhorasFilters(options?: { silent?: boolean }) {
+    setPenhorasFilters(DEFAULT_PENHORAS_FILTERS)
+    setGlobalSearch('')
+    setActivePenhorasSavedViewId(null)
+    if (!options?.silent) {
+      setFeedback('Filtros Penhoras limpos.')
+    }
+  }
+
+  function applyPenhorasView(view: SavedView, options?: { enableIfDisabled?: boolean }) {
+    const payload = view.filters
+    setActivePenhorasSavedViewId(view.id)
+    if (options?.enableIfDisabled ?? true) {
+      setDisabledSavedViewIds((current) => current.filter((id) => id !== view.id))
+    }
+    setPenhorasFilters(sanitizePenhorasFilters(payload))
+    if (view.scope === 'penhoras-dashboard') {
+      const parsedWidgets = parsePenhorasDashboardWidgets((payload as Record<string, unknown>).widgets)
+      if (parsedWidgets.length > 0) {
+        setPenhorasDashboardWidgets(parsedWidgets)
+      }
+    }
+    setGlobalSearch(typeof payload.q === 'string' ? payload.q : '')
+  }
+
   function toggleTotalMetric(metric: TotalMetricKey) {
     setSelectedTotalMetrics((current) => {
       if (current.includes(metric)) {
@@ -1748,6 +3964,14 @@ function App() {
 
   function updateStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
     setStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
+  }
+
+  function updateDsStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
+    setDsStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
+  }
+
+  function updatePenhorasStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
+    setPenhorasStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
   }
 
   function renderDashboardKpi(label: string, value: number, currency = false) {
@@ -1869,9 +4093,8 @@ function App() {
     return (
       <article
         key={widget.id}
-        className={`dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''} ${
-          dropDashboardWidgetId === widget.id ? 'drop-target' : ''
-        } ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
+        className={`dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''} ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''
+          } ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
         style={{ height: `${widget.minHeight}px` }}
         draggable={!resizingDashboardWidgetId}
         onDragStart={(event) => {
@@ -1984,13 +4207,547 @@ function App() {
             className="subtle-btn icon-btn micro resize-widget-handle"
             type="button"
             title="Arrastar para redimensionar altura"
-            onMouseDown={(event) => startDashboardWidgetResize(event, widget)}
+            onMouseDown={(event) => startDashboardWidgetResize(event, 'recibos', widget.id, widget.minHeight)}
           >
             ⇳
           </button>
         </div>
       </article>
     )
+  }
+
+  function renderDsDashboardWidget(widget: DsDashboardWidget) {
+    const effectiveColSpan = widget.column === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || 1)
+    const canShrinkWidth = widget.column !== 'side' && effectiveColSpan > DASHBOARD_WIDGET_MIN_COL_SPAN
+    const canGrowWidth = widget.column !== 'side' && effectiveColSpan < DASHBOARD_WIDGET_MAX_COL_SPAN
+
+    const headerLabel =
+      widget.type === 'ds-status'
+        ? 'Estado DS'
+        : widget.type === 'ds-top-gestoras'
+          ? 'Top gestoras'
+          : widget.type === 'ds-top-entidades'
+            ? 'Top entidades'
+            : widget.type === 'ds-mensal'
+              ? 'Tendência mensal (12 meses)'
+              : 'Recibos'
+
+    let content: ReactNode
+    if (widget.type === 'ds-status') {
+      content = renderDashboardBars(dsDashboardByStatus)
+    } else if (widget.type === 'ds-top-gestoras') {
+      content = renderDashboardBars(dsDashboardTopGestoras)
+    } else if (widget.type === 'ds-top-entidades') {
+      content = renderDashboardBars(dsDashboardTopEntidades)
+    } else if (widget.type === 'ds-mensal') {
+      content = renderDashboardBars(dsDashboardByMonth, { currency: true })
+    } else {
+      content = (
+        <>
+          {renderDashboardKpi('Com recibo', dsDashboardTotals.comRecibo)}
+          {renderDashboardKpi('Sem recibo', dsDashboardTotals.semRecibo)}
+          {renderDashboardKpi('Comissão gestor', dsDashboardTotals.comissaoGestor, true)}
+        </>
+      )
+    }
+
+    return (
+      <article
+        key={widget.id}
+        className={`dashboard-widget-card ds-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
+          } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
+        style={{ height: `${widget.minHeight}px` }}
+        draggable={!resizingDashboardWidgetId}
+        onDragStart={(event) => {
+          if (resizingDashboardWidgetId) {
+            event.preventDefault()
+            return
+          }
+          setDraggedDashboardWidgetId(widget.id)
+          setDropDashboardWidgetId(widget.id)
+          event.dataTransfer.effectAllowed = 'move'
+          event.dataTransfer.setData('text/plain', widget.id)
+        }}
+        onDragOver={(event) => {
+          event.preventDefault()
+          if (dropDashboardWidgetId !== widget.id) {
+            setDropDashboardWidgetId(widget.id)
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault()
+          const sourceWidgetId = event.dataTransfer.getData('text/plain') || draggedDashboardWidgetId
+          if (sourceWidgetId) {
+            reorderDsDashboardWidgets(sourceWidgetId, widget.id)
+          }
+          setDraggedDashboardWidgetId(null)
+          setDropDashboardWidgetId(null)
+        }}
+        onDragEnd={() => {
+          setDraggedDashboardWidgetId(null)
+          setDropDashboardWidgetId(null)
+        }}
+      >
+        <div className="dashboard-widget-head">
+          <h4>{headerLabel}</h4>
+          <div className="dashboard-widget-actions">
+            <button className="subtle-btn icon-btn micro drag-handle-btn" type="button" title="Arrastar widget">
+              <GripVertical size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mover para coluna principal' : 'Mover para coluna lateral'}
+              onClick={() => toggleDsDashboardWidgetColumn(widget.id)}
+            >
+              {widget.column === 'side' ? '↤' : '↦'}
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Diminuir largura'}
+              onClick={() => adjustDsDashboardWidgetWidth(widget.id, -1)}
+              disabled={!canShrinkWidth}
+            >
+              <Minimize2 size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Aumentar largura'}
+              onClick={() => adjustDsDashboardWidgetWidth(widget.id, 1)}
+              disabled={!canGrowWidth}
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Diminuir altura"
+              onClick={() => adjustDsDashboardWidgetHeight(widget.id, -80)}
+            >
+              <Minus size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Aumentar altura"
+              onClick={() => adjustDsDashboardWidgetHeight(widget.id, 80)}
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Mover para cima"
+              onClick={() => moveDsDashboardWidget(widget.id, -1)}
+            >
+              ↑
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Mover para baixo"
+              onClick={() => moveDsDashboardWidget(widget.id, 1)}
+            >
+              ↓
+            </button>
+            <button
+              className="subtle-btn icon-btn micro danger"
+              type="button"
+              title="Remover widget"
+              onClick={() => removeDsDashboardWidget(widget.id)}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-widget-content">
+          {dsRecordsLoading && dsRecords.length === 0 ? <div className="small-note">A carregar dados…</div> : content}
+        </div>
+        <div className="dashboard-widget-footer">
+          <button
+            className="subtle-btn icon-btn micro resize-widget-handle"
+            type="button"
+            title="Arrastar para redimensionar altura"
+            onMouseDown={(event) => startDashboardWidgetResize(event, 'ds', widget.id, widget.minHeight)}
+          >
+            ⇳
+          </button>
+        </div>
+      </article>
+    )
+  }
+
+  function renderPenhorasDashboardWidget(widget: PenhorasDashboardWidget) {
+    const effectiveColSpan = widget.column === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || 1)
+    const canShrinkWidth = widget.column !== 'side' && effectiveColSpan > DASHBOARD_WIDGET_MIN_COL_SPAN
+    const canGrowWidth = widget.column !== 'side' && effectiveColSpan < DASHBOARD_WIDGET_MAX_COL_SPAN
+
+    const headerLabel =
+      widget.type === 'penhoras-status'
+        ? 'Estado Penhoras'
+        : widget.type === 'penhoras-top-gestores'
+          ? 'Top gestores'
+          : 'Tendência mensal (12 meses)'
+
+    const content =
+      widget.type === 'penhoras-status'
+        ? renderDashboardBars(penhorasDashboardByStatus)
+        : widget.type === 'penhoras-top-gestores'
+          ? renderDashboardBars(penhorasDashboardTopGestores)
+          : renderDashboardBars(penhorasDashboardByMonth)
+
+    return (
+      <article
+        key={widget.id}
+        className={`dashboard-widget-card ds-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
+          } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
+        style={{ height: `${widget.minHeight}px` }}
+        draggable={!resizingDashboardWidgetId}
+        onDragStart={(event) => {
+          if (resizingDashboardWidgetId) {
+            event.preventDefault()
+            return
+          }
+          setDraggedDashboardWidgetId(widget.id)
+          setDropDashboardWidgetId(widget.id)
+          event.dataTransfer.effectAllowed = 'move'
+          event.dataTransfer.setData('text/plain', widget.id)
+        }}
+        onDragOver={(event) => {
+          event.preventDefault()
+          if (dropDashboardWidgetId !== widget.id) {
+            setDropDashboardWidgetId(widget.id)
+          }
+        }}
+        onDrop={(event) => {
+          event.preventDefault()
+          const sourceWidgetId = event.dataTransfer.getData('text/plain') || draggedDashboardWidgetId
+          if (sourceWidgetId) {
+            reorderPenhorasDashboardWidgets(sourceWidgetId, widget.id)
+          }
+          setDraggedDashboardWidgetId(null)
+          setDropDashboardWidgetId(null)
+        }}
+        onDragEnd={() => {
+          setDraggedDashboardWidgetId(null)
+          setDropDashboardWidgetId(null)
+        }}
+      >
+        <div className="dashboard-widget-head">
+          <h4>{headerLabel}</h4>
+          <div className="dashboard-widget-actions">
+            <button className="subtle-btn icon-btn micro drag-handle-btn" type="button" title="Arrastar widget">
+              <GripVertical size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mover para coluna principal' : 'Mover para coluna lateral'}
+              onClick={() => togglePenhorasDashboardWidgetColumn(widget.id)}
+            >
+              {widget.column === 'side' ? '↤' : '↦'}
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Diminuir largura'}
+              onClick={() => adjustPenhorasDashboardWidgetWidth(widget.id, -1)}
+              disabled={!canShrinkWidth}
+            >
+              <Minimize2 size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Aumentar largura'}
+              onClick={() => adjustPenhorasDashboardWidgetWidth(widget.id, 1)}
+              disabled={!canGrowWidth}
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Diminuir altura"
+              onClick={() => adjustPenhorasDashboardWidgetHeight(widget.id, -80)}
+            >
+              <Minus size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Aumentar altura"
+              onClick={() => adjustPenhorasDashboardWidgetHeight(widget.id, 80)}
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Mover para cima"
+              onClick={() => movePenhorasDashboardWidget(widget.id, -1)}
+            >
+              ↑
+            </button>
+            <button
+              className="subtle-btn icon-btn micro"
+              type="button"
+              title="Mover para baixo"
+              onClick={() => movePenhorasDashboardWidget(widget.id, 1)}
+            >
+              ↓
+            </button>
+            <button
+              className="subtle-btn icon-btn micro danger"
+              type="button"
+              title="Remover widget"
+              onClick={() => removePenhorasDashboardWidget(widget.id)}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+        <div className="dashboard-widget-content">
+          {penhorasRecordsLoading && penhorasRecords.length === 0 ? <div className="small-note">A carregar dados…</div> : content}
+        </div>
+        <div className="dashboard-widget-footer">
+          <button
+            className="subtle-btn icon-btn micro resize-widget-handle"
+            type="button"
+            title="Arrastar para redimensionar altura"
+            onMouseDown={(event) => startDashboardWidgetResize(event, 'penhoras', widget.id, widget.minHeight)}
+          >
+            ⇳
+          </button>
+        </div>
+      </article>
+    )
+  }
+
+  function toggleQuickTool(tool: QuickToolId) {
+    setToolsExpanded(true)
+    const isOpen = tool === 'notes' ? notesOpen : tool === 'calculator' ? calculatorOpen : smartNotesOpen
+    if (isOpen) {
+      if (tool === 'notes') {
+        setNotesOpen(false)
+      } else if (tool === 'calculator') {
+        setCalculatorOpen(false)
+      } else {
+        setSmartNotesOpen(false)
+      }
+      if (draggingTool === tool) {
+        toolDragRef.current = null
+        setDraggingTool(null)
+      }
+      return
+    }
+
+    if (tool === 'notes') {
+      setNotesOpen(true)
+    } else if (tool === 'calculator') {
+      setCalculatorOpen(true)
+    } else {
+      setSmartNotesOpen(true)
+    }
+
+    setToolLayers((current) => {
+      const nextLayer = toolLayerRef.current++
+      return { ...current, [tool]: nextLayer }
+    })
+  }
+
+  function toggleQuickToolPinned(tool: QuickToolId) {
+    setToolPinned((current) => ({ ...current, [tool]: !current[tool] }))
+    setToolLayers((current) => {
+      const nextLayer = toolLayerRef.current++
+      return { ...current, [tool]: nextLayer }
+    })
+  }
+
+  function bringToolToFront(tool: QuickToolId) {
+    setToolLayers((current) => {
+      const nextLayer = toolLayerRef.current++
+      return { ...current, [tool]: nextLayer }
+    })
+  }
+
+  function getToolWindowElement(tool: QuickToolId): HTMLDivElement | null {
+    if (tool === 'notes') return notesWindowRef.current
+    if (tool === 'calculator') return calculatorWindowRef.current
+    return smartNotesWindowRef.current
+  }
+
+  function startToolWindowDrag(tool: QuickToolId, event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.button !== 0) return
+    const element = getToolWindowElement(tool)
+    if (!element) return
+
+    bringToolToFront(tool)
+    const rect = element.getBoundingClientRect()
+    setToolPositions((current) => ({ ...current, [tool]: { x: rect.left, y: rect.top } }))
+    toolDragRef.current = {
+      tool,
+      pointerOffsetX: event.clientX - rect.left,
+      pointerOffsetY: event.clientY - rect.top,
+    }
+    setDraggingTool(tool)
+    event.preventDefault()
+  }
+
+  function clearCalculator() {
+    setCalculatorExpression('')
+    setCalculatorResult(null)
+    setCalculatorError('')
+  }
+
+  function appendCalculatorValue(value: string) {
+    setCalculatorExpression((current) => `${current}${value}`)
+    setCalculatorError('')
+  }
+
+  function backspaceCalculator() {
+    setCalculatorExpression((current) => current.slice(0, -1))
+    setCalculatorError('')
+  }
+
+  const evaluateCalculator = useCallback(() => {
+    const normalized = calculatorExpression
+      .replace(/,/g, '.')
+      .replace(/[×x]/g, '*')
+      .replace(/[÷]/g, '/')
+      .trim()
+
+    if (!normalized) {
+      setCalculatorResult(null)
+      setCalculatorError('')
+      return
+    }
+
+    if (!/^[0-9+\-*/().\s%]+$/.test(normalized)) {
+      setCalculatorError('Expressão inválida.')
+      setCalculatorResult(null)
+      return
+    }
+
+    const expressionWithPercent = normalized.replace(/(\d+(\.\d+)?)%/g, '($1/100)')
+
+    try {
+      const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
+      if (typeof computed !== 'number' || !Number.isFinite(computed)) {
+        setCalculatorError('Resultado inválido.')
+        setCalculatorResult(null)
+        return
+      }
+      setCalculatorError('')
+      setCalculatorResult(
+        new Intl.NumberFormat('pt-PT', {
+          maximumFractionDigits: 6,
+        }).format(computed),
+      )
+    } catch {
+      setCalculatorError('Não foi possível calcular.')
+      setCalculatorResult(null)
+    }
+  }, [calculatorExpression])
+
+  function handleCalculatorKeyPress(key: CalculatorKey) {
+    if (key.action === 'clear') {
+      clearCalculator()
+      return
+    }
+    if (key.action === 'backspace') {
+      backspaceCalculator()
+      return
+    }
+    if (key.action === 'equals') {
+      evaluateCalculator()
+      return
+    }
+    if (key.value) {
+      appendCalculatorValue(key.value)
+    }
+  }
+
+  useEffect(() => {
+    if (!draggingTool) return
+
+    function handleToolWindowMouseMove(event: MouseEvent) {
+      const dragState = toolDragRef.current
+      if (!dragState) return
+      const element = getToolWindowElement(dragState.tool)
+      if (!element) return
+
+      const margin = 10
+      const width = element.offsetWidth
+      const height = element.offsetHeight
+      const maxX = Math.max(margin, window.innerWidth - width - margin)
+      const maxY = Math.max(margin, window.innerHeight - height - margin)
+      const rawX = event.clientX - dragState.pointerOffsetX
+      const rawY = event.clientY - dragState.pointerOffsetY
+      const nextX = Math.min(maxX, Math.max(margin, rawX))
+      const nextY = Math.min(maxY, Math.max(margin, rawY))
+
+      setToolPositions((current) => ({ ...current, [dragState.tool]: { x: nextX, y: nextY } }))
+    }
+
+    function stopToolWindowDrag() {
+      toolDragRef.current = null
+      setDraggingTool(null)
+    }
+
+    window.addEventListener('mousemove', handleToolWindowMouseMove)
+    window.addEventListener('mouseup', stopToolWindowDrag, { once: true })
+    return () => {
+      window.removeEventListener('mousemove', handleToolWindowMouseMove)
+      window.removeEventListener('mouseup', stopToolWindowDrag)
+    }
+  }, [draggingTool])
+
+  useEffect(() => {
+    if (!notesOpen && !calculatorOpen && !smartNotesOpen) return
+
+    function handleQuickToolKeyboard(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      const isEditableTarget =
+        target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable === true
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        const openTools: QuickToolId[] = []
+        if (notesOpen) openTools.push('notes')
+        if (calculatorOpen) openTools.push('calculator')
+        if (smartNotesOpen) openTools.push('smart-notes')
+        const topTool = openTools.sort((a, b) => toolLayers[b] - toolLayers[a])[0]
+        if (topTool === 'notes') {
+          setNotesOpen(false)
+        } else if (topTool === 'calculator') {
+          setCalculatorOpen(false)
+        } else if (topTool === 'smart-notes') {
+          setSmartNotesOpen(false)
+        }
+        return
+      }
+
+      if (event.key === 'Enter' && calculatorOpen && !isEditableTarget) {
+        event.preventDefault()
+        evaluateCalculator()
+      }
+    }
+
+    window.addEventListener('keydown', handleQuickToolKeyboard)
+    return () => {
+      window.removeEventListener('keydown', handleQuickToolKeyboard)
+    }
+  }, [notesOpen, calculatorOpen, smartNotesOpen, evaluateCalculator, toolLayers])
+
+  function switchModule(nextModule: ModuleId) {
+    setActiveModule(nextModule)
+    setActiveTab(nextModule === 'recibos' ? 'entrada' : 'consulta')
+    if (nextModule !== 'recibos') setSelectedRecordId(null)
+    if (nextModule !== 'ds') setSelectedDsRecordId(null)
+    if (nextModule !== 'penhoras') setSelectedPenhorasRecordId(null)
   }
 
   const topActionButtons = (
@@ -2006,20 +4763,55 @@ function App() {
         <Undo2 size={15} />
       </button>
       <button
-        className="subtle-btn icon-btn"
+        className={`subtle-btn icon-btn ${toolsExpanded ? 'active' : ''}`}
         type="button"
-        onClick={() => setLayoutMode((current) => (current === 'wide' ? 'narrow' : 'wide'))}
-        title={layoutMode === 'wide' ? 'Compacto' : 'Expandir'}
-        aria-label={layoutMode === 'wide' ? 'Compacto' : 'Expandir'}
+        onClick={() => setToolsExpanded((current) => !current)}
+        title={toolsExpanded ? 'Ocultar ferramentas' : 'Mostrar ferramentas'}
+        aria-label={toolsExpanded ? 'Ocultar ferramentas' : 'Mostrar ferramentas'}
       >
-        {layoutMode === 'wide' ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        <Wrench size={15} />
       </button>
+      {toolsExpanded && (
+        <div className="top-tools">
+          <button
+            className={`subtle-btn icon-btn micro ${notesOpen ? 'active' : ''}`}
+            type="button"
+            title="Notas rápidas (Alt+N)"
+            aria-label="Notas rápidas"
+            onClick={() => toggleQuickTool('notes')}
+          >
+            <StickyNote size={15} />
+          </button>
+          <button
+            className={`subtle-btn icon-btn micro ${calculatorOpen ? 'active' : ''}`}
+            type="button"
+            title="Calculadora (Alt+C)"
+            aria-label="Calculadora"
+            onClick={() => toggleQuickTool('calculator')}
+          >
+            <Calculator size={15} />
+          </button>
+          <button
+            className={`subtle-btn icon-btn micro ${smartNotesOpen ? 'active' : ''}`}
+            type="button"
+            title="Notas com cálculo (Alt+S)"
+            aria-label="Notas com cálculo"
+            onClick={() => toggleQuickTool('smart-notes')}
+          >
+            <SquareFunction size={15} />
+          </button>
+        </div>
+      )}
       <button
         className="primary-btn icon-btn"
         type="button"
         onClick={() => setActiveTab('entrada')}
-        title="Novo registo"
-        aria-label="Novo registo"
+        title={
+          activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
+        }
+        aria-label={
+          activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
+        }
       >
         <Plus size={16} />
       </button>
@@ -2038,73 +4830,75 @@ function App() {
   ))
 
   const isDashboardFocusMode = activeTab === 'dashboards' && dashboardFocusMode
+  const notesWindowZIndex = (toolPinned.notes ? 2600 : 1700) + toolLayers.notes
+  const calculatorWindowZIndex = (toolPinned.calculator ? 2600 : 1700) + toolLayers.calculator
+  const smartNotesWindowZIndex = (toolPinned['smart-notes'] ? 2600 : 1700) + toolLayers['smart-notes']
 
   if (bootstrapLoading) {
-    return <div className={`app-shell ${layoutMode === 'wide' ? 'wide' : ''} ${ENABLE_NEO_REDESIGN_EXPERIMENT ? 'neo-experiment' : ''}`}><div className="panel">A carregar aplicação...</div></div>
+    return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">A carregar aplicação...</div></div>
   }
 
   if (pageError) {
-    return <div className={`app-shell ${layoutMode === 'wide' ? 'wide' : ''} ${ENABLE_NEO_REDESIGN_EXPERIMENT ? 'neo-experiment' : ''}`}><div className="panel">Erro: {pageError}</div></div>
+    return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">Erro: {pageError}</div></div>
   }
 
   return (
     <div
-      className={`app-shell ${layoutMode === 'wide' || isDashboardFocusMode ? 'wide' : ''} ${ENABLE_NEO_REDESIGN_EXPERIMENT ? 'neo-experiment' : ''} ${
-        isDashboardFocusMode ? 'dashboard-focus-mode' : ''
-      }`}
+      className={`app-shell module-${activeModule} ${layoutMode === 'wide' || isDashboardFocusMode ? 'wide' : ''} ${isDashboardFocusMode ? 'dashboard-focus-mode' : ''}`}
     >
-      <header className={`topbar ${ENABLE_UNIFIED_HEADER_LAYOUT ? 'unified' : ''}`}>
-        <div className="brand-block">
-          <img className="brand-logo-img" src={brandLogoSrc} alt="Mesa de Recibos" />
-          <div className="brand-subtitle">Postgres + API · Entrada e consulta de recibos</div>
+      <header className="topbar unified">
+        <div className={`brand-block module-brand-host ${activeModule}-active`}>
+          <div className={`module-brand-stack ${activeModule}-active`}>
+            <button
+              type="button"
+              className={`module-brand-card back module-${nextModuleCard.id}`}
+              onClick={() => switchModule(nextModuleCard.id)}
+              title={`Trocar para ${nextModuleCard.title}`}
+              aria-label={`Trocar para ${nextModuleCard.title}`}
+            >
+              <img className="brand-logo-img" src={nextModuleCard.logoSrc} alt={nextModuleCard.title} />
+              {nextModuleCard.showSubtitle !== false && <div className="brand-subtitle">{nextModuleCard.subtitle}</div>}
+            </button>
+            <button
+              type="button"
+              className={`module-brand-card front module-${activeModuleCard.id}`}
+              onClick={() => switchModule(nextModuleCard.id)}
+              title={`Módulo ativo: ${activeModuleCard.title}. Clique para trocar para ${nextModuleCard.title}.`}
+              aria-label={`Módulo ativo: ${activeModuleCard.title}. Clique para trocar para ${nextModuleCard.title}.`}
+            >
+              <img className="brand-logo-img" src={activeModuleCard.logoSrc} alt={activeModuleCard.title} />
+              {activeModuleCard.showSubtitle !== false && <div className="brand-subtitle">{activeModuleCard.subtitle}</div>}
+            </button>
+          </div>
         </div>
 
-        {ENABLE_UNIFIED_HEADER_LAYOUT ? (
-          <div className={`topbar-command ${isDashboardFocusMode ? 'focus' : ''}`}>
-            <nav className="tab-nav tab-nav-inline">{tabButtons}</nav>
-            {isDashboardFocusMode ? (
-              <div className="focus-exit-actions">
-                <button className="subtle-btn" type="button" onClick={() => setDashboardFocusMode(false)}>
-                  <Minimize2 size={15} />
-                  Voltar ao normal
-                </button>
-              </div>
-            ) : (
-              <div className="topbar-search-actions">
-                <input
-                  className="global-search"
-                  value={globalSearch}
-                  onChange={(event) => {
-                    setActiveSavedViewId(null)
-                    setGlobalSearch(event.target.value)
-                  }}
-                  placeholder="Pesquisar por processo, PE, recibo, exequente, gestor ou nota..."
-                />
-                {topActionButtons}
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            {!isDashboardFocusMode && (
-              <>
-                <input
-                  className="global-search"
-                  value={globalSearch}
-                  onChange={(event) => {
-                    setActiveSavedViewId(null)
-                    setGlobalSearch(event.target.value)
-                  }}
-                  placeholder="Pesquisar por processo, PE, recibo, exequente, gestor ou nota..."
-                />
-                {topActionButtons}
-              </>
-            )}
-          </>
-        )}
+        <div className={`topbar-command ${isDashboardFocusMode ? 'focus' : ''}`}>
+          <nav className="tab-nav tab-nav-inline">{tabButtons}</nav>
+          {isDashboardFocusMode ? (
+            <div className="focus-exit-actions">
+              <button className="subtle-btn" type="button" onClick={() => setDashboardFocusMode(false)}>
+                <Minimize2 size={15} />
+                Voltar ao normal
+              </button>
+            </div>
+          ) : (
+            <div className="topbar-search-actions">
+              <input
+                className="global-search"
+                value={globalSearch}
+                onChange={(event) => {
+                  setActiveSavedViewId(null)
+                  setActiveDsSavedViewId(null)
+                  setActivePenhorasSavedViewId(null)
+                  setGlobalSearch(event.target.value)
+                }}
+                placeholder="Pesquisar por processo, PE, recibo, exequente, gestor ou nota..."
+              />
+              {topActionButtons}
+            </div>
+          )}
+        </div>
       </header>
-
-      {!ENABLE_UNIFIED_HEADER_LAYOUT && <nav className="tab-nav">{tabButtons}</nav>}
 
       {feedback && !isDashboardFocusMode && (
         <div className={`panel import-feedback ${feedbackClosing ? 'closing' : ''}`} role="status">
@@ -2120,8 +4914,1610 @@ function App() {
         </div>
       )}
 
+      {notesOpen && (
+        <section
+          ref={notesWindowRef}
+          className={`tool-window notes-window ${toolPositions.notes ? 'positioned' : 'centered'} ${draggingTool === 'notes' ? 'dragging' : ''
+            } ${toolPinned.notes ? 'pinned' : ''}`}
+          style={toolPositions.notes ? { left: `${toolPositions.notes.x}px`, top: `${toolPositions.notes.y}px`, zIndex: notesWindowZIndex } : { zIndex: notesWindowZIndex }}
+          onMouseDown={() => bringToolToFront('notes')}
+          aria-label="Notas rápidas"
+        >
+          <div className="tool-window-header" onMouseDown={(event) => startToolWindowDrag('notes', event)}>
+            <div className="tool-window-title">
+              <GripVertical size={14} />
+              <div>
+                <h3>Notas rápidas</h3>
+                <p className="small-note">Bloco pessoal guardado automaticamente no browser.</p>
+              </div>
+            </div>
+            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
+              <button
+                className={`subtle-btn icon-btn micro ${toolPinned.notes ? 'active' : ''}`}
+                type="button"
+                onClick={() => toggleQuickToolPinned('notes')}
+                title={toolPinned.notes ? 'Desafixar janela' : 'Fixar no topo'}
+                aria-label={toolPinned.notes ? 'Desafixar janela' : 'Fixar no topo'}
+              >
+                {toolPinned.notes ? <PinOff size={14} /> : <Pin size={14} />}
+              </button>
+              <button className="subtle-btn icon-btn micro" type="button" onClick={() => setNotesOpen(false)} title="Fechar notas" aria-label="Fechar notas">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="quick-tool-body">
+            <textarea
+              className="quick-notes-input"
+              value={quickNotes}
+              onChange={(event) => setQuickNotes(event.target.value)}
+              placeholder="Escreva aqui notas rápidas para qualquer módulo..."
+            />
+            <div className="actions-row start">
+              <button className="subtle-btn" type="button" onClick={exportQuickNotesTxt}>
+                Exportar TXT
+              </button>
+              <button className="subtle-btn" type="button" onClick={exportQuickNotesPdf}>
+                Exportar PDF
+              </button>
+              <button className="subtle-btn" type="button" onClick={() => setQuickNotes('')}>
+                Apagar notas
+              </button>
+              <span className="muted">Guardado automaticamente</span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {smartNotesOpen && (
+        <section
+          ref={smartNotesWindowRef}
+          className={`tool-window smart-notes-window ${toolPositions['smart-notes'] ? 'positioned' : 'centered'} ${draggingTool === 'smart-notes' ? 'dragging' : ''
+            } ${toolPinned['smart-notes'] ? 'pinned' : ''}`}
+          style={
+            toolPositions['smart-notes']
+              ? { left: `${toolPositions['smart-notes'].x}px`, top: `${toolPositions['smart-notes'].y}px`, zIndex: smartNotesWindowZIndex }
+              : { zIndex: smartNotesWindowZIndex }
+          }
+          onMouseDown={() => bringToolToFront('smart-notes')}
+          aria-label="Notas com cálculo"
+        >
+          <div className="tool-window-header" onMouseDown={(event) => startToolWindowDrag('smart-notes', event)}>
+            <div className="tool-window-title">
+              <GripVertical size={14} />
+              <div>
+                <h3>Notas com cálculo</h3>
+                <p className="small-note">Escreva linguagem natural e contas por linha. Ex.: "23% de 1250".</p>
+              </div>
+            </div>
+            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
+              <button
+                className={`subtle-btn icon-btn micro ${toolPinned['smart-notes'] ? 'active' : ''}`}
+                type="button"
+                onClick={() => toggleQuickToolPinned('smart-notes')}
+                title={toolPinned['smart-notes'] ? 'Desafixar janela' : 'Fixar no topo'}
+                aria-label={toolPinned['smart-notes'] ? 'Desafixar janela' : 'Fixar no topo'}
+              >
+                {toolPinned['smart-notes'] ? <PinOff size={14} /> : <Pin size={14} />}
+              </button>
+              <button
+                className="subtle-btn icon-btn micro"
+                type="button"
+                onClick={() => setSmartNotesOpen(false)}
+                title="Fechar notas com cálculo"
+                aria-label="Fechar notas com cálculo"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className="smart-notes-layout">
+            <textarea
+              className="smart-notes-input"
+              value={smartNotesText}
+              onChange={(event) => setSmartNotesText(event.target.value)}
+              placeholder={`7 × 7\n3k ganhos ÷ 5 pessoas\neu gastei 200 euros e 10 euro em bebidas\ntotal`}
+            />
+            <aside className="smart-notes-results">
+              <div className="smart-notes-results-head">
+                <strong>{smartNotesResults.length} linhas calculadas</strong>
+                <div className="smart-notes-head-meta">
+                  {smartNotesSavedEntries.length > 0 && <span className="muted">{smartNotesSavedEntries.length} guardadas</span>}
+                  {smartNotesErrors.length > 0 && <span className="muted">{smartNotesErrors.length} com erro</span>}
+                </div>
+              </div>
+              {smartNotesResults.length === 0 ? (
+                <div className="muted">Sem cálculos detetados.</div>
+              ) : (
+                <div className="smart-notes-list">
+                  {smartNotesDisplayResults.map((row) => (
+                    <div
+                      key={`${row.lineNumber}-${row.signature}`}
+                      className={`smart-notes-row ${smartNotesPinnedSet.has(row.signature) ? 'pinned' : ''}`}
+                    >
+                      <span className="smart-notes-line">L{row.lineNumber}</span>
+                      <div className="smart-notes-row-main">
+                        <div className="smart-notes-row-text">
+                          <div className="smart-notes-expression">{row.expression}</div>
+                          <strong>{formatSmartNotesValue(row.result)}</strong>
+                        </div>
+                        <div className="smart-notes-row-actions">
+                          <button
+                            className={`subtle-btn icon-btn micro ${smartNotesPinnedSet.has(row.signature) ? 'active' : ''}`}
+                            type="button"
+                            onClick={() => toggleSmartNotesPinned(row.signature)}
+                            title={smartNotesPinnedSet.has(row.signature) ? 'Desafixar' : 'Fixar no topo'}
+                            aria-label={smartNotesPinnedSet.has(row.signature) ? 'Desafixar' : 'Fixar no topo'}
+                          >
+                            <Pin size={13} />
+                          </button>
+                          <button
+                            className={`subtle-btn icon-btn micro ${smartNotesSavedSet.has(row.signature) ? 'active' : ''}`}
+                            type="button"
+                            onClick={() => toggleSmartNotesSaved(row)}
+                            title={smartNotesSavedSet.has(row.signature) ? 'Remover dos guardados' : 'Guardar cálculo'}
+                            aria-label={smartNotesSavedSet.has(row.signature) ? 'Remover dos guardados' : 'Guardar cálculo'}
+                          >
+                            <Save size={13} />
+                          </button>
+                          <button
+                            className="subtle-btn icon-btn micro danger"
+                            type="button"
+                            onClick={() => removeSmartNotesLine(row.lineNumber)}
+                            title="Eliminar linha"
+                            aria-label="Eliminar linha"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {smartNotesErrors.length > 0 && (
+                <div className="smart-notes-errors">
+                  {smartNotesErrors.slice(0, 5).map((row) => (
+                    <div key={`${row.lineNumber}-${row.error}`} className="smart-notes-error-row">
+                      <span>L{row.lineNumber}</span>
+                      <span>{row.error}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {smartNotesSavedEntries.length > 0 && (
+                <div className="smart-notes-saved">
+                  <div className="smart-notes-saved-head">
+                    <strong>Guardados</strong>
+                    <button className="subtle-btn" type="button" onClick={() => setSmartNotesSavedEntries([])}>
+                      Limpar guardados
+                    </button>
+                  </div>
+                  <div className="smart-notes-saved-list">
+                    {smartNotesSavedEntries.slice(0, 5).map((entry) => (
+                      <div key={entry.signature} className="smart-notes-saved-item">
+                        <span className="muted">{entry.expression}</span>
+                        <strong>{formatSmartNotesValue(entry.result)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </aside>
+          </div>
+          <div className="actions-row start smart-notes-actions">
+            <button className="subtle-btn" type="button" onClick={exportSmartNotesTxt}>
+              Exportar TXT
+            </button>
+            <button className="subtle-btn" type="button" onClick={exportSmartNotesPdf}>
+              Exportar PDF
+            </button>
+            <button className="subtle-btn" type="button" onClick={() => setSmartNotesText('')}>
+              Limpar
+            </button>
+            <span className="muted">Alt+S</span>
+          </div>
+        </section>
+      )}
+
+      {calculatorOpen && (
+        <section
+          ref={calculatorWindowRef}
+          className={`tool-window calculator-window ${toolPositions.calculator ? 'positioned' : 'centered'} ${draggingTool === 'calculator' ? 'dragging' : ''
+            } ${toolPinned.calculator ? 'pinned' : ''}`}
+          style={
+            toolPositions.calculator
+              ? { left: `${toolPositions.calculator.x}px`, top: `${toolPositions.calculator.y}px`, zIndex: calculatorWindowZIndex }
+              : { zIndex: calculatorWindowZIndex }
+          }
+          onMouseDown={() => bringToolToFront('calculator')}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Calculadora"
+        >
+          <div className="tool-window-header calculator-header" onMouseDown={(event) => startToolWindowDrag('calculator', event)}>
+            <div className="tool-window-title">
+              <GripVertical size={14} />
+              <div>
+                <h3>Calculadora</h3>
+                <p className="small-note">+, -, ×, ÷, parênteses e %</p>
+              </div>
+            </div>
+            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
+              <button
+                className={`subtle-btn icon-btn micro ${toolPinned.calculator ? 'active' : ''}`}
+                type="button"
+                onClick={() => toggleQuickToolPinned('calculator')}
+                title={toolPinned.calculator ? 'Desafixar janela' : 'Fixar no topo'}
+                aria-label={toolPinned.calculator ? 'Desafixar janela' : 'Fixar no topo'}
+              >
+                {toolPinned.calculator ? <PinOff size={14} /> : <Pin size={14} />}
+              </button>
+              <button className="subtle-btn icon-btn micro" type="button" onClick={() => setCalculatorOpen(false)} title="Fechar calculadora" aria-label="Fechar calculadora">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          <div className={`calculator-display ${calculatorError ? 'error' : ''}`}>
+            <div className="calculator-expression">
+              {(calculatorExpression || '0').replace(/\*/g, '×').replace(/\//g, '÷').replace(/\./g, ',')}
+            </div>
+            <div className="calculator-result">{calculatorError || calculatorResult || '0'}</div>
+          </div>
+
+          <div className="calculator-keypad">
+            {CALCULATOR_KEYS.map((key) => (
+              <button
+                key={key.label}
+                className={`calculator-key tone-${key.tone ?? 'default'} ${key.wide ? 'wide' : ''}`}
+                type="button"
+                onClick={() => handleCalculatorKeyPress(key)}
+              >
+                {key.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <main className="main-grid">
-        {activeTab === 'entrada' && (
+        {activeModule === 'ds' && activeTab === 'entrada' && (
+          <section className="panel entrada-layout">
+            <aside className="panel side-list">
+              <div className="row-between">
+                <h2>Registos recentes DS</h2>
+                <span className="recent-mode-badge">Lista</span>
+              </div>
+              <div className="small-note">Últimas alterações</div>
+              <div className="recent-list compact ds-recent-list">
+                {dsRecentRecords.length === 0 ? (
+                  <div className="empty-text">Ainda não existem registos DS.</div>
+                ) : (
+                  dsRecentRecords.map((record) => {
+                    const status = getStatus(dsStatuses, record.estadoId)
+                    const reference = record.referencia || record.proponentes || 'Sem referência'
+                    const details = [record.gestora, record.produto].filter((value): value is string => Boolean(value?.trim())).join(' · ')
+                    return (
+                      <button
+                        key={record.id}
+                        className="recent-card ds-recent-card"
+                        type="button"
+                        onClick={() => {
+                          setSelectedDsRecordId(record.id)
+                          setActiveTab('consulta')
+                        }}
+                      >
+                        <span className="ds-recent-ref">{reference}</span>
+                        <span className="muted ds-recent-meta">{details || '-'}</span>
+                        {status ? (
+                          <StatusPill status={status} compact />
+                        ) : (
+                          <span className="status-pill compact ds-status-fallback">
+                            <Circle size={14} />
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </aside>
+
+            <div className="panel ds-panel ds-entry-panel">
+              <div className="row-between">
+                <div>
+                  <h2>Entrada DS</h2>
+                  <p className="small-note">Registo manual de escrituras concretizadas no módulo DS.</p>
+                </div>
+              </div>
+
+              <form className="entry-form ds-entry-form" onSubmit={(event) => void submitDsEntry(event, 'save')}>
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Identificação</h3>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Gestora"
+                      value={dsEntryForm.gestora}
+                      onChange={(value) => handleDsEntryInput('gestora', value)}
+                      suggestions={dsGestoraFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Proponentes"
+                      value={dsEntryForm.proponentes}
+                      onChange={(value) => handleDsEntryInput('proponentes', value)}
+                      suggestions={dsProponentesSuggestions}
+                    />
+                    <LabeledInput
+                      label="Referência"
+                      value={dsEntryForm.referencia}
+                      onChange={(value) => handleDsEntryInput('referencia', value)}
+                      suggestions={dsReferenciaSuggestions}
+                    />
+                  </div>
+                </section>
+
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Contexto operacional</h3>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Produto"
+                      value={dsEntryForm.produto}
+                      onChange={(value) => handleDsEntryInput('produto', value)}
+                      suggestions={dsProdutoFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Entidade bancária"
+                      value={dsEntryForm.entidadeBancaria}
+                      onChange={(value) => handleDsEntryInput('entidadeBancaria', value)}
+                      suggestions={dsEntidadeFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Líder cálculo"
+                      value={dsEntryForm.liderCalculo}
+                      onChange={(value) => handleDsEntryInput('liderCalculo', value)}
+                    />
+                  </div>
+
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Recibo"
+                      value={dsEntryForm.recibo}
+                      onChange={(value) => handleDsEntryInput('recibo', value)}
+                      suggestions={dsReciboSuggestions}
+                    />
+                    <LabeledInput
+                      label="Falta recibo gestora"
+                      value={dsEntryForm.faltaReciboGestora}
+                      onChange={(value) => handleDsEntryInput('faltaReciboGestora', value)}
+                    />
+                    <LabeledSelect
+                      label="Estado"
+                      value={dsEntryForm.estadoId}
+                      onChange={(value) => handleDsEntryInput('estadoId', value)}
+                      options={
+                        dsOrderedStatuses.length > 0
+                          ? dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))
+                          : [{ value: dsEntryForm.estadoId || '', label: 'Sem estado' }]
+                      }
+                    />
+                  </div>
+                </section>
+
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Financeiro</h3>
+                  <div className="field-grid three">
+                    <LabeledInput label="Valor" value={dsEntryForm.valor} onChange={(value) => handleDsEntryInput('valor', value)} />
+                    <LabeledInput label="Comissão loja" value={dsEntryForm.comissaoLoja} onChange={(value) => handleDsEntryInput('comissaoLoja', value)} />
+                    <LabeledInput
+                      label="Total comissão loja c/ IVA"
+                      value={dsEntryForm.totalComissaoLojaCmIva}
+                      onChange={(value) => handleDsEntryInput('totalComissaoLojaCmIva', value)}
+                    />
+                  </div>
+
+                  <div className="field-grid three">
+                    <LabeledInput label="IVA CGD (raw)" value={dsEntryForm.ivaCgdRaw} onChange={(value) => handleDsEntryInput('ivaCgdRaw', value)} />
+                    <LabeledInput label="Comissão gestor" value={dsEntryForm.comissaoGestor} onChange={(value) => handleDsEntryInput('comissaoGestor', value)} />
+                    <LabeledInput label="Percentagem" value={dsEntryForm.percentagem} onChange={(value) => handleDsEntryInput('percentagem', value)} />
+                  </div>
+                </section>
+
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Datas e pagamento</h3>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Data escritura"
+                      type="date"
+                      value={dsEntryForm.dataEscritura}
+                      onChange={(value) => handleDsEntryInput('dataEscritura', value)}
+                    />
+                    <LabeledInput
+                      label="Data fecho CRM"
+                      type="date"
+                      value={dsEntryForm.dataFechoCrm}
+                      onChange={(value) => handleDsEntryInput('dataFechoCrm', value)}
+                    />
+                    <LabeledInput
+                      label="Pagamento comissão gestor"
+                      value={dsEntryForm.pagComissaoGestor}
+                      onChange={(value) => handleDsEntryInput('pagComissaoGestor', value)}
+                    />
+                  </div>
+                </section>
+
+                <div className="actions-row ds-entry-actions">
+                  <button
+                    className="subtle-btn"
+                    type="button"
+                    onClick={() => setDsEntryForm(getInitialDsEntryForm(dsDefaultStatus?.id ?? dsEntryForm.estadoId))}
+                  >
+                    Limpar
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => void saveNewDsEntry()}>
+                    Guardar e novo
+                  </button>
+                  <button className="primary-btn" type="submit">
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        )}
+
+        {activeModule === 'ds' && activeTab === 'dashboards' && (
+          <section className="panel dashboard-experiment ds-panel ds-dashboard-panel">
+            {!isDashboardFocusMode && (
+              <>
+                <div className="row-between wrap">
+                  <div>
+                    <h2>Dashboards DS</h2>
+                    <p className="small-note">Visão rápida de performance da operação DS com filtros e vistas guardadas.</p>
+                  </div>
+                  <div className="saved-view-bar ds-saved-view-bar">
+                    {dsDashboardViews.map((view) => {
+                      const isDisabled = disabledSavedViewIds.includes(view.id)
+                      const isActive = activeDsSavedViewId === view.id && !isDisabled
+                      return (
+                        <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
+                          <button
+                            className="subtle-btn saved-view-apply"
+                            type="button"
+                            onClick={() => applyDsView(view)}
+                            disabled={isDisabled}
+                            title={isDisabled ? 'Vista DS desativada' : `Aplicar vista: ${view.name}`}
+                          >
+                            {view.name}
+                          </button>
+                          <button
+                            className="subtle-btn icon-btn micro"
+                            type="button"
+                            onClick={() => toggleDsSavedViewDisabled(view.id)}
+                            title={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
+                            aria-label={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
+                          >
+                            {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                          </button>
+                          <button
+                            className="subtle-btn icon-btn micro danger"
+                            type="button"
+                            onClick={() => void deleteDsSavedView(view.id)}
+                            title="Eliminar vista DS"
+                            aria-label="Eliminar vista DS"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                    <button className="subtle-btn" type="button" onClick={() => clearDsFilters()}>
+                      <FilterX size={15} />
+                      Limpar filtros
+                    </button>
+                    <button
+                      className="subtle-btn"
+                      type="button"
+                      onClick={() => void saveCurrentView('ds-dashboard', { ...dsFilters, q: globalSearch, widgets: dsDashboardWidgets })}
+                    >
+                      Guardar vista
+                    </button>
+                  </div>
+                </div>
+
+                <div className="dashboard-top-actions">
+                  <button
+                    className="subtle-btn"
+                    type="button"
+                    onClick={() => {
+                      setDashboardFocusMode(true)
+                      setDsDashboardWidgetsOpen(true)
+                    }}
+                  >
+                    <Maximize2 size={15} />
+                    Expandir dashboard
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardConfigOpen((current) => !current)}>
+                    {dsDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {dsDashboardConfigOpen ? 'Ocultar painel' : 'Mostrar painel'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgetsOpen((current) => !current)}>
+                    {dsDashboardWidgetsOpen ? 'Ocultar widgets' : 'Mostrar widgets'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardPickerOpen((current) => !current)}>
+                    <Plus size={15} />
+                    {dsDashboardPickerOpen ? 'Ocultar catálogo' : 'Adicionar widgets'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgets(cloneDefaultDsDashboardWidgets())}>
+                    Repor widgets
+                  </button>
+                </div>
+
+                {dsDashboardConfigOpen ? (
+                  <>
+                    <div className="dashboard-hero-grid ds-dashboard-hero">
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Total registos</span>
+                        <strong>{new Intl.NumberFormat('pt-PT').format(dsDashboardTotals.registos)}</strong>
+                      </article>
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Total comissão loja</span>
+                        <strong>{formatCurrency(dsDashboardTotals.comissaoLoja)}</strong>
+                      </article>
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Total comissão loja c/ IVA</span>
+                        <strong>{formatCurrency(dsDashboardTotals.totalComissaoLojaCmIva)}</strong>
+                      </article>
+                    </div>
+
+                    <div className="filters-row eight ds-filters-row">
+                      <LabeledSelect
+                        label="Estado"
+                        value={String(dsFilters.estadoId ?? 'todos')}
+                        onChange={(value) => patchDsFilters('estadoId', value as DsRecordFilters['estadoId'])}
+                        options={[{ value: 'todos', label: 'Todos' }, ...dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
+                      />
+                      <LabeledSelect
+                        label="Ano"
+                        value={String(dsFilters.ano ?? 'todos')}
+                        onChange={(value) => patchDsFilters('ano', value === 'todos' ? 'todos' : Number(value))}
+                        options={[{ value: 'todos', label: 'Todos' }, ...dsYears.map((year) => ({ value: String(year), label: String(year) }))]}
+                      />
+                      <LabeledSelect
+                        label="Mês"
+                        value={String(dsFilters.mes ?? 'todos')}
+                        onChange={(value) => patchDsFilters('mes', value === 'todos' ? 'todos' : Number(value))}
+                        options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
+                      />
+                      <LabeledSelect
+                        label="Gestora"
+                        value={String(dsFilters.gestora ?? '')}
+                        onChange={(value) => patchDsFilters('gestora', value)}
+                        options={[{ value: '', label: 'Todas' }, ...dsGestoraFilterOptions.map((value) => ({ value, label: value }))]}
+                      />
+                      <LabeledSelect
+                        label="Entidade"
+                        value={String(dsFilters.entidadeBancaria ?? '')}
+                        onChange={(value) => patchDsFilters('entidadeBancaria', value)}
+                        options={[{ value: '', label: 'Todas' }, ...dsEntidadeFilterOptions.map((value) => ({ value, label: value }))]}
+                      />
+                      <LabeledSelect
+                        label="Produto"
+                        value={String(dsFilters.produto ?? '')}
+                        onChange={(value) => patchDsFilters('produto', value)}
+                        options={[{ value: '', label: 'Todos' }, ...dsProdutoFilterOptions.map((value) => ({ value, label: value }))]}
+                      />
+                      <LabeledSelect
+                        label="Recibo"
+                        value={String(dsFilters.reciboEstado ?? 'todos')}
+                        onChange={(value) => patchDsFilters('reciboEstado', value as DsRecordFilters['reciboEstado'])}
+                        options={[
+                          { value: 'todos', label: 'Todos' },
+                          { value: 'com-recibo', label: 'Com recibo' },
+                          { value: 'sem-recibo', label: 'Sem recibo' },
+                        ]}
+                      />
+                      <div className="field">
+                        <span>Total</span>
+                        <div className="counter-box">{dsRecordsLoading ? 'A carregar...' : `${dsTotalRecords} registos`}</div>
+                      </div>
+                    </div>
+
+                    <div className="dashboard-picker-wrap">
+                      <button className="subtle-btn" type="button" onClick={() => setDsDashboardPickerOpen((current) => !current)}>
+                        {dsDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
+                      </button>
+                      {dsDashboardPickerOpen && (
+                        <div className="dashboard-widget-library">
+                          {DS_DASHBOARD_WIDGET_LIBRARY.map((widget) => (
+                            <button
+                              key={widget.type}
+                              className="dashboard-widget-option"
+                              type="button"
+                              onClick={() => addDsDashboardWidget(widget.type)}
+                            >
+                              <strong>{widget.label}</strong>
+                              <span>{widget.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="dashboard-collapsed-note muted">
+                    Painel de configuração oculto. Use “Mostrar painel” para editar filtros.
+                  </div>
+                )}
+              </>
+            )}
+
+            {dsDashboardWidgetsOpen || isDashboardFocusMode ? (
+              dsDashboardWidgets.length === 0 ? (
+                <div className="empty-text dashboard-empty">
+                  Sem widgets ativos.
+                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgets(cloneDefaultDsDashboardWidgets())}>
+                    Repor widgets
+                  </button>
+                </div>
+              ) : (
+                <div className={`dashboard-grid ds-dashboard-grid ${dsDashboardHasSideStack ? 'with-side-stack' : ''}`}>
+                  {dsDashboardHasSideStack ? (
+                    <>
+                      <div className="dashboard-main-widgets">{dsDashboardMainWidgets.map((widget) => renderDsDashboardWidget(widget))}</div>
+                      <aside className="dashboard-side-widgets">{dsDashboardSideWidgets.map((widget) => renderDsDashboardWidget(widget))}</aside>
+                    </>
+                  ) : dsDashboardSideWidgets.length > 0 && dsDashboardMainWidgets.length === 0 ? (
+                    <aside className="dashboard-side-widgets">{dsDashboardSideWidgets.map((widget) => renderDsDashboardWidget(widget))}</aside>
+                  ) : (
+                    dsDashboardWidgets.map((widget) => renderDsDashboardWidget(widget))
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="dashboard-collapsed-note muted">
+                Widgets ocultos. Use “Mostrar widgets” para voltar a apresentar o dashboard.
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && (
+          <section className="panel ds-panel ds-results-panel">
+            <div className="row-between wrap">
+              <div>
+                <h2>{activeTab === 'consulta' ? 'Consulta DS' : 'Tabela DS'}</h2>
+                <p className="small-note">Registos de escrituras DS isolados do módulo de recibos.</p>
+              </div>
+              <div className="saved-view-bar ds-saved-view-bar">
+                {dsTableViews.map((view) => {
+                  const isDisabled = disabledSavedViewIds.includes(view.id)
+                  const isActive = activeDsSavedViewId === view.id && !isDisabled
+                  return (
+                    <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
+                      <button
+                        className="subtle-btn saved-view-apply"
+                        type="button"
+                        onClick={() => applyDsView(view)}
+                        disabled={isDisabled}
+                        title={isDisabled ? 'Vista DS desativada' : `Aplicar vista: ${view.name}`}
+                      >
+                        {view.name}
+                      </button>
+                      <button
+                        className="subtle-btn icon-btn micro"
+                        type="button"
+                        onClick={() => toggleDsSavedViewDisabled(view.id)}
+                        title={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
+                        aria-label={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
+                      >
+                        {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <button
+                        className="subtle-btn icon-btn micro danger"
+                        type="button"
+                        onClick={() => void deleteDsSavedView(view.id)}
+                        title="Eliminar vista DS"
+                        aria-label="Eliminar vista DS"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )
+                })}
+                <button className="subtle-btn" type="button" onClick={() => clearDsFilters()}>
+                  <FilterX size={15} />
+                  Limpar filtros
+                </button>
+                <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('ds-tabela', { ...dsFilters, q: globalSearch })}>
+                  Guardar vista
+                </button>
+              </div>
+            </div>
+
+            <div className="filters-row eight ds-filters-row">
+              <LabeledSelect
+                label="Estado"
+                value={String(dsFilters.estadoId ?? 'todos')}
+                onChange={(value) => patchDsFilters('estadoId', value as DsRecordFilters['estadoId'])}
+                options={[{ value: 'todos', label: 'Todos' }, ...dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
+              />
+              <LabeledSelect
+                label="Ano"
+                value={String(dsFilters.ano ?? 'todos')}
+                onChange={(value) => patchDsFilters('ano', value === 'todos' ? 'todos' : Number(value))}
+                options={[{ value: 'todos', label: 'Todos' }, ...dsYears.map((year) => ({ value: String(year), label: String(year) }))]}
+              />
+              <LabeledSelect
+                label="Mês"
+                value={String(dsFilters.mes ?? 'todos')}
+                onChange={(value) => patchDsFilters('mes', value === 'todos' ? 'todos' : Number(value))}
+                options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
+              />
+              <LabeledSelect
+                label="Gestora"
+                value={String(dsFilters.gestora ?? '')}
+                onChange={(value) => patchDsFilters('gestora', value)}
+                options={[{ value: '', label: 'Todas' }, ...dsGestoraFilterOptions.map((value) => ({ value, label: value }))]}
+              />
+              <LabeledSelect
+                label="Entidade"
+                value={String(dsFilters.entidadeBancaria ?? '')}
+                onChange={(value) => patchDsFilters('entidadeBancaria', value)}
+                options={[{ value: '', label: 'Todas' }, ...dsEntidadeFilterOptions.map((value) => ({ value, label: value }))]}
+              />
+              <LabeledSelect
+                label="Produto"
+                value={String(dsFilters.produto ?? '')}
+                onChange={(value) => patchDsFilters('produto', value)}
+                options={[{ value: '', label: 'Todos' }, ...dsProdutoFilterOptions.map((value) => ({ value, label: value }))]}
+              />
+              <LabeledSelect
+                label="Recibo"
+                value={String(dsFilters.reciboEstado ?? 'todos')}
+                onChange={(value) => patchDsFilters('reciboEstado', value as DsRecordFilters['reciboEstado'])}
+                options={[
+                  { value: 'todos', label: 'Todos' },
+                  { value: 'com-recibo', label: 'Com recibo' },
+                  { value: 'sem-recibo', label: 'Sem recibo' },
+                ]}
+              />
+              <div className="field">
+                <span>Total</span>
+                <div className="counter-box">{dsRecordsLoading ? 'A carregar...' : `${dsTotalRecords} registos`}</div>
+              </div>
+            </div>
+
+            {dsRecords.length === 0 ? (
+              <div className="empty-text">Sem resultados DS para os filtros selecionados.</div>
+            ) : activeTab === 'consulta' ? (
+              <div className="card-list ds-card-list">
+                {dsRecords.map((record) => {
+                  const status = getStatus(dsStatuses, record.estadoId)
+                  return (
+                    <article key={record.id} className="result-card ds-result-card clickable-row" onClick={() => setSelectedDsRecordId(record.id)}>
+                      <div className="result-main ds-result-main">
+                        <div className="result-title ds-result-title">{record.proponentes || 'Sem proponentes'}</div>
+                        <div className="muted ds-result-secondary">
+                          <span>Gestor/a: {record.gestora || '-'}</span>
+                          <span>Referência: {record.referencia || '-'}</span>
+                        </div>
+                      </div>
+                      <div className="result-entity muted ds-result-meta">
+                        {`Escritura: ${record.dataEscritura || '-'} · ${record.produto || 'Produto por definir'}`}
+                      </div>
+                      <div className="ds-result-metrics">
+                        <strong>{formatCurrency(record.valor)}</strong>
+                        <span>Comissão loja: {formatCurrency(record.comissaoLoja)}</span>
+                      </div>
+                      <div className="card-actions ds-card-actions">
+                        <button
+                          className="subtle-btn"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelectedDsRecordId(record.id)
+                            setIsDsRecordEditing(true)
+                          }}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                      <div className="result-status ds-result-status">
+                        {record.faltaReciboGestora?.trim() && (
+                          <span className="ds-warning-pill" title={record.faltaReciboGestora}>
+                            <AlertTriangle size={13} />
+                            <span>{record.faltaReciboGestora}</span>
+                          </span>
+                        )}
+                        {status ? <StatusPill status={status} /> : <span className="muted ds-status-pill-empty">Sem estado</span>}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="table-wrapper ds-table-wrapper">
+                <table className="records-table ds-records-table">
+                  <thead>
+                    <tr>
+                      <th>Gestor/a</th>
+                      <th>Proponentes</th>
+                      <th>Valor</th>
+                      <th>Data Escritura</th>
+                      <th>Comissão Loja</th>
+                      <th>Estado</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dsRecords.map((record) => {
+                      const status = getStatus(dsStatuses, record.estadoId)
+                      return (
+                        <tr
+                          key={record.id}
+                          style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
+                          onClick={() => setSelectedDsRecordId(record.id)}
+                        >
+                          <td>{record.gestora || '-'}</td>
+                          <td>{record.proponentes || '-'}</td>
+                          <td>{formatCurrency(record.valor)}</td>
+                          <td>{record.dataEscritura || '-'}</td>
+                          <td>{formatCurrency(record.comissaoLoja)}</td>
+                          <td>
+                            <select
+                              className="ds-status-select"
+                              value={record.estadoId}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => void updateDsRecordStatus(record.id, event.target.value)}
+                            >
+                              {dsOrderedStatuses.map((statusOption) => (
+                                <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              className="subtle-btn compact"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelectedDsRecordId(record.id)
+                                setIsDsRecordEditing(true)
+                              }}
+                            >
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'ds' && activeTab === 'importar' && (
+          <section className="panel ds-panel ds-import-panel">
+            <h2>Importar DS</h2>
+            <p className="small-note">Importação da folha de escrituras concretizadas com preview e conflitos.</p>
+            <div className="import-box">
+              <input type="file" accept=".xlsx" onChange={(event) => void handleDsImportFile(event)} />
+              <div className="actions-row start">
+                <button className="subtle-btn" type="button" onClick={() => void refreshDsImportPreview()}>
+                  Rever conflitos DS
+                </button>
+                <LabeledSelect
+                  label="Estratégia"
+                  value={dsImportStrategy}
+                  onChange={(value) => setDsImportStrategy(value as 'skip' | 'update' | 'duplicate')}
+                  options={[
+                    { value: 'update', label: 'Atualizar existentes' },
+                    { value: 'skip', label: 'Ignorar duplicados' },
+                    { value: 'duplicate', label: 'Criar duplicado' },
+                  ]}
+                />
+                <button className="primary-btn" type="button" onClick={() => void runDsImportCommit()} disabled={!dsImportPreview || dsImportLoading}>
+                  Confirmar importação DS
+                </button>
+              </div>
+              {dsImportLoading && <div className="small-note">A processar ficheiro DS...</div>}
+            </div>
+            {dsImportServerPreview && (
+              <div className="import-summary">
+                <span>Total: {dsImportServerPreview.summary.total}</span>
+                <span>Válidas: {dsImportServerPreview.summary.valid}</span>
+                <span>Conflitos: {dsImportServerPreview.summary.conflicts}</span>
+                <span>Novas: {dsImportServerPreview.summary.creates}</span>
+                <span>Inválidas: {dsImportServerPreview.summary.invalid}</span>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'ds' && activeTab === 'configuracao' && (
+          <section className="panel ds-panel ds-settings-panel">
+            <h2>Configuração DS</h2>
+            <p className="small-note">Estados independentes do módulo de recibos.</p>
+            <div className="actions-row start">
+              <button className="subtle-btn" type="button" onClick={() => setActiveTab('importar')}>
+                Importar DS
+              </button>
+            </div>
+            <div className="status-list">
+              {dsOrderedStatuses.map((status) => (
+                <div key={status.id} className="status-item">
+                  <span className="status-icon-preview">
+                    <StatusIcon name={status.icon} size={16} />
+                  </span>
+                  <select className="status-icon" value={status.icon} onChange={(event) => updateDsStatusLocal(status.id, { icon: event.target.value })}>
+                    {STATUS_ICON_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <input value={status.label} onChange={(event) => updateDsStatusLocal(status.id, { label: event.target.value })} />
+                  <input type="color" value={toColor(status.color)} onChange={(event) => updateDsStatusLocal(status.id, { color: event.target.value })} />
+                  <input type="number" className="small-number" value={status.order} onChange={(event) => updateDsStatusLocal(status.id, { order: Number(event.target.value) || 0 })} />
+                  <label className="inline-check">
+                    <input type="checkbox" checked={status.active} onChange={(event) => updateDsStatusLocal(status.id, { active: event.target.checked })} />
+                    Ativo
+                  </label>
+                  <button className="danger-link" type="button" onClick={() => void removeDsStatus(status.id)}>Remover</button>
+                </div>
+              ))}
+            </div>
+            <div className="actions-row start">
+              <button className="subtle-btn" type="button" onClick={() => void addDsStatus()}>Novo estado DS</button>
+              <button className="subtle-btn" type="button" onClick={() => void saveDsStatuses()}>Guardar estados DS</button>
+            </div>
+          </section>
+        )}
+
+        {activeModule === 'penhoras' && activeTab === 'entrada' && (
+          <section className="panel entrada-layout">
+            <aside className="panel side-list">
+              <div className="row-between">
+                <h2>Registos recentes Penhoras</h2>
+                <span className="recent-mode-badge">Lista</span>
+              </div>
+              <div className="small-note">Últimas alterações</div>
+              <div className="recent-list compact penhoras-recent-list">
+                {penhorasRecentRecords.length === 0 ? (
+                  <div className="empty-text">Ainda não existem registos de penhoras.</div>
+                ) : (
+                  penhorasRecentRecords.map((record) => {
+                    const status = getStatus(penhorasStatuses, record.estadoId)
+                    const reference = record.pe || record.pedido || record.identificacao || 'Sem referência'
+                    const details = [record.gestor, record.acto].filter((value): value is string => Boolean(value?.trim())).join(' · ')
+                    return (
+                      <button
+                        key={record.id}
+                        className="recent-card penhoras-recent-card"
+                        type="button"
+                        onClick={() => {
+                          setSelectedPenhorasRecordId(record.id)
+                          setActiveTab('consulta')
+                        }}
+                      >
+                        <span className="penhoras-recent-ref">{reference}</span>
+                        <span className="muted penhoras-recent-meta">{details || '-'}</span>
+                        {status ? (
+                          <StatusPill status={status} compact />
+                        ) : (
+                          <span className="status-pill compact ds-status-fallback">
+                            <Circle size={14} />
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </aside>
+
+            <div className="panel ds-panel penhoras-panel penhoras-entry-panel">
+              <div className="row-between">
+                <div>
+                  <h2>Entrada Penhoras</h2>
+                  <p className="small-note">Registo manual de penhoras com dados isolados dos módulos de recibos e DS.</p>
+                </div>
+              </div>
+
+              <form className="entry-form ds-entry-form" onSubmit={(event) => void submitPenhorasEntry(event, 'save')}>
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Identificação</h3>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="PE"
+                      value={penhorasEntryForm.pe}
+                      onChange={(value) => handlePenhorasEntryInput('pe', value)}
+                      suggestions={penhorasPeSuggestions}
+                    />
+                    <LabeledInput
+                      label="Acto"
+                      value={penhorasEntryForm.acto}
+                      onChange={(value) => handlePenhorasEntryInput('acto', value)}
+                      suggestions={penhorasActoFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Data pedido"
+                      type="date"
+                      value={penhorasEntryForm.dataPedido}
+                      onChange={(value) => handlePenhorasEntryInput('dataPedido', value)}
+                    />
+                  </div>
+                </section>
+
+                <section className="ds-form-section">
+                  <h3 className="ds-form-section-title">Contexto operacional</h3>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Identificação"
+                      value={penhorasEntryForm.identificacao}
+                      onChange={(value) => handlePenhorasEntryInput('identificacao', value)}
+                    />
+                    <LabeledInput
+                      label="Pedido"
+                      value={penhorasEntryForm.pedido}
+                      onChange={(value) => handlePenhorasEntryInput('pedido', value)}
+                    />
+                    <LabeledInput
+                      label="Gestor"
+                      value={penhorasEntryForm.gestor}
+                      onChange={(value) => handlePenhorasEntryInput('gestor', value)}
+                      suggestions={penhorasGestorFilterOptions}
+                    />
+                  </div>
+                  <div className="field-grid three">
+                    <LabeledSelect
+                      label="Estado"
+                      value={penhorasEntryForm.estadoId}
+                      onChange={(value) => handlePenhorasEntryInput('estadoId', value)}
+                      options={
+                        penhorasActiveStatuses.length > 0
+                          ? penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))
+                          : [{ value: penhorasEntryForm.estadoId || '', label: 'Sem estado' }]
+                      }
+                    />
+                  </div>
+                </section>
+
+                <div className="actions-row ds-entry-actions">
+                  <button
+                    className="subtle-btn"
+                    type="button"
+                    onClick={() => setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasDefaultStatus?.id ?? penhorasEntryForm.estadoId))}
+                  >
+                    Limpar
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => void saveNewPenhorasEntry()}>
+                    Guardar e novo
+                  </button>
+                  <button className="primary-btn" type="submit">
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        )}
+
+        {activeModule === 'penhoras' && activeTab === 'dashboards' && (
+          <section className="panel dashboard-experiment ds-panel penhoras-panel penhoras-dashboard-panel">
+            {!isDashboardFocusMode && (
+              <>
+                <div className="row-between wrap">
+                  <div>
+                    <h2>Dashboards Penhoras</h2>
+                    <p className="small-note">Acompanhamento de volume, estado e distribuição temporal dos registos de penhoras.</p>
+                  </div>
+                  <div className="saved-view-bar ds-saved-view-bar">
+                    {penhorasDashboardViews.map((view) => {
+                      const isDisabled = disabledSavedViewIds.includes(view.id)
+                      const isActive = activePenhorasSavedViewId === view.id && !isDisabled
+                      return (
+                        <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
+                          <button
+                            className="subtle-btn saved-view-apply"
+                            type="button"
+                            onClick={() => applyPenhorasView(view)}
+                            disabled={isDisabled}
+                            title={isDisabled ? 'Vista Penhoras desativada' : `Aplicar vista: ${view.name}`}
+                          >
+                            {view.name}
+                          </button>
+                          <button
+                            className="subtle-btn icon-btn micro"
+                            type="button"
+                            onClick={() => togglePenhorasSavedViewDisabled(view.id)}
+                            title={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
+                            aria-label={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
+                          >
+                            {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                          </button>
+                          <button
+                            className="subtle-btn icon-btn micro danger"
+                            type="button"
+                            onClick={() => void deletePenhorasSavedView(view.id)}
+                            title="Eliminar vista Penhoras"
+                            aria-label="Eliminar vista Penhoras"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                    <button className="subtle-btn" type="button" onClick={() => clearPenhorasFilters()}>
+                      <FilterX size={15} />
+                      Limpar filtros
+                    </button>
+                    <button
+                      className="subtle-btn"
+                      type="button"
+                      onClick={() =>
+                        void saveCurrentView('penhoras-dashboard', { ...penhorasFilters, q: globalSearch, widgets: penhorasDashboardWidgets })
+                      }
+                    >
+                      Guardar vista
+                    </button>
+                  </div>
+                </div>
+
+                <div className="dashboard-top-actions">
+                  <button
+                    className="subtle-btn"
+                    type="button"
+                    onClick={() => {
+                      setDashboardFocusMode(true)
+                      setPenhorasDashboardWidgetsOpen(true)
+                    }}
+                  >
+                    <Maximize2 size={15} />
+                    Expandir dashboard
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardConfigOpen((current) => !current)}>
+                    {penhorasDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
+                    {penhorasDashboardConfigOpen ? 'Ocultar painel' : 'Mostrar painel'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgetsOpen((current) => !current)}>
+                    {penhorasDashboardWidgetsOpen ? 'Ocultar widgets' : 'Mostrar widgets'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardPickerOpen((current) => !current)}>
+                    <Plus size={15} />
+                    {penhorasDashboardPickerOpen ? 'Ocultar catálogo' : 'Adicionar widgets'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgets(cloneDefaultPenhorasDashboardWidgets())}>
+                    Repor widgets
+                  </button>
+                </div>
+
+                {penhorasDashboardConfigOpen ? (
+                  <>
+                    <div className="dashboard-hero-grid ds-dashboard-hero">
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Total registos</span>
+                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.registos)}</strong>
+                      </article>
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Com data pedido</span>
+                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.comDataPedido)}</strong>
+                      </article>
+                      <article className="dashboard-hero-card ds-dashboard-hero-card">
+                        <span>Recusados/Desistência</span>
+                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.recusados)}</strong>
+                      </article>
+                    </div>
+
+                    <div className="filters-row seven ds-filters-row">
+                      <LabeledSelect
+                        label="Estado"
+                        value={String(penhorasFilters.estadoId ?? 'todos')}
+                        onChange={(value) => patchPenhorasFilters('estadoId', value as PenhorasRecordFilters['estadoId'])}
+                        options={[{ value: 'todos', label: 'Todos' }, ...penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))]}
+                      />
+                      <LabeledSelect
+                        label="Ano"
+                        value={String(penhorasFilters.ano ?? 'todos')}
+                        onChange={(value) => patchPenhorasFilters('ano', value === 'todos' ? 'todos' : Number(value))}
+                        options={[{ value: 'todos', label: 'Todos' }, ...penhorasYears.map((year) => ({ value: String(year), label: String(year) }))]}
+                      />
+                      <LabeledSelect
+                        label="Mês"
+                        value={String(penhorasFilters.mes ?? 'todos')}
+                        onChange={(value) => patchPenhorasFilters('mes', value === 'todos' ? 'todos' : Number(value))}
+                        options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
+                      />
+                      <LabeledSelect
+                        label="Gestor"
+                        value={String(penhorasFilters.gestor ?? '')}
+                        onChange={(value) => patchPenhorasFilters('gestor', value)}
+                        options={[{ value: '', label: 'Todos' }, ...penhorasGestorFilterOptions.map((value) => ({ value, label: value }))]}
+                      />
+                      <LabeledSelect
+                        label="Acto"
+                        value={String(penhorasFilters.acto ?? '')}
+                        onChange={(value) => patchPenhorasFilters('acto', value)}
+                        options={[{ value: '', label: 'Todos' }, ...penhorasActoFilterOptions.map((value) => ({ value, label: value }))]}
+                      />
+                      <div className="field">
+                        <span>Total</span>
+                        <div className="counter-box">{penhorasRecordsLoading ? 'A carregar...' : `${penhorasTotalRecords} registos`}</div>
+                      </div>
+                      <div className="field">
+                        <span>Aguarda registo</span>
+                        <div className="counter-box">{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.pendentes)}</div>
+                      </div>
+                    </div>
+
+                    <div className="dashboard-picker-wrap">
+                      <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardPickerOpen((current) => !current)}>
+                        {penhorasDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
+                      </button>
+                      {penhorasDashboardPickerOpen && (
+                        <div className="dashboard-widget-library">
+                          {PENHORAS_DASHBOARD_WIDGET_LIBRARY.map((widget) => (
+                            <button
+                              key={widget.type}
+                              className="dashboard-widget-option"
+                              type="button"
+                              onClick={() => addPenhorasDashboardWidget(widget.type)}
+                            >
+                              <strong>{widget.label}</strong>
+                              <span>{widget.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="dashboard-collapsed-note muted">
+                    Painel de configuração oculto. Use “Mostrar painel” para editar filtros.
+                  </div>
+                )}
+              </>
+            )}
+
+            {penhorasDashboardWidgetsOpen || isDashboardFocusMode ? (
+              penhorasDashboardWidgets.length === 0 ? (
+                <div className="empty-text dashboard-empty">
+                  Sem widgets ativos.
+                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgets(cloneDefaultPenhorasDashboardWidgets())}>
+                    Repor widgets
+                  </button>
+                </div>
+              ) : (
+                <div className={`dashboard-grid ds-dashboard-grid ${penhorasDashboardHasSideStack ? 'with-side-stack' : ''}`}>
+                  {penhorasDashboardHasSideStack ? (
+                    <>
+                      <div className="dashboard-main-widgets">
+                        {penhorasDashboardMainWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
+                      </div>
+                      <aside className="dashboard-side-widgets">
+                        {penhorasDashboardSideWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
+                      </aside>
+                    </>
+                  ) : penhorasDashboardSideWidgets.length > 0 && penhorasDashboardMainWidgets.length === 0 ? (
+                    <aside className="dashboard-side-widgets">
+                      {penhorasDashboardSideWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
+                    </aside>
+                  ) : (
+                    penhorasDashboardWidgets.map((widget) => renderPenhorasDashboardWidget(widget))
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="dashboard-collapsed-note muted">
+                Widgets ocultos. Use “Mostrar widgets” para voltar a apresentar o dashboard.
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && (
+          <section className="panel ds-panel penhoras-panel penhoras-results-panel">
+            <div className="row-between wrap">
+              <div>
+                <h2>{activeTab === 'consulta' ? 'Consulta Penhoras' : 'Tabela Penhoras'}</h2>
+                <p className="small-note">Registos de penhoras isolados dos módulos de recibos e DS.</p>
+              </div>
+              <div className="saved-view-bar ds-saved-view-bar">
+                {penhorasTableViews.map((view) => {
+                  const isDisabled = disabledSavedViewIds.includes(view.id)
+                  const isActive = activePenhorasSavedViewId === view.id && !isDisabled
+                  return (
+                    <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
+                      <button
+                        className="subtle-btn saved-view-apply"
+                        type="button"
+                        onClick={() => applyPenhorasView(view)}
+                        disabled={isDisabled}
+                        title={isDisabled ? 'Vista Penhoras desativada' : `Aplicar vista: ${view.name}`}
+                      >
+                        {view.name}
+                      </button>
+                      <button
+                        className="subtle-btn icon-btn micro"
+                        type="button"
+                        onClick={() => togglePenhorasSavedViewDisabled(view.id)}
+                        title={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
+                        aria-label={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
+                      >
+                        {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
+                      </button>
+                      <button
+                        className="subtle-btn icon-btn micro danger"
+                        type="button"
+                        onClick={() => void deletePenhorasSavedView(view.id)}
+                        title="Eliminar vista Penhoras"
+                        aria-label="Eliminar vista Penhoras"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )
+                })}
+                <button className="subtle-btn" type="button" onClick={() => clearPenhorasFilters()}>
+                  <FilterX size={15} />
+                  Limpar filtros
+                </button>
+                <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('penhoras-tabela', { ...penhorasFilters, q: globalSearch })}>
+                  Guardar vista
+                </button>
+              </div>
+            </div>
+
+            <div className="filters-row seven ds-filters-row">
+              <LabeledSelect
+                label="Estado"
+                value={String(penhorasFilters.estadoId ?? 'todos')}
+                onChange={(value) => patchPenhorasFilters('estadoId', value as PenhorasRecordFilters['estadoId'])}
+                options={[{ value: 'todos', label: 'Todos' }, ...penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))]}
+              />
+              <LabeledSelect
+                label="Ano"
+                value={String(penhorasFilters.ano ?? 'todos')}
+                onChange={(value) => patchPenhorasFilters('ano', value === 'todos' ? 'todos' : Number(value))}
+                options={[{ value: 'todos', label: 'Todos' }, ...penhorasYears.map((year) => ({ value: String(year), label: String(year) }))]}
+              />
+              <LabeledSelect
+                label="Mês"
+                value={String(penhorasFilters.mes ?? 'todos')}
+                onChange={(value) => patchPenhorasFilters('mes', value === 'todos' ? 'todos' : Number(value))}
+                options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
+              />
+              <LabeledSelect
+                label="Gestor"
+                value={String(penhorasFilters.gestor ?? '')}
+                onChange={(value) => patchPenhorasFilters('gestor', value)}
+                options={[{ value: '', label: 'Todos' }, ...penhorasGestorFilterOptions.map((value) => ({ value, label: value }))]}
+              />
+              <LabeledSelect
+                label="Acto"
+                value={String(penhorasFilters.acto ?? '')}
+                onChange={(value) => patchPenhorasFilters('acto', value)}
+                options={[{ value: '', label: 'Todos' }, ...penhorasActoFilterOptions.map((value) => ({ value, label: value }))]}
+              />
+              <div className="field">
+                <span>Total</span>
+                <div className="counter-box">{penhorasRecordsLoading ? 'A carregar...' : `${penhorasTotalRecords} registos`}</div>
+              </div>
+              <div className="field">
+                <span>Aguarda registo</span>
+                <div className="counter-box">{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.pendentes)}</div>
+              </div>
+            </div>
+
+            {penhorasRecords.length === 0 ? (
+              <div className="empty-text">Sem resultados Penhoras para os filtros selecionados.</div>
+            ) : activeTab === 'consulta' ? (
+              <div className="card-list ds-card-list">
+                {penhorasRecords.map((record) => {
+                  const status = getStatus(penhorasStatuses, record.estadoId)
+                  return (
+                    <article key={record.id} className="result-card penhoras-result-card clickable-row" onClick={() => setSelectedPenhorasRecordId(record.id)}>
+                      <div className="result-main ds-result-main">
+                        <div className="result-title ds-result-title">{record.identificacao || record.pe || 'Sem identificação'}</div>
+                        <div className="muted ds-result-secondary">
+                          <span>PE: {record.pe || '-'}</span>
+                          <span> · Pedido: {record.pedido || '-'}</span>
+                        </div>
+                      </div>
+                      <div className="result-entity muted ds-result-meta">{`Gestor: ${record.gestor || '-'} · ${record.acto || 'Acto por definir'}`}</div>
+                      <div className="ds-result-metrics">
+                        <strong>{record.dataPedido || '-'}</strong>
+                        <span>Data pedido</span>
+                      </div>
+                      <div className="card-actions ds-card-actions">
+                        <button
+                          className="subtle-btn"
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setSelectedPenhorasRecordId(record.id)
+                            setIsPenhorasRecordEditing(true)
+                          }}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                      <div className="result-status ds-result-status">
+                        {status ? <StatusPill status={status} /> : <span className="muted ds-status-pill-empty">Sem estado</span>}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="table-wrapper ds-table-wrapper">
+                <table className="records-table ds-records-table">
+                  <thead>
+                    <tr>
+                      <th>PE</th>
+                      <th>Acto</th>
+                      <th>Data Pedido</th>
+                      <th>Identificação</th>
+                      <th>Pedido</th>
+                      <th>Gestor</th>
+                      <th>Estado</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {penhorasRecords.map((record) => {
+                      const status = getStatus(penhorasStatuses, record.estadoId)
+                      const hasStatusOption = penhorasActiveStatuses.some((statusOption) => statusOption.id === record.estadoId)
+                      const statusValue = hasStatusOption ? record.estadoId : ''
+                      return (
+                        <tr
+                          key={record.id}
+                          style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
+                          onClick={(event) => {
+                            const target = event.target as HTMLElement
+                            if (target.closest('button, select, option, input, textarea, a')) return
+                            setSelectedPenhorasRecordId(record.id)
+                          }}
+                        >
+                          <td>{record.pe || '-'}</td>
+                          <td>{record.acto || '-'}</td>
+                          <td>{record.dataPedido || '-'}</td>
+                          <td>{record.identificacao || '-'}</td>
+                          <td>{record.pedido || '-'}</td>
+                          <td>{record.gestor || '-'}</td>
+                          <td>
+                            <select
+                              className="ds-status-select"
+                              value={statusValue}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => void updatePenhorasRecordStatus(record.id, event.target.value)}
+                            >
+                              {!hasStatusOption && <option value="">Selecionar estado...</option>}
+                              {penhorasActiveStatuses.map((statusOption) => (
+                                <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              className="subtle-btn compact"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelectedPenhorasRecordId(record.id)
+                                setIsPenhorasRecordEditing(true)
+                              }}
+                            >
+                              Editar
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'penhoras' && activeTab === 'importar' && (
+          <section className="panel ds-panel penhoras-panel ds-import-panel">
+            <h2>Importar Penhoras</h2>
+            <p className="small-note">Importação dedicada de penhoras com pré-visualização e resolução de conflitos.</p>
+            <div className="import-box">
+              <input type="file" accept=".xlsx" onChange={(event) => void handlePenhorasImportFile(event)} />
+              <div className="actions-row start">
+                <button className="subtle-btn" type="button" onClick={() => void refreshPenhorasImportPreview()}>
+                  Rever conflitos Penhoras
+                </button>
+                <LabeledSelect
+                  label="Estratégia"
+                  value={penhorasImportStrategy}
+                  onChange={(value) => setPenhorasImportStrategy(value as 'skip' | 'update' | 'duplicate')}
+                  options={[
+                    { value: 'update', label: 'Atualizar existentes' },
+                    { value: 'skip', label: 'Ignorar duplicados' },
+                    { value: 'duplicate', label: 'Criar duplicado' },
+                  ]}
+                />
+                <button
+                  className="primary-btn"
+                  type="button"
+                  onClick={() => void runPenhorasImportCommit()}
+                  disabled={!penhorasImportPreview || penhorasImportLoading}
+                >
+                  Confirmar importação Penhoras
+                </button>
+              </div>
+              {penhorasImportLoading && <div className="small-note">A processar ficheiro Penhoras...</div>}
+            </div>
+            {penhorasImportPreview && (
+              <div className="import-summary">
+                <span>Ficheiro: {penhorasImportPreview.fileName}</span>
+                <span>Linhas: {penhorasImportPreview.rows.length}</span>
+              </div>
+            )}
+            {penhorasImportServerPreview && (
+              <div className="import-summary">
+                <span>Total: {penhorasImportServerPreview.summary.total}</span>
+                <span>Válidas: {penhorasImportServerPreview.summary.valid}</span>
+                <span>Conflitos: {penhorasImportServerPreview.summary.conflicts}</span>
+                <span>Novas: {penhorasImportServerPreview.summary.creates}</span>
+                <span>Inválidas: {penhorasImportServerPreview.summary.invalid}</span>
+              </div>
+            )}
+          </section>
+        )}
+
+        {activeModule === 'penhoras' && activeTab === 'configuracao' && (
+          <section className="panel ds-panel penhoras-panel ds-settings-panel">
+            <h2>Configuração Penhoras</h2>
+            <p className="small-note">Estados e importação dedicados ao módulo Penhoras.</p>
+            <div className="actions-row start">
+              <button className="subtle-btn" type="button" onClick={() => setActiveTab('importar')}>
+                Importar Penhoras
+              </button>
+            </div>
+            <div className="status-list">
+              {penhorasOrderedStatuses.map((status) => (
+                <div key={status.id} className="status-item">
+                  <span className="status-icon-preview">
+                    <StatusIcon name={status.icon} size={16} />
+                  </span>
+                  <select className="status-icon" value={status.icon} onChange={(event) => updatePenhorasStatusLocal(status.id, { icon: event.target.value })}>
+                    {STATUS_ICON_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <input value={status.label} onChange={(event) => updatePenhorasStatusLocal(status.id, { label: event.target.value })} />
+                  <input type="color" value={toColor(status.color)} onChange={(event) => updatePenhorasStatusLocal(status.id, { color: event.target.value })} />
+                  <input
+                    type="number"
+                    className="small-number"
+                    value={status.order}
+                    onChange={(event) => updatePenhorasStatusLocal(status.id, { order: Number(event.target.value) || 0 })}
+                  />
+                  <label className="inline-check">
+                    <input type="checkbox" checked={status.active} onChange={(event) => updatePenhorasStatusLocal(status.id, { active: event.target.checked })} />
+                    Ativo
+                  </label>
+                  <button className="danger-link" type="button" onClick={() => void removePenhorasStatus(status.id)}>Remover</button>
+                </div>
+              ))}
+            </div>
+            <div className="actions-row start">
+              <button className="subtle-btn" type="button" onClick={() => void addPenhorasStatus()}>Novo estado Penhoras</button>
+              <button className="subtle-btn" type="button" onClick={() => void savePenhorasStatuses()}>Guardar estados Penhoras</button>
+            </div>
+          </section>
+        )}
+
+        {activeModule === 'recibos' && activeTab === 'entrada' && (
           <section className="panel entrada-layout">
             <aside className="panel side-list">
               <div className="row-between">
@@ -2253,7 +6649,7 @@ function App() {
           </section>
         )}
 
-        {(activeTab === 'consulta' || activeTab === 'tabela') && (
+        {activeModule === 'recibos' && (activeTab === 'consulta' || activeTab === 'tabela') && (
           <section className="panel">
             <div className="row-between wrap">
               <div>
@@ -2623,7 +7019,7 @@ function App() {
           </section>
         )}
 
-        {activeTab === 'dashboards' && (
+        {activeModule === 'recibos' && activeTab === 'dashboards' && (
           <section className="panel dashboard-experiment">
             {!isDashboardFocusMode && (
               <>
@@ -2824,7 +7220,7 @@ function App() {
           </section>
         )}
 
-        {activeTab === 'importar' && (
+        {activeModule === 'recibos' && activeTab === 'importar' && (
           <section className="panel">
             <h2>Importar ficheiro</h2>
             <p className="small-note">Preview com conflitos e estratégia: ignorar, atualizar ou duplicar.</p>
@@ -2907,7 +7303,7 @@ function App() {
           </section>
         )}
 
-        {activeTab === 'configuracao' && (
+        {activeModule === 'recibos' && activeTab === 'configuracao' && (
           <section className="panel">
             <h2>Configuração</h2>
             <p className="small-note">Estados, regras de cálculo fiscal e comissões configuráveis.</p>
@@ -3030,7 +7426,296 @@ function App() {
           </section>
         )}
 
-        {selectedRecord && (
+        {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
+          <div className="record-modal-overlay" onClick={() => setSelectedDsRecordId(null)}>
+            <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="drawer-header">
+                <div className="modal-title-block">
+                  <h3>{selectedDsRecord.referencia || selectedDsRecord.proponentes || 'Detalhe do registo DS'}</h3>
+                  <div className="small-note modal-meta">
+                    {[selectedDsRecord.gestora, selectedDsRecord.entidadeBancaria, selectedDsRecord.dataEscritura].filter(Boolean).join(' · ') || '-'}
+                  </div>
+                </div>
+                <div className="actions-row modal-header-actions">
+                  <button className="subtle-btn" type="button" onClick={() => setIsDsRecordEditing((current) => !current)}>
+                    {isDsRecordEditing ? <X size={15} /> : <Pencil size={15} />}
+                    {isDsRecordEditing ? 'Cancelar edição' : 'Editar'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setSelectedDsRecordId(null)}>Fechar</button>
+                </div>
+              </div>
+
+              {isDsRecordEditing && selectedDsRecordEdit ? (
+                <div className="record-edit-content">
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Gestora"
+                      value={selectedDsRecordEdit.gestora}
+                      onChange={(value) => handleDsRecordEditInput('gestora', value)}
+                      suggestions={dsGestoraFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Proponentes"
+                      value={selectedDsRecordEdit.proponentes}
+                      onChange={(value) => handleDsRecordEditInput('proponentes', value)}
+                      suggestions={dsProponentesSuggestions}
+                    />
+                    <LabeledInput
+                      label="Referência"
+                      value={selectedDsRecordEdit.referencia}
+                      onChange={(value) => handleDsRecordEditInput('referencia', value)}
+                      suggestions={dsReferenciaSuggestions}
+                    />
+                  </div>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Produto"
+                      value={selectedDsRecordEdit.produto}
+                      onChange={(value) => handleDsRecordEditInput('produto', value)}
+                      suggestions={dsProdutoFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Entidade bancária"
+                      value={selectedDsRecordEdit.entidadeBancaria}
+                      onChange={(value) => handleDsRecordEditInput('entidadeBancaria', value)}
+                      suggestions={dsEntidadeFilterOptions}
+                    />
+                    <LabeledInput
+                      label="Líder cálculo"
+                      value={selectedDsRecordEdit.liderCalculo}
+                      onChange={(value) => handleDsRecordEditInput('liderCalculo', value)}
+                    />
+                  </div>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Recibo"
+                      value={selectedDsRecordEdit.recibo}
+                      onChange={(value) => handleDsRecordEditInput('recibo', value)}
+                      suggestions={dsReciboSuggestions}
+                    />
+                    <LabeledInput
+                      label="Falta recibo gestora"
+                      value={selectedDsRecordEdit.faltaReciboGestora}
+                      onChange={(value) => handleDsRecordEditInput('faltaReciboGestora', value)}
+                    />
+                    <LabeledSelect
+                      label="Estado"
+                      value={selectedDsRecordEdit.estadoId}
+                      onChange={(value) => handleDsRecordEditInput('estadoId', value)}
+                      options={dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                    />
+                  </div>
+                  <div className="field-grid five">
+                    <LabeledInput label="Valor" value={selectedDsRecordEdit.valor} onChange={(value) => handleDsRecordEditInput('valor', value)} />
+                    <LabeledInput
+                      label="Comissão loja"
+                      value={selectedDsRecordEdit.comissaoLoja}
+                      onChange={(value) => handleDsRecordEditInput('comissaoLoja', value)}
+                    />
+                    <LabeledInput
+                      label="IVA CGD (raw)"
+                      value={selectedDsRecordEdit.ivaCgdRaw}
+                      onChange={(value) => handleDsRecordEditInput('ivaCgdRaw', value)}
+                    />
+                    <LabeledInput
+                      label="Total comissão c/ IVA"
+                      value={selectedDsRecordEdit.totalComissaoLojaCmIva}
+                      onChange={(value) => handleDsRecordEditInput('totalComissaoLojaCmIva', value)}
+                    />
+                    <LabeledInput
+                      label="Comissão gestor"
+                      value={selectedDsRecordEdit.comissaoGestor}
+                      onChange={(value) => handleDsRecordEditInput('comissaoGestor', value)}
+                    />
+                  </div>
+                  <div className="field-grid four">
+                    <LabeledInput
+                      label="Percentagem"
+                      value={selectedDsRecordEdit.percentagem}
+                      onChange={(value) => handleDsRecordEditInput('percentagem', value)}
+                    />
+                    <LabeledInput
+                      type="date"
+                      label="Data escritura"
+                      value={selectedDsRecordEdit.dataEscritura}
+                      onChange={(value) => handleDsRecordEditInput('dataEscritura', value)}
+                    />
+                    <LabeledInput
+                      type="date"
+                      label="Data fecho CRM"
+                      value={selectedDsRecordEdit.dataFechoCrm}
+                      onChange={(value) => handleDsRecordEditInput('dataFechoCrm', value)}
+                    />
+                    <LabeledInput
+                      label="Pagamento comissão gestor"
+                      value={selectedDsRecordEdit.pagComissaoGestor}
+                      onChange={(value) => handleDsRecordEditInput('pagComissaoGestor', value)}
+                    />
+                  </div>
+                  <div className="actions-row modal-edit-actions">
+                    <button className="primary-btn" type="button" onClick={() => void saveSelectedDsRecordEdits()}>
+                      <Save size={15} />
+                      Guardar alterações
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="detail-grid modal-detail-grid">
+                  <Info label="Gestora" value={selectedDsRecord.gestora || '-'} />
+                  <Info label="Proponentes" value={selectedDsRecord.proponentes || '-'} />
+                  <Info label="Referência" value={selectedDsRecord.referencia || '-'} />
+                  <Info label="Produto" value={selectedDsRecord.produto || '-'} />
+                  <Info label="Entidade bancária" value={selectedDsRecord.entidadeBancaria || '-'} />
+                  <Info label="Líder cálculo" value={selectedDsRecord.liderCalculo || '-'} />
+                  <Info label="Recibo" value={selectedDsRecord.recibo || '-'} />
+                  <Info label="Falta recibo gestora" value={selectedDsRecord.faltaReciboGestora || '-'} />
+                  <Info label="Valor" value={formatCurrency(selectedDsRecord.valor)} />
+                  <Info label="Comissão loja" value={formatCurrency(selectedDsRecord.comissaoLoja)} />
+                  <Info label="Total comissão c/ IVA" value={formatCurrency(selectedDsRecord.totalComissaoLojaCmIva)} />
+                  <Info label="Comissão gestor" value={formatCurrency(selectedDsRecord.comissaoGestor)} />
+                  <Info label="IVA CGD" value={selectedDsRecord.ivaCgdRaw || formatCurrency(selectedDsRecord.ivaCgdValor)} />
+                  <Info label="Percentagem" value={selectedDsRecord.percentagemRaw || toFormNumber(selectedDsRecord.percentagem) || '-'} />
+                  <Info label="Data escritura" value={selectedDsRecord.dataEscritura || '-'} />
+                  <Info label="Data fecho CRM" value={selectedDsRecord.dataFechoCrm || '-'} />
+                  <Info label="Pag. comissão gestor" value={selectedDsRecord.pagComissaoGestor || '-'} />
+                  <div className="field modal-status-field">
+                    <span>Estado</span>
+                    <select value={selectedDsRecord.estadoId} onChange={(event) => void updateDsRecordStatus(selectedDsRecord.id, event.target.value)}>
+                      {dsOrderedStatuses.map((statusOption) => (
+                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <h4 className="modal-section-title">Metadados</h4>
+              <div className="history-list modal-history-list">
+                <div className="history-item">
+                  <div>Criado</div>
+                  <div className="muted">{new Date(selectedDsRecord.createdAt).toLocaleString('pt-PT')}</div>
+                </div>
+                <div className="history-item">
+                  <div>Última atualização</div>
+                  <div className="muted">{new Date(selectedDsRecord.updatedAt).toLocaleString('pt-PT')}</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedPenhorasRecord && (
+          <div className="record-modal-overlay" onClick={() => setSelectedPenhorasRecordId(null)}>
+            <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="drawer-header">
+                <div className="modal-title-block">
+                  <h3>{selectedPenhorasRecord.pe || selectedPenhorasRecord.identificacao || 'Detalhe do registo Penhoras'}</h3>
+                  <div className="small-note modal-meta">
+                    {[selectedPenhorasRecord.gestor, selectedPenhorasRecord.acto, selectedPenhorasRecord.dataPedido].filter(Boolean).join(' · ') || '-'}
+                  </div>
+                </div>
+                <div className="actions-row modal-header-actions">
+                  <button className="subtle-btn" type="button" onClick={() => setIsPenhorasRecordEditing((current) => !current)}>
+                    {isPenhorasRecordEditing ? <X size={15} /> : <Pencil size={15} />}
+                    {isPenhorasRecordEditing ? 'Cancelar edição' : 'Editar'}
+                  </button>
+                  <button className="subtle-btn" type="button" onClick={() => setSelectedPenhorasRecordId(null)}>Fechar</button>
+                </div>
+              </div>
+
+              {isPenhorasRecordEditing && selectedPenhorasRecordEdit ? (
+                <div className="record-edit-content">
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="PE"
+                      value={selectedPenhorasRecordEdit.pe}
+                      onChange={(value) => handlePenhorasRecordEditInput('pe', value)}
+                      suggestions={penhorasPeSuggestions}
+                    />
+                    <LabeledInput
+                      label="Acto"
+                      value={selectedPenhorasRecordEdit.acto}
+                      onChange={(value) => handlePenhorasRecordEditInput('acto', value)}
+                      suggestions={penhorasActoFilterOptions}
+                    />
+                    <LabeledInput
+                      type="date"
+                      label="Data pedido"
+                      value={selectedPenhorasRecordEdit.dataPedido}
+                      onChange={(value) => handlePenhorasRecordEditInput('dataPedido', value)}
+                    />
+                  </div>
+                  <div className="field-grid three">
+                    <LabeledInput
+                      label="Identificação"
+                      value={selectedPenhorasRecordEdit.identificacao}
+                      onChange={(value) => handlePenhorasRecordEditInput('identificacao', value)}
+                    />
+                    <LabeledInput
+                      label="Pedido"
+                      value={selectedPenhorasRecordEdit.pedido}
+                      onChange={(value) => handlePenhorasRecordEditInput('pedido', value)}
+                    />
+                    <LabeledInput
+                      label="Gestor"
+                      value={selectedPenhorasRecordEdit.gestor}
+                      onChange={(value) => handlePenhorasRecordEditInput('gestor', value)}
+                      suggestions={penhorasGestorFilterOptions}
+                    />
+                  </div>
+                  <div className="field-grid three">
+                    <LabeledSelect
+                      label="Estado"
+                      value={selectedPenhorasRecordEdit.estadoId}
+                      onChange={(value) => handlePenhorasRecordEditInput('estadoId', value)}
+                      options={penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                    />
+                  </div>
+                  <div className="actions-row modal-edit-actions">
+                    <button className="primary-btn" type="button" onClick={() => void saveSelectedPenhorasRecordEdits()}>
+                      <Save size={15} />
+                      Guardar alterações
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="detail-grid modal-detail-grid">
+                  <Info label="PE" value={selectedPenhorasRecord.pe || '-'} />
+                  <Info label="Acto" value={selectedPenhorasRecord.acto || '-'} />
+                  <Info label="Data pedido" value={selectedPenhorasRecord.dataPedido || '-'} />
+                  <Info label="Identificação" value={selectedPenhorasRecord.identificacao || '-'} />
+                  <Info label="Pedido" value={selectedPenhorasRecord.pedido || '-'} />
+                  <Info label="Gestor" value={selectedPenhorasRecord.gestor || '-'} />
+                  <div className="field modal-status-field">
+                    <span>Estado</span>
+                    <select value={selectedPenhorasRecord.estadoId} onChange={(event) => void updatePenhorasRecordStatus(selectedPenhorasRecord.id, event.target.value)}>
+                      {!penhorasActiveStatuses.some((statusOption) => statusOption.id === selectedPenhorasRecord.estadoId) && (
+                        <option value="">Selecionar estado...</option>
+                      )}
+                      {penhorasActiveStatuses.map((statusOption) => (
+                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <h4 className="modal-section-title">Metadados</h4>
+              <div className="history-list modal-history-list">
+                <div className="history-item">
+                  <div>Criado</div>
+                  <div className="muted">{new Date(selectedPenhorasRecord.createdAt).toLocaleString('pt-PT')}</div>
+                </div>
+                <div className="history-item">
+                  <div>Última atualização</div>
+                  <div className="muted">{new Date(selectedPenhorasRecord.updatedAt).toLocaleString('pt-PT')}</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {activeModule === 'recibos' && selectedRecord && (
           <div className="record-modal-overlay" onClick={() => setSelectedRecordId(null)}>
             <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
               <div className="drawer-header">

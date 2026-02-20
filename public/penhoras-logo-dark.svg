@@ -1,0 +1,22 @@
+<svg width="470" height="140" viewBox="0 0 470 140" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Penhoras Imóveis">
+  <defs>
+    <linearGradient id="penhorasCircleDark" x1="54" y1="18" x2="54" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A1C"/>
+      <stop offset="1" stop-color="#C95A00"/>
+    </linearGradient>
+    <linearGradient id="penhorasRingDark" x1="4" y1="6" x2="110" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FFE7D3"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(0 8)">
+    <circle cx="54" cy="62" r="53" fill="url(#penhorasRingDark)" />
+    <circle cx="54" cy="62" r="50" fill="url(#penhorasCircleDark)" />
+    <path d="M27 61L54 40L81 61V84H67V68H41V84H27V61Z" fill="white"/>
+    <path d="M50 53H58V60H50V53Z" fill="#C95A00"/>
+    <path d="M23 62L54 36L85 62" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="130" y="50" fill="#FFF2E6" font-family="'Segoe UI', 'Arial', sans-serif" font-size="26" font-weight="800">Penhoras Imóveis</text>
+    <text x="130" y="79" fill="#FFE0C4" font-family="'Segoe UI', 'Arial', sans-serif" font-size="16" font-weight="700">Módulo operacional dedicado</text>
+  </g>
+</svg>

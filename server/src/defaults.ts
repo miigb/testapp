@@ -37,3 +37,73 @@ export const DEFAULT_TAX_RULES = [
     order: 3,
   },
 ] as const
+
+export const DEFAULT_DS_STATUSES = [
+  {
+    key: 'ds-pagas-banco-comissao-gestora',
+    label: 'Pagas pelo banco/comissão paga gestora',
+    icon: 'check-circle2',
+    color: '#92D050',
+    active: true,
+    order: 1,
+  },
+  {
+    key: 'ds-falta-recibo-gestora',
+    label: 'Falta recibo gestora',
+    icon: 'alert-triangle',
+    color: '#FFFF00',
+    active: true,
+    order: 2,
+  },
+  {
+    key: 'ds-aguarda-pagamento-banco',
+    label: 'Aguarda pagamento banco',
+    icon: 'clock3',
+    color: '#00B0F0',
+    active: true,
+    order: 3,
+  },
+  {
+    key: 'ds-sem-estado',
+    label: 'Sem estado',
+    icon: 'circle',
+    color: '#BFC4CC',
+    active: true,
+    order: 999,
+  },
+] as const
+
+export const DEFAULT_PENHORAS_STATUSES = [
+  {
+    key: 'penhoras-registados',
+    label: 'REGISTADOS',
+    icon: 'check-circle2',
+    color: '#92D050',
+    active: true,
+    order: 1,
+  },
+  {
+    key: 'penhoras-recusados-desistencia',
+    label: 'RECUSADOS/DESISTENCIA',
+    icon: 'ban',
+    color: '#FF0000',
+    active: true,
+    order: 2,
+  },
+  {
+    key: 'penhoras-atrasados-reforcos-10-dias',
+    label: 'ATRASADOS - FEITOS REFORÇOS A CADA 10 DIAS',
+    icon: 'alert-triangle',
+    color: '#FFFF00',
+    active: true,
+    order: 3,
+  },
+  {
+    key: 'penhoras-aguarda-registo',
+    label: 'AGUARDA REGISTO',
+    icon: 'clock3',
+    color: '#F2F2F2',
+    active: true,
+    order: 4,
+  },
+] as const

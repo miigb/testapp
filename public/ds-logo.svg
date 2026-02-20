@@ -1,0 +1,28 @@
+<svg width="470" height="140" viewBox="0 0 470 140" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DS Intermediários de Crédito">
+  <defs>
+    <linearGradient id="dsCircle" x1="54" y1="18" x2="54" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D9007A"/>
+      <stop offset="1" stop-color="#B10062"/>
+    </linearGradient>
+    <linearGradient id="dsRing" x1="4" y1="6" x2="110" y2="126" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7C3DE"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(0 8)">
+    <circle cx="54" cy="62" r="53" fill="url(#dsRing)" />
+    <circle cx="54" cy="62" r="50" fill="url(#dsCircle)" />
+    <path
+      d="M24 40.5H52.4C68.4 40.5 78.4 48.5 78.4 62.2C78.4 76 68.4 84 52.4 84H24V40.5ZM50.3 52.8H37.7V71.7H50.3C58.5 71.7 64.1 68.2 64.1 62.2C64.1 56.3 58.5 52.8 50.3 52.8Z"
+      fill="white"
+    />
+    <path
+      d="M79.6 82.8V71.5H92.8C97.2 71.5 99.4 69.8 99.4 66.8C99.4 63.9 97.4 62.2 92.8 62.2H87C74.3 62.2 67.6 55.8 67.6 45.8C67.6 35.4 75.2 29.5 89.4 29.5H109.9V40.8H91.6C87.2 40.8 85.1 42.2 85.1 45.1C85.1 48 87.2 49.5 91.6 49.5H97.2C109.9 49.5 116.9 56.1 116.9 66.3C116.9 76.8 109.3 82.8 95.1 82.8H79.6Z"
+      fill="white"
+    />
+    <text x="130" y="50" fill="#A1005D" font-family="'Segoe UI', 'Arial', sans-serif" font-size="26" font-weight="800">DS</text>
+    <text x="176" y="50" fill="#A1005D" font-family="'Segoe UI', 'Arial', sans-serif" font-size="22" font-weight="800">Intermediários de Crédito</text>
+    <text x="130" y="79" fill="#7A124F" font-family="'Segoe UI', 'Arial', sans-serif" font-size="16" font-weight="700">Módulo operacional dedicado</text>
+  </g>
+</svg>

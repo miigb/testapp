@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs'
 
-import type { ParsedImport, ReceiptRecord, RecordType } from '../types'
+import type { DsParsedImport, ParsedImport, PenhorasParsedImport, ReceiptRecord, RecordType } from '../types'
+import { normalizeText, parseDateToISO } from './utils'
 
 const MONTH_NAME_TO_NUM: Record<string, number> = {
   JANEIRO: 1,
@@ -35,17 +36,6 @@ type ImportField =
   | 'dataLevantamento'
   | 'reciboNumero'
 
-function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) {
-    return ''
-  }
-  return String(value)
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-}
-
 function parseNumber(value: string): number | undefined {
   if (!value.trim()) {
     return undefined
@@ -54,39 +44,6 @@ function parseNumber(value: string): number | undefined {
   const cleaned = value.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '')
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : undefined
-}
-
-function parseDateToISO(value: unknown): string | undefined {
-  if (!value) {
-    return undefined
-  }
-
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10)
-  }
-
-  if (typeof value === 'number') {
-    const excelEpoch = new Date(Date.UTC(1899, 11, 30))
-    const date = new Date(excelEpoch.getTime() + value * 24 * 60 * 60 * 1000)
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10)
-  }
-
-  const text = String(value).trim()
-  if (!text) {
-    return undefined
-  }
-
-  const dmy = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
-  if (dmy) {
-    const day = Number(dmy[1])
-    const month = Number(dmy[2])
-    const year = Number(dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3])
-    const date = new Date(Date.UTC(year, month - 1, day))
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10)
-  }
-
-  const parsed = new Date(text)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10)
 }
 
 function toHexColor(color: string): string {
@@ -376,6 +333,298 @@ export async function parseImportedWorkbook(fileName: string, buffer: ArrayBuffe
       }
     }
   })
+
+  return {
+    fileName,
+    parsedAt: new Date().toISOString(),
+    rows,
+    colorCount,
+  }
+}
+
+type DsFieldKey =
+  | 'gestora'
+  | 'proponentes'
+  | 'referencia'
+  | 'produto'
+  | 'valor'
+  | 'dataEscritura'
+  | 'entidadeBancaria'
+  | 'dataFechoCrm'
+  | 'liderCalculo'
+  | 'comissaoLoja'
+  | 'ivaCgd'
+  | 'totalComissaoLojaCmIva'
+  | 'comissaoGestor'
+  | 'percentagem'
+  | 'pagComissaoGestor'
+  | 'recibo'
+  | 'faltaReciboGestora'
+
+function deriveDsStatusKey(faltaReciboGestora: unknown, recibo: unknown): string {
+  const lastColumnText = normalizeText(faltaReciboGestora)
+  const reciboText = String(recibo ?? '').trim()
+
+  if (lastColumnText.includes('AGUARDA PAGAMENTO BANCO')) return 'ds-aguarda-pagamento-banco'
+  if (lastColumnText.includes('FALTA RECIBO GESTORA')) return 'ds-falta-recibo-gestora'
+  if (lastColumnText.includes('PAGAS PELO BANCO') || lastColumnText.includes('COMISSAO PAGA GESTORA')) {
+    return 'ds-pagas-banco-comissao-gestora'
+  }
+
+  if (!reciboText) return 'ds-falta-recibo-gestora'
+  return 'ds-pagas-banco-comissao-gestora'
+}
+
+function mapDsHeader(header: string): DsFieldKey | undefined {
+  const normalized = normalizeText(header)
+  if (!normalized) return undefined
+  if (normalized.includes('FALTA RECIBO GESTORA')) return 'faltaReciboGestora'
+  if (normalized.includes('GESTORA')) return 'gestora'
+  if (normalized.includes('PROPONENTES')) return 'proponentes'
+  if (normalized.includes('REFERENCIA')) return 'referencia'
+  if (normalized.includes('PRODUTO')) return 'produto'
+  if (normalized === 'VALOR' || normalized.startsWith('VALOR ')) return 'valor'
+  if (normalized.includes('DATA ESCRITURA')) return 'dataEscritura'
+  if (normalized.includes('ENTIDADE BANCARIA')) return 'entidadeBancaria'
+  if (normalized.includes('DATA FECHO CRM')) return 'dataFechoCrm'
+  if (normalized.includes('LIDER CALCULO')) return 'liderCalculo'
+  if (normalized.includes('COMISSAO LOJA') && !normalized.includes('TOTAL')) return 'comissaoLoja'
+  if (normalized.includes('IVA CGD')) return 'ivaCgd'
+  if (normalized.includes('TOTAL COMISSAO LOJA')) return 'totalComissaoLojaCmIva'
+  if (normalized.includes('COMISSAO GESTOR')) return 'comissaoGestor'
+  if (normalized.includes('PERCENTAGEM')) return 'percentagem'
+  if (normalized.includes('PAG. COMISSAO GESTOR')) return 'pagComissaoGestor'
+  if (normalized === 'RECIBO') return 'recibo'
+  return undefined
+}
+
+export async function parseDsWorkbook(fileName: string, buffer: ArrayBuffer): Promise<DsParsedImport> {
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+  const sheet = workbook.worksheets.find((item) => normalizeText(item.name).includes('ESCRITURAS CONCRETIZADAS')) ?? workbook.worksheets[0]
+
+  if (!sheet) {
+    return {
+      fileName,
+      parsedAt: new Date().toISOString(),
+      rows: [],
+      colorCount: {},
+    }
+  }
+
+  const headerRowNumber = 4
+  const headerRow = sheet.getRow(headerRowNumber)
+  const headers = getRowValues(headerRow).map((value: ExcelJS.CellValue) => String(getCellRawValue(value) ?? ''))
+  const maxCol = headers.length
+
+  const rows: Array<Record<string, unknown>> = []
+  const colorCount: Record<string, number> = {}
+
+  for (let rowNumber = headerRowNumber + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber)
+    const values = getRowValues(row).map((value: ExcelJS.CellValue) => getCellRawValue(value))
+    if (!values.some((value) => value !== undefined && value !== null && String(value).trim() !== '')) continue
+
+    const sourceColor = extractRowColor(row, maxCol)
+    colorCount[sourceColor] = (colorCount[sourceColor] ?? 0) + 1
+
+    const dsRow: Record<string, unknown> = {
+      sourceFile: fileName,
+      sourceSheet: sheet.name,
+      sourceRowNumber: rowNumber,
+      sourceColor,
+    }
+
+    for (let col = 1; col <= maxCol; col += 1) {
+      const header = headers[col - 1]
+      const field = mapDsHeader(header)
+      if (!field) continue
+
+      const value = values[col - 1]
+      if (value === undefined || value === null || String(value).trim() === '') continue
+
+      const textValue = String(value).trim()
+      if (field === 'dataEscritura' || field === 'dataFechoCrm' || field === 'pagComissaoGestor') {
+        const parsedDate = parseDateToISO(value)
+        if (parsedDate) {
+          dsRow[field] = parsedDate
+        }
+        continue
+      }
+
+      dsRow[field] = textValue
+
+      if (field === 'valor') {
+        if (typeof value === 'number') dsRow.valor = value
+      }
+      if (field === 'comissaoLoja') {
+        if (typeof value === 'number') dsRow.comissaoLoja = value
+      }
+      if (field === 'totalComissaoLojaCmIva') {
+        if (typeof value === 'number') dsRow.totalComissaoLojaCmIva = value
+      }
+      if (field === 'comissaoGestor') {
+        if (typeof value === 'number') dsRow.comissaoGestor = value
+      }
+      if (field === 'percentagem') {
+        if (typeof value === 'number') dsRow.percentagem = value
+      }
+    }
+
+    if (dsRow.referencia || dsRow.proponentes || dsRow.dataEscritura) {
+      dsRow.statusId = deriveDsStatusKey(dsRow.faltaReciboGestora, dsRow.recibo)
+      rows.push(dsRow)
+    }
+  }
+
+  return {
+    fileName,
+    parsedAt: new Date().toISOString(),
+    rows,
+    colorCount,
+  }
+}
+
+type PenhorasFieldKey = 'pe' | 'acto' | 'dataPedido' | 'identificacao' | 'pedido' | 'gestor'
+
+const PENHORAS_LEGEND_ACTO_NORMALIZED = new Set(
+  [
+    'LEGENDA',
+    'LEGENDA:',
+    'REGISTADOS',
+    'RECUSADOS/DESISTENCIA',
+    'RECUSADOS / DESISTENCIA',
+    'AGUARDA REGISTO',
+    'ATRASADOS - FEITOS REFORCOS A CADA 10 DIAS',
+    'ATRASADOS - FEITOS REFORÇOS A CADA 10 DIAS',
+  ].map((value) => normalizeText(value).replace(/\s+/g, ' ').trim()),
+)
+
+function isPlaceholderPenhorasValue(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  const trimmed = String(value).trim()
+  return trimmed === '' || trimmed === '-' || trimmed === '--' || trimmed === '—'
+}
+
+function isLegendPenhorasImportRow(row: Record<string, unknown>): boolean {
+  const acto = typeof row.acto === 'string' ? row.acto : undefined
+  if (!acto) return false
+  const normalizedActo = normalizeText(acto).replace(/\s+/g, ' ').trim()
+  if (!PENHORAS_LEGEND_ACTO_NORMALIZED.has(normalizedActo)) return false
+
+  return (
+    isPlaceholderPenhorasValue(row.pe) &&
+    isPlaceholderPenhorasValue(row.identificacao) &&
+    isPlaceholderPenhorasValue(row.pedido) &&
+    isPlaceholderPenhorasValue(row.gestor) &&
+    !row.dataPedido
+  )
+}
+
+function mapPenhorasHeader(header: string): PenhorasFieldKey | undefined {
+  const normalized = normalizeText(header)
+  if (!normalized) return undefined
+  if (normalized === 'PE') return 'pe'
+  if (normalized.includes('ACTO')) return 'acto'
+  if (normalized.includes('DATA') && normalized.includes('PEDIDO')) return 'dataPedido'
+  if (normalized.includes('IDENTIFICACAO')) return 'identificacao'
+  if (normalized === 'PEDIDO') return 'pedido'
+  if (normalized.includes('GESTOR')) return 'gestor'
+  return undefined
+}
+
+function derivePenhorasStatusKey(acto: unknown): string {
+  const normalized = normalizeText(acto)
+  if (normalized.includes('RECUS') || normalized.includes('DESIST')) return 'penhoras-recusados-desistencia'
+  if (normalized.includes('ATRASAD') || normalized.includes('REFORC')) return 'penhoras-atrasados-reforcos-10-dias'
+  if (normalized.includes('AGUARDA') && normalized.includes('REGIST')) return 'penhoras-aguarda-registo'
+  if (normalized.includes('REGISTAD')) return 'penhoras-registados'
+  // Compatibility with legacy values from older spreadsheets.
+  if (normalized.includes('CANCELAMENTO')) return 'penhoras-recusados-desistencia'
+  if (normalized.includes('PENHORA')) return 'penhoras-registados'
+  return 'penhoras-aguarda-registo'
+}
+
+export async function parsePenhorasWorkbook(fileName: string, buffer: ArrayBuffer): Promise<PenhorasParsedImport> {
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+  const sheet =
+    workbook.worksheets.find((item) => normalizeText(item.name).includes('PENHORAS')) ??
+    workbook.worksheets.find((item) => normalizeText(item.name).includes('REGISTO')) ??
+    workbook.worksheets[0]
+
+  if (!sheet) {
+    return {
+      fileName,
+      parsedAt: new Date().toISOString(),
+      rows: [],
+      colorCount: {},
+    }
+  }
+
+  const headerRowNumber = 1
+  const headerRow = sheet.getRow(headerRowNumber)
+  const headers = getRowValues(headerRow).map((value: ExcelJS.CellValue) => String(getCellRawValue(value) ?? ''))
+  const maxCol = headers.length
+
+  const rows: Array<Record<string, unknown>> = []
+  const colorCount: Record<string, number> = {}
+
+  for (let rowNumber = headerRowNumber + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber)
+    const values = getRowValues(row).map((value: ExcelJS.CellValue) => getCellRawValue(value))
+    if (!values.some((value) => value !== undefined && value !== null && String(value).trim() !== '')) continue
+
+    const sourceColor = extractRowColor(row, maxCol)
+    colorCount[sourceColor] = (colorCount[sourceColor] ?? 0) + 1
+
+    const penhorasRow: Record<string, unknown> = {
+      sourceFile: fileName,
+      sourceSheet: sheet.name,
+      sourceRowNumber: rowNumber,
+      sourceColor,
+    }
+
+    for (let col = 1; col <= maxCol; col += 1) {
+      const header = headers[col - 1]
+      const field = mapPenhorasHeader(header)
+      if (!field) continue
+
+      const value = values[col - 1]
+      if (value === undefined || value === null || String(value).trim() === '') continue
+
+      if (field === 'dataPedido') {
+        const parsedDate = parseDateToISO(value)
+        if (parsedDate) penhorasRow.dataPedido = parsedDate
+        continue
+      }
+
+      if (field === 'pedido') {
+        const asNumber = typeof value === 'number' ? Math.round(value) : Number(String(value).replace(/[^\d]/g, ''))
+        penhorasRow.pedido = Number.isFinite(asNumber) ? String(asNumber) : String(value).trim()
+        continue
+      }
+
+      if (field === 'gestor') {
+        const normalizedGestor = String(value).trim()
+        if (normalizedGestor && !isPlaceholderPenhorasValue(normalizedGestor)) {
+          penhorasRow.gestor = normalizedGestor.toUpperCase()
+        }
+        continue
+      }
+
+      penhorasRow[field] = String(value).trim()
+    }
+
+    if (isLegendPenhorasImportRow(penhorasRow)) {
+      continue
+    }
+
+    if (penhorasRow.pe || penhorasRow.acto || penhorasRow.identificacao || penhorasRow.dataPedido) {
+      penhorasRow.statusId = derivePenhorasStatusKey(penhorasRow.acto)
+      rows.push(penhorasRow)
+    }
+  }
 
   return {
     fileName,

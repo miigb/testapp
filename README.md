@@ -75,6 +75,12 @@ npm run seed:from-xlsx -- "/Users/miguelbrito/Downloads/RECIBOS EMITIDOS 2025.xl
 - Neste ambiente, o Docker daemon não estava disponível, por isso a migração Prisma não foi executada contra uma base ativa.
 - A API arranca e responde em `/api/health`; para persistência completa precisa de PostgreSQL acessível no `DATABASE_URL`.
 
+## Deployment
+- Plano detalhado: `DEPLOYMENT_PLAN.md`
+
+## DS Module Planning
+- Plano formal: `DS_MODULE_PLAN.md`
+
 ## Future-Proofing Roadmap (API-first)
 Backlog para evoluir a app com integrações externas e estabilidade de longo prazo.
 

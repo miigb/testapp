@@ -2,7 +2,15 @@ import type {
   AnalyticsSummary,
   BootstrapResponse,
   CalculationSettings,
+  DsBootstrapResponse,
+  PenhorasBootstrapResponse,
+  DsRecord,
+  DsRecordFilters,
+  DsRecordsResponse,
   ImportPreviewResponse,
+  PenhorasRecord,
+  PenhorasRecordFilters,
+  PenhorasRecordsResponse,
   ParsedImport,
   RecordFilters,
   RecordSuggestions,
@@ -13,6 +21,14 @@ import type {
 } from './types'
 
 type RecordWithStatusAliases = ReceiptRecord & {
+  statusId?: string
+}
+
+type DsRecordWithStatusAliases = DsRecord & {
+  statusId?: string
+}
+
+type PenhorasRecordWithStatusAliases = PenhorasRecord & {
   statusId?: string
 }
 
@@ -44,7 +60,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 function normalizeRecord(record: RecordWithStatusAliases): ReceiptRecord {
   return {
     ...record,
-    estadoId: record.estadoId || record.statusId || record.status?.id || '',
+    estadoId: record.statusId || record.status?.id || record.estadoId || '',
   }
 }
 
@@ -57,20 +73,82 @@ function normalizeRecordPayload(payload: Partial<ReceiptRecord>): Record<string,
   return normalized
 }
 
-function queryFromFilters(filters: RecordFilters): string {
+/**
+ * Generic helper — converts a flat filters record into a URLSearchParams string.
+ * String values equal to 'todos' are omitted (treated as "no filter").
+ * Numbers are coerced to strings. undefined values are always omitted.
+ */
+function buildFilterParams(
+  entries: Record<string, string | number | undefined>,
+  pagination: { page: number; pageSize: number },
+): string {
   const params = new URLSearchParams()
-
-  if (filters.q) params.set('q', filters.q)
-  if (filters.tipo && filters.tipo !== 'todos') params.set('tipo', filters.tipo)
-  if (filters.estadoId && filters.estadoId !== 'todos') params.set('estadoId', filters.estadoId)
-  if (filters.mes && filters.mes !== 'todos') params.set('mes', String(filters.mes))
-  if (filters.ano && filters.ano !== 'todos') params.set('ano', String(filters.ano))
-  if (filters.exequente) params.set('exequente', filters.exequente)
-  if (filters.gestor) params.set('gestor', filters.gestor)
-  params.set('page', String(filters.page ?? 1))
-  params.set('pageSize', String(filters.pageSize ?? 300))
-
+  for (const [key, value] of Object.entries(entries)) {
+    if (value === undefined || value === 'todos') continue
+    params.set(key, String(value))
+  }
+  params.set('page', String(pagination.page ?? 1))
+  params.set('pageSize', String(pagination.pageSize ?? 300))
   return params.toString()
+}
+
+function queryFromFilters(filters: RecordFilters): string {
+  return buildFilterParams(
+    {
+      q: filters.q,
+      tipo: filters.tipo,
+      estadoId: filters.estadoId,
+      mes: filters.mes as number | undefined,
+      ano: filters.ano as number | undefined,
+      exequente: filters.exequente,
+      gestor: filters.gestor,
+    },
+    { page: filters.page ?? 1, pageSize: filters.pageSize ?? 300 },
+  )
+}
+
+function queryFromDsFilters(filters: DsRecordFilters): string {
+  return buildFilterParams(
+    {
+      q: filters.q,
+      estadoId: filters.estadoId,
+      gestora: filters.gestora,
+      entidadeBancaria: filters.entidadeBancaria,
+      produto: filters.produto,
+      reciboEstado: filters.reciboEstado,
+      mes: filters.mes as number | undefined,
+      ano: filters.ano as number | undefined,
+    },
+    { page: filters.page ?? 1, pageSize: filters.pageSize ?? 300 },
+  )
+}
+
+function queryFromPenhorasFilters(filters: PenhorasRecordFilters): string {
+  return buildFilterParams(
+    {
+      q: filters.q,
+      estadoId: filters.estadoId,
+      gestor: filters.gestor,
+      acto: filters.acto,
+      mes: filters.mes as number | undefined,
+      ano: filters.ano as number | undefined,
+    },
+    { page: filters.page ?? 1, pageSize: filters.pageSize ?? 300 },
+  )
+}
+
+function normalizeDsRecord(record: DsRecordWithStatusAliases): DsRecord {
+  return {
+    ...record,
+    estadoId: record.statusId || record.status?.id || record.estadoId || '',
+  }
+}
+
+function normalizePenhorasRecord(record: PenhorasRecordWithStatusAliases): PenhorasRecord {
+  return {
+    ...record,
+    estadoId: record.statusId || record.status?.id || record.estadoId || '',
+  }
 }
 
 export const api = {
@@ -240,6 +318,156 @@ export const api = {
     clearOnly?: boolean
   }) {
     return request<{ ok: true; migrated: number; skipped?: number }>('/api/migrate/local-storage', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  dsBootstrap() {
+    return request<DsBootstrapResponse>('/api/ds/bootstrap')
+  },
+
+  getDsRecords(filters: DsRecordFilters) {
+    return request<DsRecordsResponse>(`/api/ds/records?${queryFromDsFilters(filters)}`).then((response) => ({
+      ...response,
+      items: response.items.map((item) => normalizeDsRecord(item as DsRecordWithStatusAliases)),
+    }))
+  },
+
+  getDsRecord(id: string) {
+    return request<DsRecord>(`/api/ds/records/${id}`).then((record) => normalizeDsRecord(record as DsRecordWithStatusAliases))
+  },
+
+  createDsRecord(payload: Partial<DsRecord>) {
+    return request<DsRecord>('/api/ds/records', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then((record) => normalizeDsRecord(record as DsRecordWithStatusAliases))
+  },
+
+  patchDsRecord(id: string, payload: Partial<DsRecord>) {
+    return request<DsRecord>(`/api/ds/records/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }).then((record) => normalizeDsRecord(record as DsRecordWithStatusAliases))
+  },
+
+  updateDsRecordStatus(id: string, statusId: string) {
+    return request<DsRecord>(`/api/ds/records/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statusId }),
+    }).then((record) => normalizeDsRecord(record as DsRecordWithStatusAliases))
+  },
+
+  getDsStatuses() {
+    return request<StatusDefinition[]>('/api/ds/statuses')
+  },
+
+  createDsStatus(payload: Omit<StatusDefinition, 'id'>) {
+    return request<StatusDefinition>('/api/ds/statuses', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updateDsStatus(id: string, payload: Partial<Omit<StatusDefinition, 'id'>>) {
+    return request<StatusDefinition>(`/api/ds/statuses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteDsStatus(id: string, options?: { reassignToStatusId?: string }) {
+    const query = options?.reassignToStatusId ? `?reassignToStatusId=${encodeURIComponent(options.reassignToStatusId)}` : ''
+    return request<{ ok: boolean; reassigned?: number }>(`/api/ds/statuses/${id}${query}`, {
+      method: 'DELETE',
+    })
+  },
+
+  previewDsImport(payload: { rows: Array<Record<string, unknown>> }) {
+    return request<ImportPreviewResponse>('/api/ds/import/preview', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  commitDsImport(payload: { rows: Array<Record<string, unknown>>; strategy: 'skip' | 'update' | 'duplicate' }) {
+    return request<{ ok: true; summary: Record<string, unknown> }>('/api/ds/import/commit', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  penhorasBootstrap() {
+    return request<PenhorasBootstrapResponse>('/api/penhoras/bootstrap')
+  },
+
+  getPenhorasRecords(filters: PenhorasRecordFilters) {
+    return request<PenhorasRecordsResponse>(`/api/penhoras/records?${queryFromPenhorasFilters(filters)}`).then((response) => ({
+      ...response,
+      items: response.items.map((item) => normalizePenhorasRecord(item as PenhorasRecordWithStatusAliases)),
+    }))
+  },
+
+  getPenhorasRecord(id: string) {
+    return request<PenhorasRecord>(`/api/penhoras/records/${id}`).then((record) => normalizePenhorasRecord(record as PenhorasRecordWithStatusAliases))
+  },
+
+  createPenhorasRecord(payload: Partial<PenhorasRecord>) {
+    return request<PenhorasRecord>('/api/penhoras/records', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then((record) => normalizePenhorasRecord(record as PenhorasRecordWithStatusAliases))
+  },
+
+  patchPenhorasRecord(id: string, payload: Partial<PenhorasRecord>) {
+    return request<PenhorasRecord>(`/api/penhoras/records/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }).then((record) => normalizePenhorasRecord(record as PenhorasRecordWithStatusAliases))
+  },
+
+  updatePenhorasRecordStatus(id: string, statusId: string) {
+    return request<PenhorasRecord>(`/api/penhoras/records/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statusId }),
+    }).then((record) => normalizePenhorasRecord(record as PenhorasRecordWithStatusAliases))
+  },
+
+  getPenhorasStatuses() {
+    return request<StatusDefinition[]>('/api/penhoras/statuses')
+  },
+
+  createPenhorasStatus(payload: Omit<StatusDefinition, 'id'>) {
+    return request<StatusDefinition>('/api/penhoras/statuses', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updatePenhorasStatus(id: string, payload: Partial<Omit<StatusDefinition, 'id'>>) {
+    return request<StatusDefinition>(`/api/penhoras/statuses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deletePenhorasStatus(id: string, options?: { reassignToStatusId?: string }) {
+    const query = options?.reassignToStatusId ? `?reassignToStatusId=${encodeURIComponent(options.reassignToStatusId)}` : ''
+    return request<{ ok: boolean; reassigned?: number }>(`/api/penhoras/statuses/${id}${query}`, {
+      method: 'DELETE',
+    })
+  },
+
+  previewPenhorasImport(payload: { rows: Array<Record<string, unknown>> }) {
+    return request<ImportPreviewResponse>('/api/penhoras/import/preview', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  commitPenhorasImport(payload: { rows: Array<Record<string, unknown>>; strategy: 'skip' | 'update' | 'duplicate' }) {
+    return request<{ ok: true; summary: Record<string, unknown> }>('/api/penhoras/import/commit', {
       method: 'POST',
       body: JSON.stringify(payload),
     })

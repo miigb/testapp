@@ -25,6 +25,13 @@ enum TaxBaseField {
   valorEmissao
 }
 
+enum DsIvaKind {
+  sem_iva
+  total_levantado
+  valor
+  outro
+}
+
 model Status {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -121,4 +128,106 @@ model SavedView {
   updatedAt DateTime @updatedAt
 
   @@index([scope])
+}
+
+model DsStatus {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  icon      String
+  color     String
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  records DsRecord[]
+}
+
+model DsRecord {
+  id                         String     @id @default(cuid())
+  gestora                    String?
+  proponentes                String?
+  referencia                 String?
+  produto                    String?
+  entidadeBancaria           String?
+  liderCalculo               String?
+  recibo                     String?
+  faltaReciboGestora         String?
+
+  valorRaw                   String?
+  valor                      Decimal?   @db.Decimal(14, 2)
+  dataEscritura              DateTime?
+  dataFechoCrm               DateTime?
+  comissaoLojaRaw            String?
+  comissaoLoja               Decimal?   @db.Decimal(14, 2)
+  ivaCgdRaw                  String?
+  ivaCgdValor                Decimal?   @db.Decimal(14, 2)
+  ivaCgdKind                 DsIvaKind?
+  totalComissaoLojaCmIvaRaw  String?
+  totalComissaoLojaCmIva     Decimal?   @db.Decimal(14, 2)
+  comissaoGestorRaw          String?
+  comissaoGestor             Decimal?   @db.Decimal(14, 2)
+  percentagemRaw             String?
+  percentagem                Decimal?   @db.Decimal(8, 5)
+  pagComissaoGestor          DateTime?
+
+  sourceFile                 String?
+  sourceSheet                String?
+  sourceRowNumber            Int?
+  importBatchId              String?
+  rawPayload                 Json?
+
+  statusId String
+  status   DsStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([statusId])
+  @@index([gestora])
+  @@index([referencia])
+  @@index([entidadeBancaria])
+  @@index([dataEscritura])
+}
+
+model PenhorasStatus {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  icon      String
+  color     String
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  records PenhorasRecord[]
+}
+
+model PenhorasRecord {
+  id           String   @id @default(cuid())
+  pe           String?
+  acto         String?
+  dataPedido   DateTime?
+  identificacao String?
+  pedido       String?
+  gestor       String?
+  sourceFile   String?
+  sourceSheet  String?
+  sourceRowNumber Int?
+  importBatchId String?
+  rawPayload   Json?
+
+  statusId String
+  status   PenhorasStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([statusId])
+  @@index([pe])
+  @@index([gestor])
+  @@index([acto])
+  @@index([dataPedido])
 }

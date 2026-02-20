@@ -1,4 +1,5 @@
 export type TabId = 'entrada' | 'consulta' | 'tabela' | 'dashboards' | 'importar' | 'configuracao'
+export type ModuleId = 'recibos' | 'ds' | 'penhoras'
 
 export type RecordType = 'exequente' | 'executado'
 
@@ -137,6 +138,20 @@ export type ParsedImport = {
   colorCount: Record<string, number>
 }
 
+export type DsParsedImport = {
+  fileName: string
+  parsedAt: string
+  rows: Array<Record<string, unknown>>
+  colorCount: Record<string, number>
+}
+
+export type PenhorasParsedImport = {
+  fileName: string
+  parsedAt: string
+  rows: Array<Record<string, unknown>>
+  colorCount: Record<string, number>
+}
+
 export type ImportPreviewItem = {
   index: number
   valid: boolean
@@ -158,6 +173,143 @@ export type ImportPreviewResponse = {
     invalid: number
   }
   items: ImportPreviewItem[]
+}
+
+export type DsRecord = {
+  id: string
+  gestora?: string
+  proponentes?: string
+  referencia?: string
+  produto?: string
+  entidadeBancaria?: string
+  liderCalculo?: string
+  recibo?: string
+  faltaReciboGestora?: string
+  valorRaw?: string
+  valor?: number
+  dataEscritura?: string
+  dataFechoCrm?: string
+  comissaoLojaRaw?: string
+  comissaoLoja?: number
+  ivaCgdRaw?: string
+  ivaCgdValor?: number
+  ivaCgdKind?: 'sem_iva' | 'total_levantado' | 'valor' | 'outro'
+  totalComissaoLojaCmIvaRaw?: string
+  totalComissaoLojaCmIva?: number
+  comissaoGestorRaw?: string
+  comissaoGestor?: number
+  percentagemRaw?: string
+  percentagem?: number
+  pagComissaoGestor?: string
+  sourceFile?: string
+  sourceSheet?: string
+  sourceRowNumber?: number
+  importBatchId?: string
+  rawPayload?: Record<string, unknown>
+  estadoId: string
+  status?: StatusDefinition
+  createdAt: string
+  updatedAt: string
+}
+
+export type DsEntryForm = {
+  gestora: string
+  proponentes: string
+  referencia: string
+  produto: string
+  entidadeBancaria: string
+  liderCalculo: string
+  recibo: string
+  faltaReciboGestora: string
+  valor: string
+  dataEscritura: string
+  dataFechoCrm: string
+  comissaoLoja: string
+  ivaCgdRaw: string
+  totalComissaoLojaCmIva: string
+  comissaoGestor: string
+  percentagem: string
+  pagComissaoGestor: string
+  estadoId: string
+}
+
+export type DsBootstrapResponse = {
+  statuses: StatusDefinition[]
+  savedViews: SavedView[]
+  recordCount: number
+}
+
+export type DsRecordsResponse = {
+  items: DsRecord[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type DsRecordFilters = {
+  q?: string
+  estadoId?: string | 'todos'
+  gestora?: string
+  entidadeBancaria?: string
+  produto?: string
+  reciboEstado?: 'todos' | 'com-recibo' | 'sem-recibo'
+  ano?: number | 'todos'
+  mes?: number | 'todos'
+  page?: number
+  pageSize?: number
+}
+
+export type PenhorasRecord = {
+  id: string
+  pe?: string
+  acto?: string
+  dataPedido?: string
+  identificacao?: string
+  pedido?: string
+  gestor?: string
+  sourceFile?: string
+  sourceSheet?: string
+  sourceRowNumber?: number
+  importBatchId?: string
+  rawPayload?: Record<string, unknown>
+  estadoId: string
+  status?: StatusDefinition
+  createdAt: string
+  updatedAt: string
+}
+
+export type PenhorasEntryForm = {
+  pe: string
+  acto: string
+  dataPedido: string
+  identificacao: string
+  pedido: string
+  gestor: string
+  estadoId: string
+}
+
+export type PenhorasBootstrapResponse = {
+  statuses: StatusDefinition[]
+  savedViews: SavedView[]
+  recordCount: number
+}
+
+export type PenhorasRecordsResponse = {
+  items: PenhorasRecord[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type PenhorasRecordFilters = {
+  q?: string
+  estadoId?: string | 'todos'
+  gestor?: string
+  acto?: string
+  ano?: number | 'todos'
+  mes?: number | 'todos'
+  page?: number
+  pageSize?: number
 }
 
 export type RecordSuggestions = {
