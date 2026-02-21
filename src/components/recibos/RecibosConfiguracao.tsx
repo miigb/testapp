@@ -1,4 +1,4 @@
-import type { CalculationSettings, StatusDefinition, TaxRule } from '../../types'
+import type { CalculationSettings, StatusDefinition, TabId, TaxRule } from '../../types'
 import { STATUS_ICON_OPTIONS, THEME_OPTIONS, ThemeId, toColor } from '../../constants/configuracao'
 import { StatusIcon } from '../shared/StatusComponents'
 
@@ -18,7 +18,7 @@ export interface RecibosConfiguracaoProps {
     updateTaxRule: (ruleId: string, patch: Partial<TaxRule>) => void
     saveCalculationSettings: () => Promise<void>
     // Navigation
-    setActiveTab: (tab: string) => void
+    setActiveTab: (tab: TabId) => void
 }
 
 export function RecibosConfiguracao({

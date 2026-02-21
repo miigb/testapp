@@ -1,4 +1,4 @@
-import type { StatusDefinition } from '../../types'
+import type { StatusDefinition, TabId } from '../../types'
 import { STATUS_ICON_OPTIONS, toColor } from '../../constants/configuracao'
 import { StatusIcon } from '../shared/StatusComponents'
 
@@ -8,7 +8,7 @@ export interface PenhorasConfiguracaoProps {
     removePenhorasStatus: (id: string) => Promise<void>
     addPenhorasStatus: () => Promise<void>
     savePenhorasStatuses: () => Promise<void>
-    setActiveTab: (tab: string) => void
+    setActiveTab: (tab: TabId) => void
 }
 
 export function PenhorasConfiguracao({

@@ -262,15 +262,15 @@ Order of extraction (least to most connected):
 4. `RecibosImportar` — self-contained import flow
 5. `DsImportar`
 6. `PenhorasImportar`
-7. `RecibosDashboards` — reads `dashboardSummary`, own widget layout
-8. `DsDashboards`
-9. `PenhorasDashboards`
-10. `RecibosConsulta` — selected record detail panel
-11. `DsConsulta`
-12. `PenhorasConsulta`
-13. `RecibosTabela` — table + bulk actions (most state-heavy)
-14. `DsTabela`
-15. `PenhorasTabela`
+7. ✅ `RecibosDashboards` — reads `dashboardSummary`, own widget layout
+8. ✅ `DsDashboards`
+9. ✅ `PenhorasDashboards`
+10. ✅ `RecibosConsultaTabela` — combined consulta + tabela views (was RecibosConsulta + RecibosTabela)
+11. ✅ `DsConsultaTabela` — combined consulta + tabela views (was DsConsulta + DsTabela)
+12. ✅ `PenhorasConsultaTabela` — combined consulta + tabela views (was PenhorasConsulta + PenhorasTabela)
+13. ~~`RecibosTabela`~~ (merged into RecibosConsultaTabela)
+14. ~~`DsTabela`~~ (merged into DsConsultaTabela)
+15. ~~`PenhorasTabela`~~ (merged into PenhorasConsultaTabela)
 16. `RecibosEntrada` — entry form
 17. `DsEntrada`
 18. `PenhorasEntrada`

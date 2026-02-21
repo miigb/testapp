@@ -1,5 +1,6 @@
 export type TabId = 'entrada' | 'consulta' | 'tabela' | 'dashboards' | 'importar' | 'configuracao'
 export type ModuleId = 'recibos' | 'ds' | 'penhoras'
+export type SavedViewScope = 'tabela' | 'ds-tabela' | 'ds-dashboard' | 'penhoras-tabela' | 'penhoras-dashboard'
 
 export type RecordType = 'exequente' | 'executado'
 

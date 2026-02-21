@@ -9,9 +9,7 @@ import {
   CheckCircle2,
   Circle,
   Clock3,
-  Eye,
-  EyeOff,
-  FilterX,
+
   FileClock,
   FileSearch,
   Hammer,
@@ -79,6 +77,12 @@ import { RecibosConfiguracao } from './components/recibos/RecibosConfiguracao'
 import { DsImportar } from './components/ds/DsImportar'
 import { PenhorasImportar } from './components/penhoras/PenhorasImportar'
 import { RecibosImportar } from './components/recibos/RecibosImportar'
+import { DsDashboards } from './components/ds/DsDashboards'
+import { PenhorasDashboards } from './components/penhoras/PenhorasDashboards'
+import { RecibosDashboards } from './components/recibos/RecibosDashboards'
+import { DsConsultaTabela } from './components/ds/DsConsultaTabela'
+import { PenhorasConsultaTabela } from './components/penhoras/PenhorasConsultaTabela'
+import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabela'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'entrada', label: 'Entrada' },
@@ -145,20 +149,6 @@ const DASHBOARD_WIDGET_LIBRARY: Array<{ type: DashboardWidgetType; label: string
 type DsDashboardWidgetType = 'ds-status' | 'ds-top-gestoras' | 'ds-top-entidades' | 'ds-mensal' | 'ds-recibos'
 type PenhorasDashboardWidgetType = 'penhoras-status' | 'penhoras-top-gestores' | 'penhoras-mensal'
 
-const DS_DASHBOARD_WIDGET_LIBRARY: Array<{ type: DsDashboardWidgetType; label: string; hint: string }> = [
-  { type: 'ds-status', label: 'Estado DS', hint: 'Distribuição por estado' },
-  { type: 'ds-top-gestoras', label: 'Top gestoras', hint: 'Ranking por volume' },
-  { type: 'ds-top-entidades', label: 'Top entidades', hint: 'Ranking por volume' },
-  { type: 'ds-mensal', label: 'Tendência mensal', hint: 'Últimos 12 meses' },
-  { type: 'ds-recibos', label: 'Recibos', hint: 'KPI de recibos/comissões' },
-]
-
-const PENHORAS_DASHBOARD_WIDGET_LIBRARY: Array<{ type: PenhorasDashboardWidgetType; label: string; hint: string }> = [
-  { type: 'penhoras-status', label: 'Estado Penhoras', hint: 'Distribuição por estado' },
-  { type: 'penhoras-top-gestores', label: 'Top gestores', hint: 'Ranking por volume' },
-  { type: 'penhoras-mensal', label: 'Tendência mensal', hint: 'Últimos 12 meses' },
-]
-
 type DsDashboardWidget = {
   id: string
   type: DsDashboardWidgetType
@@ -177,27 +167,9 @@ type PenhorasDashboardWidget = {
   colSpan: number
 }
 
-const DEFAULT_DS_DASHBOARD_WIDGETS: DsDashboardWidget[] = [
-  { id: 'ds-status', type: 'ds-status', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
-  { id: 'ds-top-gestoras', type: 'ds-top-gestoras', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
-  { id: 'ds-top-entidades', type: 'ds-top-entidades', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
-  { id: 'ds-mensal', type: 'ds-mensal', size: 'wide', minHeight: 220, column: 'main', colSpan: 2 },
-  { id: 'ds-recibos', type: 'ds-recibos', size: 'kpi', minHeight: 180, column: 'side', colSpan: 1 },
-]
 
-const DEFAULT_PENHORAS_DASHBOARD_WIDGETS: PenhorasDashboardWidget[] = [
-  { id: 'penhoras-status', type: 'penhoras-status', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
-  { id: 'penhoras-top-gestores', type: 'penhoras-top-gestores', size: 'normal', minHeight: 210, column: 'main', colSpan: 1 },
-  { id: 'penhoras-mensal', type: 'penhoras-mensal', size: 'wide', minHeight: 220, column: 'main', colSpan: 2 },
-]
 
-function cloneDefaultDsDashboardWidgets(): DsDashboardWidget[] {
-  return DEFAULT_DS_DASHBOARD_WIDGETS.map((widget) => ({ ...widget }))
-}
 
-function cloneDefaultPenhorasDashboardWidgets(): PenhorasDashboardWidget[] {
-  return DEFAULT_PENHORAS_DASHBOARD_WIDGETS.map((widget) => ({ ...widget }))
-}
 
 type ThemeId =
   | 'light'
@@ -238,17 +210,7 @@ type TotalMetricKey =
   | 'outrasTaxas'
   | 'levantadoComIva'
 
-const TOTAL_METRIC_OPTIONS: Array<{ key: TotalMetricKey; label: string; currency?: boolean }> = [
-  { key: 'registos', label: 'N.º de registos' },
-  { key: 'valorIndicado', label: 'Valor indicado', currency: true },
-  { key: 'valorSemIva', label: 'Valor sem IVA', currency: true },
-  { key: 'iva', label: 'IVA', currency: true },
-  { key: 'retencao', label: 'Retenção', currency: true },
-  { key: 'meu5', label: 'Meu 5%', currency: true },
-  { key: 'valorEmissao', label: 'Valor emissão', currency: true },
-  { key: 'outrasTaxas', label: 'Outras taxas', currency: true },
-  { key: 'levantadoComIva', label: 'Levantado c/ IVA', currency: true },
-]
+
 
 const CALCULATOR_KEYS: CalculatorKey[] = [
   { label: 'AC', action: 'clear', tone: 'muted' },
@@ -424,9 +386,7 @@ function getPrimaryRecordReference(record: ReceiptRecord): string {
   return getUniqueRecordReferences(record)[0] ?? 'Sem referência'
 }
 
-function getSecondaryRecordReference(record: ReceiptRecord): string | undefined {
-  return getUniqueRecordReferences(record)[1]
-}
+
 
 function getInitialEntryForm(defaultStatusId: string): EntryForm {
   const now = new Date()
@@ -4110,436 +4070,73 @@ function App() {
         )}
 
         {activeModule === 'ds' && activeTab === 'dashboards' && (
-          <section className="panel dashboard-experiment ds-panel ds-dashboard-panel">
-            {!isDashboardFocusMode && (
-              <>
-                <div className="row-between wrap">
-                  <div>
-                    <h2>Dashboards DS</h2>
-                    <p className="small-note">Visão rápida de performance da operação DS com filtros e vistas guardadas.</p>
-                  </div>
-                  <div className="saved-view-bar ds-saved-view-bar">
-                    {dsDashboardViews.map((view) => {
-                      const isDisabled = disabledSavedViewIds.includes(view.id)
-                      const isActive = activeDsSavedViewId === view.id && !isDisabled
-                      return (
-                        <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
-                          <button
-                            className="subtle-btn saved-view-apply"
-                            type="button"
-                            onClick={() => applyDsView(view)}
-                            disabled={isDisabled}
-                            title={isDisabled ? 'Vista DS desativada' : `Aplicar vista: ${view.name}`}
-                          >
-                            {view.name}
-                          </button>
-                          <button
-                            className="subtle-btn icon-btn micro"
-                            type="button"
-                            onClick={() => toggleDsSavedViewDisabled(view.id)}
-                            title={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
-                            aria-label={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
-                          >
-                            {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                          </button>
-                          <button
-                            className="subtle-btn icon-btn micro danger"
-                            type="button"
-                            onClick={() => void deleteDsSavedView(view.id)}
-                            title="Eliminar vista DS"
-                            aria-label="Eliminar vista DS"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )
-                    })}
-                    <button className="subtle-btn" type="button" onClick={() => clearDsFilters()}>
-                      <FilterX size={15} />
-                      Limpar filtros
-                    </button>
-                    <button
-                      className="subtle-btn"
-                      type="button"
-                      onClick={() => void saveCurrentView('ds-dashboard', { ...dsFilters, q: globalSearch, widgets: dsDashboardWidgets })}
-                    >
-                      Guardar vista
-                    </button>
-                  </div>
-                </div>
-
-                <div className="dashboard-top-actions">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => {
-                      setDashboardFocusMode(true)
-                      setDsDashboardWidgetsOpen(true)
-                    }}
-                  >
-                    <Maximize2 size={15} />
-                    Expandir dashboard
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardConfigOpen((current) => !current)}>
-                    {dsDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
-                    {dsDashboardConfigOpen ? 'Ocultar painel' : 'Mostrar painel'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgetsOpen((current) => !current)}>
-                    {dsDashboardWidgetsOpen ? 'Ocultar widgets' : 'Mostrar widgets'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardPickerOpen((current) => !current)}>
-                    <Plus size={15} />
-                    {dsDashboardPickerOpen ? 'Ocultar catálogo' : 'Adicionar widgets'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgets(cloneDefaultDsDashboardWidgets())}>
-                    Repor widgets
-                  </button>
-                </div>
-
-                {dsDashboardConfigOpen ? (
-                  <>
-                    <div className="dashboard-hero-grid ds-dashboard-hero">
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Total registos</span>
-                        <strong>{new Intl.NumberFormat('pt-PT').format(dsDashboardTotals.registos)}</strong>
-                      </article>
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Total comissão loja</span>
-                        <strong>{formatCurrency(dsDashboardTotals.comissaoLoja)}</strong>
-                      </article>
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Total comissão loja c/ IVA</span>
-                        <strong>{formatCurrency(dsDashboardTotals.totalComissaoLojaCmIva)}</strong>
-                      </article>
-                    </div>
-
-                    <div className="filters-row eight ds-filters-row">
-                      <LabeledSelect
-                        label="Estado"
-                        value={String(dsFilters.estadoId ?? 'todos')}
-                        onChange={(value) => patchDsFilters('estadoId', value as DsRecordFilters['estadoId'])}
-                        options={[{ value: 'todos', label: 'Todos' }, ...dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-                      />
-                      <LabeledSelect
-                        label="Ano"
-                        value={String(dsFilters.ano ?? 'todos')}
-                        onChange={(value) => patchDsFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                        options={[{ value: 'todos', label: 'Todos' }, ...dsYears.map((year) => ({ value: String(year), label: String(year) }))]}
-                      />
-                      <LabeledSelect
-                        label="Mês"
-                        value={String(dsFilters.mes ?? 'todos')}
-                        onChange={(value) => patchDsFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                        options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-                      />
-                      <LabeledSelect
-                        label="Gestora"
-                        value={String(dsFilters.gestora ?? '')}
-                        onChange={(value) => patchDsFilters('gestora', value)}
-                        options={[{ value: '', label: 'Todas' }, ...dsGestoraFilterOptions.map((value) => ({ value, label: value }))]}
-                      />
-                      <LabeledSelect
-                        label="Entidade"
-                        value={String(dsFilters.entidadeBancaria ?? '')}
-                        onChange={(value) => patchDsFilters('entidadeBancaria', value)}
-                        options={[{ value: '', label: 'Todas' }, ...dsEntidadeFilterOptions.map((value) => ({ value, label: value }))]}
-                      />
-                      <LabeledSelect
-                        label="Produto"
-                        value={String(dsFilters.produto ?? '')}
-                        onChange={(value) => patchDsFilters('produto', value)}
-                        options={[{ value: '', label: 'Todos' }, ...dsProdutoFilterOptions.map((value) => ({ value, label: value }))]}
-                      />
-                      <LabeledSelect
-                        label="Recibo"
-                        value={String(dsFilters.reciboEstado ?? 'todos')}
-                        onChange={(value) => patchDsFilters('reciboEstado', value as DsRecordFilters['reciboEstado'])}
-                        options={[
-                          { value: 'todos', label: 'Todos' },
-                          { value: 'com-recibo', label: 'Com recibo' },
-                          { value: 'sem-recibo', label: 'Sem recibo' },
-                        ]}
-                      />
-                      <div className="field">
-                        <span>Total</span>
-                        <div className="counter-box">{dsRecordsLoading ? 'A carregar...' : `${dsTotalRecords} registos`}</div>
-                      </div>
-                    </div>
-
-                    <div className="dashboard-picker-wrap">
-                      <button className="subtle-btn" type="button" onClick={() => setDsDashboardPickerOpen((current) => !current)}>
-                        {dsDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
-                      </button>
-                      {dsDashboardPickerOpen && (
-                        <div className="dashboard-widget-library">
-                          {DS_DASHBOARD_WIDGET_LIBRARY.map((widget) => (
-                            <button
-                              key={widget.type}
-                              className="dashboard-widget-option"
-                              type="button"
-                              onClick={() => addDsDashboardWidget(widget.type)}
-                            >
-                              <strong>{widget.label}</strong>
-                              <span>{widget.hint}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="dashboard-collapsed-note muted">
-                    Painel de configuração oculto. Use “Mostrar painel” para editar filtros.
-                  </div>
-                )}
-              </>
-            )}
-
-            {dsDashboardWidgetsOpen || isDashboardFocusMode ? (
-              dsDashboardWidgets.length === 0 ? (
-                <div className="empty-text dashboard-empty">
-                  Sem widgets ativos.
-                  <button className="subtle-btn" type="button" onClick={() => setDsDashboardWidgets(cloneDefaultDsDashboardWidgets())}>
-                    Repor widgets
-                  </button>
-                </div>
-              ) : (
-                <div className={`dashboard-grid ds-dashboard-grid ${dsDashboardHasSideStack ? 'with-side-stack' : ''}`}>
-                  {dsDashboardHasSideStack ? (
-                    <>
-                      <div className="dashboard-main-widgets">{dsDashboardMainWidgets.map((widget) => renderDsDashboardWidget(widget))}</div>
-                      <aside className="dashboard-side-widgets">{dsDashboardSideWidgets.map((widget) => renderDsDashboardWidget(widget))}</aside>
-                    </>
-                  ) : dsDashboardSideWidgets.length > 0 && dsDashboardMainWidgets.length === 0 ? (
-                    <aside className="dashboard-side-widgets">{dsDashboardSideWidgets.map((widget) => renderDsDashboardWidget(widget))}</aside>
-                  ) : (
-                    dsDashboardWidgets.map((widget) => renderDsDashboardWidget(widget))
-                  )}
-                </div>
-              )
-            ) : (
-              <div className="dashboard-collapsed-note muted">
-                Widgets ocultos. Use “Mostrar widgets” para voltar a apresentar o dashboard.
-              </div>
-            )}
-          </section>
+          <DsDashboards
+            isDashboardFocusMode={isDashboardFocusMode}
+            setDashboardFocusMode={setDashboardFocusMode}
+            dsDashboardViews={dsDashboardViews}
+            disabledSavedViewIds={disabledSavedViewIds}
+            activeDsSavedViewId={activeDsSavedViewId}
+            applyDsView={applyDsView}
+            toggleDsSavedViewDisabled={toggleDsSavedViewDisabled}
+            deleteDsSavedView={deleteDsSavedView}
+            clearDsFilters={clearDsFilters}
+            saveCurrentView={saveCurrentView}
+            dsFilters={dsFilters}
+            globalSearch={globalSearch}
+            dsDashboardConfigOpen={dsDashboardConfigOpen}
+            setDsDashboardConfigOpen={setDsDashboardConfigOpen}
+            dsDashboardWidgetsOpen={dsDashboardWidgetsOpen}
+            setDsDashboardWidgetsOpen={setDsDashboardWidgetsOpen}
+            dsDashboardPickerOpen={dsDashboardPickerOpen}
+            setDsDashboardPickerOpen={setDsDashboardPickerOpen}
+            dsDashboardWidgets={dsDashboardWidgets}
+            setDsDashboardWidgets={setDsDashboardWidgets}
+            dsDashboardMainWidgets={dsDashboardMainWidgets}
+            dsDashboardSideWidgets={dsDashboardSideWidgets}
+            dsDashboardHasSideStack={dsDashboardHasSideStack}
+            addDsDashboardWidget={addDsDashboardWidget}
+            renderDsDashboardWidget={renderDsDashboardWidget}
+            dsDashboardTotals={dsDashboardTotals}
+            formatCurrency={formatCurrency}
+            dsOrderedStatuses={dsOrderedStatuses}
+            dsYears={dsYears}
+            dsGestoraFilterOptions={dsGestoraFilterOptions}
+            dsEntidadeFilterOptions={dsEntidadeFilterOptions}
+            dsProdutoFilterOptions={dsProdutoFilterOptions}
+            patchDsFilters={patchDsFilters}
+            dsRecordsLoading={dsRecordsLoading}
+            dsTotalRecords={dsTotalRecords}
+          />
         )}
 
         {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && (
-          <section className="panel ds-panel ds-results-panel">
-            <div className="row-between wrap">
-              <div>
-                <h2>{activeTab === 'consulta' ? 'Consulta DS' : 'Tabela DS'}</h2>
-                <p className="small-note">Registos de escrituras DS isolados do módulo de recibos.</p>
-              </div>
-              <div className="saved-view-bar ds-saved-view-bar">
-                {dsTableViews.map((view) => {
-                  const isDisabled = disabledSavedViewIds.includes(view.id)
-                  const isActive = activeDsSavedViewId === view.id && !isDisabled
-                  return (
-                    <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
-                      <button
-                        className="subtle-btn saved-view-apply"
-                        type="button"
-                        onClick={() => applyDsView(view)}
-                        disabled={isDisabled}
-                        title={isDisabled ? 'Vista DS desativada' : `Aplicar vista: ${view.name}`}
-                      >
-                        {view.name}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro"
-                        type="button"
-                        onClick={() => toggleDsSavedViewDisabled(view.id)}
-                        title={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
-                        aria-label={isDisabled ? 'Ativar vista DS' : 'Desativar vista DS'}
-                      >
-                        {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro danger"
-                        type="button"
-                        onClick={() => void deleteDsSavedView(view.id)}
-                        title="Eliminar vista DS"
-                        aria-label="Eliminar vista DS"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  )
-                })}
-                <button className="subtle-btn" type="button" onClick={() => clearDsFilters()}>
-                  <FilterX size={15} />
-                  Limpar filtros
-                </button>
-                <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('ds-tabela', { ...dsFilters, q: globalSearch })}>
-                  Guardar vista
-                </button>
-              </div>
-            </div>
-
-            <div className="filters-row eight ds-filters-row">
-              <LabeledSelect
-                label="Estado"
-                value={String(dsFilters.estadoId ?? 'todos')}
-                onChange={(value) => patchDsFilters('estadoId', value as DsRecordFilters['estadoId'])}
-                options={[{ value: 'todos', label: 'Todos' }, ...dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-              />
-              <LabeledSelect
-                label="Ano"
-                value={String(dsFilters.ano ?? 'todos')}
-                onChange={(value) => patchDsFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...dsYears.map((year) => ({ value: String(year), label: String(year) }))]}
-              />
-              <LabeledSelect
-                label="Mês"
-                value={String(dsFilters.mes ?? 'todos')}
-                onChange={(value) => patchDsFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-              />
-              <LabeledSelect
-                label="Gestora"
-                value={String(dsFilters.gestora ?? '')}
-                onChange={(value) => patchDsFilters('gestora', value)}
-                options={[{ value: '', label: 'Todas' }, ...dsGestoraFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <LabeledSelect
-                label="Entidade"
-                value={String(dsFilters.entidadeBancaria ?? '')}
-                onChange={(value) => patchDsFilters('entidadeBancaria', value)}
-                options={[{ value: '', label: 'Todas' }, ...dsEntidadeFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <LabeledSelect
-                label="Produto"
-                value={String(dsFilters.produto ?? '')}
-                onChange={(value) => patchDsFilters('produto', value)}
-                options={[{ value: '', label: 'Todos' }, ...dsProdutoFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <LabeledSelect
-                label="Recibo"
-                value={String(dsFilters.reciboEstado ?? 'todos')}
-                onChange={(value) => patchDsFilters('reciboEstado', value as DsRecordFilters['reciboEstado'])}
-                options={[
-                  { value: 'todos', label: 'Todos' },
-                  { value: 'com-recibo', label: 'Com recibo' },
-                  { value: 'sem-recibo', label: 'Sem recibo' },
-                ]}
-              />
-              <div className="field">
-                <span>Total</span>
-                <div className="counter-box">{dsRecordsLoading ? 'A carregar...' : `${dsTotalRecords} registos`}</div>
-              </div>
-            </div>
-
-            {dsRecords.length === 0 ? (
-              <div className="empty-text">Sem resultados DS para os filtros selecionados.</div>
-            ) : activeTab === 'consulta' ? (
-              <div className="card-list ds-card-list">
-                {dsRecords.map((record) => {
-                  const status = getStatus(dsStatuses, record.estadoId)
-                  return (
-                    <article key={record.id} className="result-card ds-result-card clickable-row" onClick={() => setSelectedDsRecordId(record.id)}>
-                      <div className="result-main ds-result-main">
-                        <div className="result-title ds-result-title">{record.proponentes || 'Sem proponentes'}</div>
-                        <div className="muted ds-result-secondary">
-                          <span>Gestor/a: {record.gestora || '-'}</span>
-                          <span>Referência: {record.referencia || '-'}</span>
-                        </div>
-                      </div>
-                      <div className="result-entity muted ds-result-meta">
-                        {`Escritura: ${record.dataEscritura || '-'} · ${record.produto || 'Produto por definir'}`}
-                      </div>
-                      <div className="ds-result-metrics">
-                        <strong>{formatCurrency(record.valor)}</strong>
-                        <span>Comissão loja: {formatCurrency(record.comissaoLoja)}</span>
-                      </div>
-                      <div className="card-actions ds-card-actions">
-                        <button
-                          className="subtle-btn"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelectedDsRecordId(record.id)
-                            setIsDsRecordEditing(true)
-                          }}
-                        >
-                          Editar
-                        </button>
-                      </div>
-                      <div className="result-status ds-result-status">
-                        {record.faltaReciboGestora?.trim() && (
-                          <span className="ds-warning-pill" title={record.faltaReciboGestora}>
-                            <AlertTriangle size={13} />
-                            <span>{record.faltaReciboGestora}</span>
-                          </span>
-                        )}
-                        {status ? <StatusPill status={status} /> : <span className="muted ds-status-pill-empty">Sem estado</span>}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="table-wrapper ds-table-wrapper">
-                <table className="records-table ds-records-table">
-                  <thead>
-                    <tr>
-                      <th>Gestor/a</th>
-                      <th>Proponentes</th>
-                      <th>Valor</th>
-                      <th>Data Escritura</th>
-                      <th>Comissão Loja</th>
-                      <th>Estado</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dsRecords.map((record) => {
-                      const status = getStatus(dsStatuses, record.estadoId)
-                      return (
-                        <tr
-                          key={record.id}
-                          style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
-                          onClick={() => setSelectedDsRecordId(record.id)}
-                        >
-                          <td>{record.gestora || '-'}</td>
-                          <td>{record.proponentes || '-'}</td>
-                          <td>{formatCurrency(record.valor)}</td>
-                          <td>{record.dataEscritura || '-'}</td>
-                          <td>{formatCurrency(record.comissaoLoja)}</td>
-                          <td>
-                            <select
-                              className="ds-status-select"
-                              value={record.estadoId}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => void updateDsRecordStatus(record.id, event.target.value)}
-                            >
-                              {dsOrderedStatuses.map((statusOption) => (
-                                <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <button
-                              className="subtle-btn compact"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setSelectedDsRecordId(record.id)
-                                setIsDsRecordEditing(true)
-                              }}
-                            >
-                              Editar
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
+          <DsConsultaTabela
+            activeTab={activeTab}
+            dsRecords={dsRecords}
+            dsRecordsLoading={dsRecordsLoading}
+            dsTotalRecords={dsTotalRecords}
+            dsStatuses={dsStatuses}
+            dsOrderedStatuses={dsOrderedStatuses}
+            dsFilters={dsFilters}
+            patchDsFilters={patchDsFilters}
+            dsYears={dsYears}
+            dsGestoraFilterOptions={dsGestoraFilterOptions}
+            dsEntidadeFilterOptions={dsEntidadeFilterOptions}
+            dsProdutoFilterOptions={dsProdutoFilterOptions}
+            dsTableViews={dsTableViews}
+            disabledSavedViewIds={disabledSavedViewIds}
+            activeDsSavedViewId={activeDsSavedViewId}
+            applyDsView={applyDsView}
+            toggleDsSavedViewDisabled={toggleDsSavedViewDisabled}
+            deleteDsSavedView={deleteDsSavedView}
+            clearDsFilters={clearDsFilters}
+            saveCurrentView={saveCurrentView}
+            globalSearch={globalSearch}
+            setSelectedDsRecordId={setSelectedDsRecordId}
+            setIsDsRecordEditing={setIsDsRecordEditing}
+            updateDsRecordStatus={updateDsRecordStatus}
+            formatCurrency={formatCurrency}
+          />
         )}
 
         {activeModule === 'ds' && activeTab === 'importar' && (
@@ -4696,1508 +4293,153 @@ function App() {
         )}
 
         {activeModule === 'penhoras' && activeTab === 'dashboards' && (
-          <section className="panel dashboard-experiment ds-panel penhoras-panel penhoras-dashboard-panel">
-            {!isDashboardFocusMode && (
-              <>
-                <div className="row-between wrap">
-                  <div>
-                    <h2>Dashboards Penhoras</h2>
-                    <p className="small-note">Acompanhamento de volume, estado e distribuição temporal dos registos de penhoras.</p>
-                  </div>
-                  <div className="saved-view-bar ds-saved-view-bar">
-                    {penhorasDashboardViews.map((view) => {
-                      const isDisabled = disabledSavedViewIds.includes(view.id)
-                      const isActive = activePenhorasSavedViewId === view.id && !isDisabled
-                      return (
-                        <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
-                          <button
-                            className="subtle-btn saved-view-apply"
-                            type="button"
-                            onClick={() => applyPenhorasView(view)}
-                            disabled={isDisabled}
-                            title={isDisabled ? 'Vista Penhoras desativada' : `Aplicar vista: ${view.name}`}
-                          >
-                            {view.name}
-                          </button>
-                          <button
-                            className="subtle-btn icon-btn micro"
-                            type="button"
-                            onClick={() => togglePenhorasSavedViewDisabled(view.id)}
-                            title={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
-                            aria-label={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
-                          >
-                            {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                          </button>
-                          <button
-                            className="subtle-btn icon-btn micro danger"
-                            type="button"
-                            onClick={() => void deletePenhorasSavedView(view.id)}
-                            title="Eliminar vista Penhoras"
-                            aria-label="Eliminar vista Penhoras"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )
-                    })}
-                    <button className="subtle-btn" type="button" onClick={() => clearPenhorasFilters()}>
-                      <FilterX size={15} />
-                      Limpar filtros
-                    </button>
-                    <button
-                      className="subtle-btn"
-                      type="button"
-                      onClick={() =>
-                        void saveCurrentView('penhoras-dashboard', { ...penhorasFilters, q: globalSearch, widgets: penhorasDashboardWidgets })
-                      }
-                    >
-                      Guardar vista
-                    </button>
-                  </div>
-                </div>
-
-                <div className="dashboard-top-actions">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => {
-                      setDashboardFocusMode(true)
-                      setPenhorasDashboardWidgetsOpen(true)
-                    }}
-                  >
-                    <Maximize2 size={15} />
-                    Expandir dashboard
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardConfigOpen((current) => !current)}>
-                    {penhorasDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
-                    {penhorasDashboardConfigOpen ? 'Ocultar painel' : 'Mostrar painel'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgetsOpen((current) => !current)}>
-                    {penhorasDashboardWidgetsOpen ? 'Ocultar widgets' : 'Mostrar widgets'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardPickerOpen((current) => !current)}>
-                    <Plus size={15} />
-                    {penhorasDashboardPickerOpen ? 'Ocultar catálogo' : 'Adicionar widgets'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgets(cloneDefaultPenhorasDashboardWidgets())}>
-                    Repor widgets
-                  </button>
-                </div>
-
-                {penhorasDashboardConfigOpen ? (
-                  <>
-                    <div className="dashboard-hero-grid ds-dashboard-hero">
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Total registos</span>
-                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.registos)}</strong>
-                      </article>
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Com data pedido</span>
-                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.comDataPedido)}</strong>
-                      </article>
-                      <article className="dashboard-hero-card ds-dashboard-hero-card">
-                        <span>Recusados/Desistência</span>
-                        <strong>{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.recusados)}</strong>
-                      </article>
-                    </div>
-
-                    <div className="filters-row seven ds-filters-row">
-                      <LabeledSelect
-                        label="Estado"
-                        value={String(penhorasFilters.estadoId ?? 'todos')}
-                        onChange={(value) => patchPenhorasFilters('estadoId', value as PenhorasRecordFilters['estadoId'])}
-                        options={[{ value: 'todos', label: 'Todos' }, ...penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-                      />
-                      <LabeledSelect
-                        label="Ano"
-                        value={String(penhorasFilters.ano ?? 'todos')}
-                        onChange={(value) => patchPenhorasFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                        options={[{ value: 'todos', label: 'Todos' }, ...penhorasYears.map((year) => ({ value: String(year), label: String(year) }))]}
-                      />
-                      <LabeledSelect
-                        label="Mês"
-                        value={String(penhorasFilters.mes ?? 'todos')}
-                        onChange={(value) => patchPenhorasFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                        options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-                      />
-                      <LabeledSelect
-                        label="Gestor"
-                        value={String(penhorasFilters.gestor ?? '')}
-                        onChange={(value) => patchPenhorasFilters('gestor', value)}
-                        options={[{ value: '', label: 'Todos' }, ...penhorasGestorFilterOptions.map((value) => ({ value, label: value }))]}
-                      />
-                      <LabeledSelect
-                        label="Acto"
-                        value={String(penhorasFilters.acto ?? '')}
-                        onChange={(value) => patchPenhorasFilters('acto', value)}
-                        options={[{ value: '', label: 'Todos' }, ...penhorasActoFilterOptions.map((value) => ({ value, label: value }))]}
-                      />
-                      <div className="field">
-                        <span>Total</span>
-                        <div className="counter-box">{penhorasRecordsLoading ? 'A carregar...' : `${penhorasTotalRecords} registos`}</div>
-                      </div>
-                      <div className="field">
-                        <span>Aguarda registo</span>
-                        <div className="counter-box">{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.pendentes)}</div>
-                      </div>
-                    </div>
-
-                    <div className="dashboard-picker-wrap">
-                      <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardPickerOpen((current) => !current)}>
-                        {penhorasDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
-                      </button>
-                      {penhorasDashboardPickerOpen && (
-                        <div className="dashboard-widget-library">
-                          {PENHORAS_DASHBOARD_WIDGET_LIBRARY.map((widget) => (
-                            <button
-                              key={widget.type}
-                              className="dashboard-widget-option"
-                              type="button"
-                              onClick={() => addPenhorasDashboardWidget(widget.type)}
-                            >
-                              <strong>{widget.label}</strong>
-                              <span>{widget.hint}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="dashboard-collapsed-note muted">
-                    Painel de configuração oculto. Use “Mostrar painel” para editar filtros.
-                  </div>
-                )}
-              </>
-            )}
-
-            {penhorasDashboardWidgetsOpen || isDashboardFocusMode ? (
-              penhorasDashboardWidgets.length === 0 ? (
-                <div className="empty-text dashboard-empty">
-                  Sem widgets ativos.
-                  <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardWidgets(cloneDefaultPenhorasDashboardWidgets())}>
-                    Repor widgets
-                  </button>
-                </div>
-              ) : (
-                <div className={`dashboard-grid ds-dashboard-grid ${penhorasDashboardHasSideStack ? 'with-side-stack' : ''}`}>
-                  {penhorasDashboardHasSideStack ? (
-                    <>
-                      <div className="dashboard-main-widgets">
-                        {penhorasDashboardMainWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
-                      </div>
-                      <aside className="dashboard-side-widgets">
-                        {penhorasDashboardSideWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
-                      </aside>
-                    </>
-                  ) : penhorasDashboardSideWidgets.length > 0 && penhorasDashboardMainWidgets.length === 0 ? (
-                    <aside className="dashboard-side-widgets">
-                      {penhorasDashboardSideWidgets.map((widget) => renderPenhorasDashboardWidget(widget))}
-                    </aside>
-                  ) : (
-                    penhorasDashboardWidgets.map((widget) => renderPenhorasDashboardWidget(widget))
-                  )}
-                </div>
-              )
-            ) : (
-              <div className="dashboard-collapsed-note muted">
-                Widgets ocultos. Use “Mostrar widgets” para voltar a apresentar o dashboard.
-              </div>
-            )}
-          </section>
+          <PenhorasDashboards
+            isDashboardFocusMode={isDashboardFocusMode}
+            setDashboardFocusMode={setDashboardFocusMode}
+            penhorasDashboardViews={penhorasDashboardViews}
+            disabledSavedViewIds={disabledSavedViewIds}
+            activePenhorasSavedViewId={activePenhorasSavedViewId}
+            applyPenhorasView={applyPenhorasView}
+            togglePenhorasSavedViewDisabled={togglePenhorasSavedViewDisabled}
+            deletePenhorasSavedView={deletePenhorasSavedView}
+            clearPenhorasFilters={clearPenhorasFilters}
+            saveCurrentView={saveCurrentView}
+            penhorasFilters={penhorasFilters}
+            globalSearch={globalSearch}
+            penhorasDashboardConfigOpen={penhorasDashboardConfigOpen}
+            setPenhorasDashboardConfigOpen={setPenhorasDashboardConfigOpen}
+            penhorasDashboardWidgetsOpen={penhorasDashboardWidgetsOpen}
+            setPenhorasDashboardWidgetsOpen={setPenhorasDashboardWidgetsOpen}
+            penhorasDashboardPickerOpen={penhorasDashboardPickerOpen}
+            setPenhorasDashboardPickerOpen={setPenhorasDashboardPickerOpen}
+            penhorasDashboardWidgets={penhorasDashboardWidgets}
+            setPenhorasDashboardWidgets={setPenhorasDashboardWidgets}
+            penhorasDashboardMainWidgets={penhorasDashboardMainWidgets}
+            penhorasDashboardSideWidgets={penhorasDashboardSideWidgets}
+            penhorasDashboardHasSideStack={penhorasDashboardHasSideStack}
+            addPenhorasDashboardWidget={addPenhorasDashboardWidget}
+            renderPenhorasDashboardWidget={renderPenhorasDashboardWidget}
+            penhorasDashboardTotals={penhorasDashboardTotals}
+            penhorasActiveStatuses={penhorasActiveStatuses}
+            penhorasYears={penhorasYears}
+            penhorasGestorFilterOptions={penhorasGestorFilterOptions}
+            penhorasActoFilterOptions={penhorasActoFilterOptions}
+            patchPenhorasFilters={patchPenhorasFilters}
+            penhorasRecordsLoading={penhorasRecordsLoading}
+            penhorasTotalRecords={penhorasTotalRecords}
+          />
         )}
 
         {activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && (
-          <section className="panel ds-panel penhoras-panel penhoras-results-panel">
-            <div className="row-between wrap">
-              <div>
-                <h2>{activeTab === 'consulta' ? 'Consulta Penhoras' : 'Tabela Penhoras'}</h2>
-                <p className="small-note">Registos de penhoras isolados dos módulos de recibos e DS.</p>
-              </div>
-              <div className="saved-view-bar ds-saved-view-bar">
-                {penhorasTableViews.map((view) => {
-                  const isDisabled = disabledSavedViewIds.includes(view.id)
-                  const isActive = activePenhorasSavedViewId === view.id && !isDisabled
-                  return (
-                    <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
-                      <button
-                        className="subtle-btn saved-view-apply"
-                        type="button"
-                        onClick={() => applyPenhorasView(view)}
-                        disabled={isDisabled}
-                        title={isDisabled ? 'Vista Penhoras desativada' : `Aplicar vista: ${view.name}`}
-                      >
-                        {view.name}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro"
-                        type="button"
-                        onClick={() => togglePenhorasSavedViewDisabled(view.id)}
-                        title={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
-                        aria-label={isDisabled ? 'Ativar vista Penhoras' : 'Desativar vista Penhoras'}
-                      >
-                        {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro danger"
-                        type="button"
-                        onClick={() => void deletePenhorasSavedView(view.id)}
-                        title="Eliminar vista Penhoras"
-                        aria-label="Eliminar vista Penhoras"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  )
-                })}
-                <button className="subtle-btn" type="button" onClick={() => clearPenhorasFilters()}>
-                  <FilterX size={15} />
-                  Limpar filtros
-                </button>
-                <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('penhoras-tabela', { ...penhorasFilters, q: globalSearch })}>
-                  Guardar vista
-                </button>
-              </div>
-            </div>
+          <PenhorasConsultaTabela
+            activeTab={activeTab}
+            penhorasRecords={penhorasRecords}
+            penhorasRecordsLoading={penhorasRecordsLoading}
+            penhorasTotalRecords={penhorasTotalRecords}
+            penhorasStatuses={penhorasStatuses}
+            penhorasActiveStatuses={penhorasActiveStatuses}
+            penhorasFilters={penhorasFilters}
+            patchPenhorasFilters={patchPenhorasFilters}
+            penhorasYears={penhorasYears}
+            penhorasGestorFilterOptions={penhorasGestorFilterOptions}
+            penhorasActoFilterOptions={penhorasActoFilterOptions}
+            penhorasTableViews={penhorasTableViews}
+            disabledSavedViewIds={disabledSavedViewIds}
+            activePenhorasSavedViewId={activePenhorasSavedViewId}
+            applyPenhorasView={applyPenhorasView}
+            togglePenhorasSavedViewDisabled={togglePenhorasSavedViewDisabled}
+            deletePenhorasSavedView={deletePenhorasSavedView}
+            clearPenhorasFilters={clearPenhorasFilters}
+            saveCurrentView={saveCurrentView}
+            globalSearch={globalSearch}
+            penhorasDashboardTotals={penhorasDashboardTotals}
+            setSelectedPenhorasRecordId={setSelectedPenhorasRecordId}
+            setIsPenhorasRecordEditing={setIsPenhorasRecordEditing}
+            updatePenhorasRecordStatus={updatePenhorasRecordStatus}
+          />
+        )}
 
-            <div className="filters-row seven ds-filters-row">
-              <LabeledSelect
-                label="Estado"
-                value={String(penhorasFilters.estadoId ?? 'todos')}
-                onChange={(value) => patchPenhorasFilters('estadoId', value as PenhorasRecordFilters['estadoId'])}
-                options={[{ value: 'todos', label: 'Todos' }, ...penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-              />
-              <LabeledSelect
-                label="Ano"
-                value={String(penhorasFilters.ano ?? 'todos')}
-                onChange={(value) => patchPenhorasFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...penhorasYears.map((year) => ({ value: String(year), label: String(year) }))]}
-              />
-              <LabeledSelect
-                label="Mês"
-                value={String(penhorasFilters.mes ?? 'todos')}
-                onChange={(value) => patchPenhorasFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-              />
-              <LabeledSelect
-                label="Gestor"
-                value={String(penhorasFilters.gestor ?? '')}
-                onChange={(value) => patchPenhorasFilters('gestor', value)}
-                options={[{ value: '', label: 'Todos' }, ...penhorasGestorFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <LabeledSelect
-                label="Acto"
-                value={String(penhorasFilters.acto ?? '')}
-                onChange={(value) => patchPenhorasFilters('acto', value)}
-                options={[{ value: '', label: 'Todos' }, ...penhorasActoFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <div className="field">
-                <span>Total</span>
-                <div className="counter-box">{penhorasRecordsLoading ? 'A carregar...' : `${penhorasTotalRecords} registos`}</div>
-              </div>
-              <div className="field">
-                <span>Aguarda registo</span>
-                <div className="counter-box">{new Intl.NumberFormat('pt-PT').format(penhorasDashboardTotals.pendentes)}</div>
-              </div>
-            </div>
+        {
+          activeModule === 'penhoras' && activeTab === 'importar' && (
+            <PenhorasImportar
+              handlePenhorasImportFile={handlePenhorasImportFile}
+              refreshPenhorasImportPreview={refreshPenhorasImportPreview}
+              runPenhorasImportCommit={runPenhorasImportCommit}
+              penhorasImportLoading={penhorasImportLoading}
+              penhorasImportStrategy={penhorasImportStrategy}
+              setPenhorasImportStrategy={setPenhorasImportStrategy}
+              penhorasImportPreview={penhorasImportPreview}
+              penhorasImportServerPreview={penhorasImportServerPreview}
+            />
+          )
+        }
 
-            {penhorasRecords.length === 0 ? (
-              <div className="empty-text">Sem resultados Penhoras para os filtros selecionados.</div>
-            ) : activeTab === 'consulta' ? (
-              <div className="card-list ds-card-list">
-                {penhorasRecords.map((record) => {
-                  const status = getStatus(penhorasStatuses, record.estadoId)
-                  return (
-                    <article key={record.id} className="result-card penhoras-result-card clickable-row" onClick={() => setSelectedPenhorasRecordId(record.id)}>
-                      <div className="result-main ds-result-main">
-                        <div className="result-title ds-result-title">{record.identificacao || record.pe || 'Sem identificação'}</div>
-                        <div className="muted ds-result-secondary">
-                          <span>PE: {record.pe || '-'}</span>
-                          <span> · Pedido: {record.pedido || '-'}</span>
-                        </div>
-                      </div>
-                      <div className="result-entity muted ds-result-meta">{`Gestor: ${record.gestor || '-'} · ${record.acto || 'Acto por definir'}`}</div>
-                      <div className="ds-result-metrics">
-                        <strong>{record.dataPedido || '-'}</strong>
-                        <span>Data pedido</span>
-                      </div>
-                      <div className="card-actions ds-card-actions">
-                        <button
-                          className="subtle-btn"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelectedPenhorasRecordId(record.id)
-                            setIsPenhorasRecordEditing(true)
-                          }}
-                        >
-                          Editar
-                        </button>
-                      </div>
-                      <div className="result-status ds-result-status">
-                        {status ? <StatusPill status={status} /> : <span className="muted ds-status-pill-empty">Sem estado</span>}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="table-wrapper ds-table-wrapper">
-                <table className="records-table ds-records-table">
-                  <thead>
-                    <tr>
-                      <th>PE</th>
-                      <th>Acto</th>
-                      <th>Data Pedido</th>
-                      <th>Identificação</th>
-                      <th>Pedido</th>
-                      <th>Gestor</th>
-                      <th>Estado</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {penhorasRecords.map((record) => {
-                      const status = getStatus(penhorasStatuses, record.estadoId)
-                      const hasStatusOption = penhorasActiveStatuses.some((statusOption) => statusOption.id === record.estadoId)
-                      const statusValue = hasStatusOption ? record.estadoId : ''
+        {
+          activeModule === 'penhoras' && activeTab === 'configuracao' && (
+            <PenhorasConfiguracao
+              penhorasOrderedStatuses={penhorasOrderedStatuses}
+              updatePenhorasStatusLocal={updatePenhorasStatusLocal}
+              removePenhorasStatus={removePenhorasStatus}
+              addPenhorasStatus={addPenhorasStatus}
+              savePenhorasStatuses={savePenhorasStatuses}
+              setActiveTab={setActiveTab}
+            />
+          )
+        }
+
+        {
+          activeModule === 'recibos' && activeTab === 'entrada' && (
+            <section className="panel entrada-layout">
+              <aside className="panel side-list">
+                <div className="row-between">
+                  <h2>Registos recentes</h2>
+                  <span className="recent-mode-badge">Lista</span>
+                </div>
+                <div className="small-note">Últimas alterações</div>
+                <div className="recent-list compact">
+                  {recentRecords.length === 0 ? (
+                    <div className="empty-text">Ainda não existem registos.</div>
+                  ) : (
+                    recentRecords.map((record) => {
+                      const status = getStatus(statuses, record.estadoId)
+                      const reference = getPrimaryRecordReference(record)
                       return (
-                        <tr
+                        <button
                           key={record.id}
-                          style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
-                          onClick={(event) => {
-                            const target = event.target as HTMLElement
-                            if (target.closest('button, select, option, input, textarea, a')) return
-                            setSelectedPenhorasRecordId(record.id)
+                          className="recent-card"
+                          type="button"
+                          onClick={() => {
+                            setSelectedRecordId(record.id)
+                            setActiveTab('consulta')
                           }}
                         >
-                          <td>{record.pe || '-'}</td>
-                          <td>{record.acto || '-'}</td>
-                          <td>{record.dataPedido || '-'}</td>
-                          <td>{record.identificacao || '-'}</td>
-                          <td>{record.pedido || '-'}</td>
-                          <td>{record.gestor || '-'}</td>
-                          <td>
-                            <select
-                              className="ds-status-select"
-                              value={statusValue}
-                              onMouseDown={(event) => event.stopPropagation()}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={(event) => void updatePenhorasRecordStatus(record.id, event.target.value)}
-                            >
-                              {!hasStatusOption && <option value="">Selecionar estado...</option>}
-                              {penhorasActiveStatuses.map((statusOption) => (
-                                <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <button
-                              className="subtle-btn compact"
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setSelectedPenhorasRecordId(record.id)
-                                setIsPenhorasRecordEditing(true)
-                              }}
-                            >
-                              Editar
-                            </button>
-                          </td>
-                        </tr>
+                          <span>{reference}</span>
+                          <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
+                          {status && <StatusPill status={status} compact />}
+                        </button>
                       )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeModule === 'penhoras' && activeTab === 'importar' && (
-          <PenhorasImportar
-            handlePenhorasImportFile={handlePenhorasImportFile}
-            refreshPenhorasImportPreview={refreshPenhorasImportPreview}
-            runPenhorasImportCommit={runPenhorasImportCommit}
-            penhorasImportLoading={penhorasImportLoading}
-            penhorasImportStrategy={penhorasImportStrategy}
-            setPenhorasImportStrategy={setPenhorasImportStrategy}
-            penhorasImportPreview={penhorasImportPreview}
-            penhorasImportServerPreview={penhorasImportServerPreview}
-          />
-        )}
-
-        {activeModule === 'penhoras' && activeTab === 'configuracao' && (
-          <PenhorasConfiguracao
-            penhorasOrderedStatuses={penhorasOrderedStatuses}
-            updatePenhorasStatusLocal={updatePenhorasStatusLocal}
-            removePenhorasStatus={removePenhorasStatus}
-            addPenhorasStatus={addPenhorasStatus}
-            savePenhorasStatuses={savePenhorasStatuses}
-            setActiveTab={setActiveTab}
-          />
-        )}
-
-        {activeModule === 'recibos' && activeTab === 'entrada' && (
-          <section className="panel entrada-layout">
-            <aside className="panel side-list">
-              <div className="row-between">
-                <h2>Registos recentes</h2>
-                <span className="recent-mode-badge">Lista</span>
-              </div>
-              <div className="small-note">Últimas alterações</div>
-              <div className="recent-list compact">
-                {recentRecords.length === 0 ? (
-                  <div className="empty-text">Ainda não existem registos.</div>
-                ) : (
-                  recentRecords.map((record) => {
-                    const status = getStatus(statuses, record.estadoId)
-                    const reference = getPrimaryRecordReference(record)
-                    return (
-                      <button
-                        key={record.id}
-                        className="recent-card"
-                        type="button"
-                        onClick={() => {
-                          setSelectedRecordId(record.id)
-                          setActiveTab('consulta')
-                        }}
-                      >
-                        <span>{reference}</span>
-                        <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
-                        {status && <StatusPill status={status} compact />}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </aside>
-
-            <div className="panel">
-              <div className="row-between">
-                <div>
-                  <h2>Novo registo</h2>
-                  <p className="small-note">Campos fiscais calculados automaticamente com base na configuração.</p>
-                </div>
-                <button className="subtle-btn" type="button" onClick={() => setEntryForm(applyFormAutoCalculations(entryForm, calculationSettings, true))}>
-                  Recalcular
-                </button>
-              </div>
-
-              <form className="entry-form" onSubmit={(event) => void submitEntry(event, 'save')}>
-                <div className="field-grid three">
-                  <LabeledSelect
-                    label="Tipo"
-                    value={entryForm.tipo}
-                    onChange={(value) => handleEntryInput('tipo', value as RecordType)}
-                    options={[
-                      { value: 'exequente', label: 'Exequente' },
-                      { value: 'executado', label: 'Executado' },
-                    ]}
-                  />
-                  <LabeledSelect
-                    label="Mês"
-                    value={String(entryForm.mes)}
-                    onChange={(value) => handleEntryInput('mes', Number(value))}
-                    options={MONTHS.map((label, index) => ({ value: String(index + 1), label }))}
-                  />
-                  <LabeledInput
-                    label="Ano"
-                    value={String(entryForm.ano)}
-                    onChange={(value) => handleEntryInput('ano', Number(value) || new Date().getFullYear())}
-                  />
-                </div>
-
-                <div className="field-grid three">
-                  <LabeledInput label="Processo" value={entryForm.processo} onChange={(value) => handleEntryInput('processo', value)} suggestions={recordSuggestions.processo} />
-                  <LabeledInput label="PE" value={entryForm.pe} onChange={(value) => handleEntryInput('pe', value)} suggestions={recordSuggestions.pe} />
-                  <LabeledInput label="N.º de recibo" value={entryForm.reciboNumero} onChange={(value) => handleEntryInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
-                </div>
-
-                <div className="field-grid four">
-                  <LabeledInput type="date" label="Data de levantamento" value={entryForm.dataLevantamento} onChange={(value) => handleEntryInput('dataLevantamento', value)} />
-                  <LabeledInput type="date" label="Data de recibo" value={entryForm.dataRecibo} onChange={(value) => handleEntryInput('dataRecibo', value)} />
-                  <LabeledInput
-                    label="Gestor"
-                    value={entryForm.gestor}
-                    onChange={(value) => handleEntryInput('gestor', value)}
-                    suggestions={gestorSuggestions}
-                  />
-                  <LabeledInput
-                    label="Exequente"
-                    value={entryForm.exequente}
-                    onChange={(value) => handleEntryInput('exequente', value)}
-                    suggestions={exequenteSuggestions}
-                  />
-                </div>
-
-                <div className="field-grid five">
-                  <LabeledInput label="Valor indicado" value={entryForm.valorIndicado} onChange={(value) => handleEntryInput('valorIndicado', value)} />
-                  <LabeledInput label="Valor sem IVA" value={entryForm.valorSemIva} onChange={(value) => handleEntryInput('valorSemIva', value)} />
-                  <LabeledInput label="IVA" value={entryForm.iva} onChange={(value) => handleEntryInput('iva', value)} />
-                  <LabeledInput label="Retenção" value={entryForm.retencao} onChange={(value) => handleEntryInput('retencao', value)} />
-                  <LabeledInput label="Meu 5%" value={entryForm.meu5} onChange={(value) => handleEntryInput('meu5', value)} />
-                </div>
-
-                <div className="field-grid five">
-                  <LabeledInput label="GPESE" value={entryForm.gpeSe} onChange={(value) => handleEntryInput('gpeSe', value)} />
-                  <LabeledInput label="Outras taxas" value={entryForm.outrasTaxas} onChange={(value) => handleEntryInput('outrasTaxas', value)} />
-                  <LabeledInput label="Valor emissão" value={entryForm.valorEmissao} onChange={(value) => handleEntryInput('valorEmissao', value)} />
-                  <LabeledInput label="Descrição valor" value={entryForm.descricaoValor} onChange={(value) => handleEntryInput('descricaoValor', value)} />
-                  <LabeledSelect
-                    label="Estado"
-                    value={entryForm.estadoId}
-                    onChange={(value) => handleEntryInput('estadoId', value)}
-                    options={activeStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                  />
-                </div>
-
-                <div className="field-grid one">
-                  <LabeledInput label="Indicações de levantamento" value={entryForm.indicacoes} onChange={(value) => handleEntryInput('indicacoes', value)} />
-                </div>
-
-                <div className="actions-row">
-                  <button type="button" className="subtle-btn" onClick={() => defaultStatus && setEntryForm(getInitialEntryForm(defaultStatus.id))}>
-                    Limpar
-                  </button>
-                  <button type="button" className="subtle-btn" onClick={() => void saveNewEntry()}>
-                    Guardar e novo
-                  </button>
-                  <button type="submit" className="primary-btn">Guardar</button>
-                </div>
-              </form>
-            </div>
-          </section>
-        )}
-
-        {activeModule === 'recibos' && (activeTab === 'consulta' || activeTab === 'tabela') && (
-          <section className="panel">
-            <div className="row-between wrap">
-              <div>
-                <h2>{activeTab === 'consulta' ? 'Consulta' : 'Tabela'}</h2>
-                <p className="small-note">Filtros avançados por ano, mês, tipo e estado.</p>
-              </div>
-
-              <div className="saved-view-bar">
-                {tableViews.map((view) => {
-                  const isDisabled = disabledSavedViewIds.includes(view.id)
-                  const isActive = activeSavedViewId === view.id && !isDisabled
-                  return (
-                    <div key={view.id} className={`saved-view-chip ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`}>
-                      <button
-                        className="subtle-btn saved-view-apply"
-                        type="button"
-                        onClick={() => applyView(view)}
-                        disabled={isDisabled}
-                        title={isDisabled ? 'Vista desativada' : `Aplicar vista: ${view.name}`}
-                      >
-                        {view.name}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro"
-                        type="button"
-                        onClick={() => toggleSavedViewDisabled(view.id)}
-                        title={isDisabled ? 'Ativar vista' : 'Desativar vista'}
-                        aria-label={isDisabled ? 'Ativar vista' : 'Desativar vista'}
-                      >
-                        {isDisabled ? <Eye size={14} /> : <EyeOff size={14} />}
-                      </button>
-                      <button
-                        className="subtle-btn icon-btn micro danger"
-                        type="button"
-                        onClick={() => void deleteSavedView(view.id)}
-                        title="Eliminar vista"
-                        aria-label="Eliminar vista"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  )
-                })}
-                <div
-                  className="totals-hover-wrap"
-                  onMouseEnter={() => setTotalsHoverOpen(true)}
-                  onMouseLeave={() => setTotalsHoverOpen(false)}
-                >
-                  <button
-                    className="subtle-btn totals-trigger"
-                    type="button"
-                    onClick={() => setTotalsHoverOpen((current) => !current)}
-                    aria-expanded={totalsHoverOpen}
-                    aria-haspopup="dialog"
-                  >
-                    Totais
-                  </button>
-                  {totalsHoverOpen && (
-                    <div className="totals-hover-panel" role="dialog" aria-label="Selecionar totais">
-                      <div className="totals-options">
-                        {TOTAL_METRIC_OPTIONS.map((option) => (
-                          <label key={option.key} className="totals-option">
-                            <input
-                              type="checkbox"
-                              checked={selectedTotalMetrics.includes(option.key)}
-                              onChange={() => toggleTotalMetric(option.key)}
-                            />
-                            <span>{option.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="totals-values">
-                        {selectedTotalMetrics.map((metricKey) => {
-                          const option = TOTAL_METRIC_OPTIONS.find((item) => item.key === metricKey)
-                          if (!option) return null
-                          const value = totalsSnapshot[metricKey]
-                          return (
-                            <div key={metricKey} className="totals-value-item">
-                              <span>{option.label}</span>
-                              <strong>{option.currency ? formatCurrency(typeof value === 'number' ? value : undefined) : String(value)}</strong>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
+                    })
                   )}
                 </div>
-                <button className="subtle-btn" type="button" onClick={() => clearTableFilters()}>
-                  <FilterX size={15} />
-                  Limpar filtros
-                </button>
-                <button
-                  className="subtle-btn"
-                  type="button"
-                  onClick={() => void saveCurrentView('tabela', { ...filters, q: globalSearch })}
-                >
-                  Guardar vista
-                </button>
-              </div>
-            </div>
+              </aside>
 
-            <div className="filters-row seven">
-              <LabeledSelect
-                label="Tipo"
-                value={String(filters.tipo ?? 'todos')}
-                onChange={(value) => patchFilters('tipo', value as RecordFilters['tipo'])}
-                options={[
-                  { value: 'todos', label: 'Todos' },
-                  { value: 'exequente', label: 'Exequentes' },
-                  { value: 'executado', label: 'Executados' },
-                ]}
-              />
-              <LabeledSelect
-                label="Estado"
-                value={String(filters.estadoId ?? 'todos')}
-                onChange={(value) => patchFilters('estadoId', value as RecordFilters['estadoId'])}
-                options={[{ value: 'todos', label: 'Todos' }, ...orderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-              />
-              <LabeledSelect
-                label="Mês"
-                value={String(filters.mes ?? 'todos')}
-                onChange={(value) => patchFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-              />
-              <LabeledSelect
-                label="Ano"
-                value={String(filters.ano ?? 'todos')}
-                onChange={(value) => patchFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                options={[{ value: 'todos', label: 'Todos' }, ...years.map((year) => ({ value: String(year), label: String(year) }))]}
-              />
-              <LabeledSelect
-                label="Exequente"
-                value={String(filters.exequente ?? '')}
-                onChange={(value) => patchFilters('exequente', value)}
-                options={[{ value: '', label: 'Todos' }, ...exequenteFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <LabeledSelect
-                label="Gestor"
-                value={String(filters.gestor ?? '')}
-                onChange={(value) => patchFilters('gestor', value)}
-                options={[{ value: '', label: 'Todos' }, ...gestorFilterOptions.map((value) => ({ value, label: value }))]}
-              />
-              <div className="field">
-                <span>Total</span>
-                <div className="counter-box">{recordsLoading ? 'A carregar...' : `${totalRecords} registos`}</div>
-              </div>
-            </div>
-
-            {activeTab === 'tabela' && (
-              <div className="bulk-panel">
-                <div className="bulk-panel-header">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => {
-                      setBulkSectionOpen((current) => {
-                        const next = !current
-                        if (!next) setBulkPanelOpen(false)
-                        return next
-                      })
-                    }}
-                    aria-expanded={bulkSectionOpen}
-                  >
-                    {bulkSectionOpen ? 'Ocultar ações em lote' : 'Mostrar ações em lote'}
-                  </button>
-                  <span className="bulk-selected-badge">{selectedIds.length} selecionados</span>
-                </div>
-
-                {bulkSectionOpen && (
-                  <>
-                    <div className="bulk-row bulk-row-top">
-                      <label className="inline-check">
-                        <input type="checkbox" checked={allSelectedInTable} onChange={toggleSelectAllRecords} />
-                        Selecionar todos
-                      </label>
-                      <button className="subtle-btn" type="button" onClick={exportCurrentTableToCsv}>
-                        Exportar CSV
-                      </button>
-                    </div>
-
-                    <div className="bulk-row bulk-row-main">
-                      <label className="field bulk-inline-field">
-                        <span>Novo estado</span>
-                        <select value={bulkStatusId} onChange={(event) => setBulkStatusId(event.target.value)}>
-                          {orderedStatuses.map((status) => (
-                            <option key={status.id} value={status.id}>{status.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <button className="primary-btn" type="button" onClick={() => void runBulkStatusUpdate()} disabled={selectedIds.length === 0}>
-                        Aplicar estado
-                      </button>
-                      <button className="subtle-btn" type="button" onClick={() => setBulkPanelOpen((current) => !current)}>
-                        {bulkPanelOpen ? 'Ocultar edição avançada' : 'Editar campos em lote'}
-                      </button>
-                    </div>
-
-                    {bulkPanelOpen && (
-                      <div className="bulk-advanced">
-                        <div className="bulk-advanced-grid">
-                          <label className="field">
-                            <span>Gestor (lote)</span>
-                            <AutocompleteInput
-                              value={bulkGestor}
-                              onChange={(value) => setBulkGestor(value)}
-                              suggestions={gestorSuggestions}
-                              placeholder="Gestor"
-                            />
-                          </label>
-                          <label className="field">
-                            <span>Exequente (lote)</span>
-                            <AutocompleteInput
-                              value={bulkExequente}
-                              onChange={(value) => setBulkExequente(value)}
-                              suggestions={exequenteSuggestions}
-                              placeholder="Exequente"
-                            />
-                          </label>
-                          <label className="field">
-                            <span>Indicações (lote)</span>
-                            <input
-                              value={bulkIndicacoes}
-                              onChange={(event) => setBulkIndicacoes(event.target.value)}
-                              placeholder="Indicações"
-                              aria-label="Indicações em lote"
-                            />
-                          </label>
-                        </div>
-                        <div className="bulk-row bulk-row-advanced-actions">
-                          <label className="inline-check">
-                            <input
-                              type="checkbox"
-                              checked={bulkForceRecalculate}
-                              onChange={(event) => setBulkForceRecalculate(event.target.checked)}
-                            />
-                            Recalcular impostos automaticamente
-                          </label>
-                          <button className="subtle-btn" type="button" onClick={() => void runBulkFieldUpdate()} disabled={selectedIds.length === 0}>
-                            Aplicar edição avançada
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {records.length === 0 ? (
-              <div className="empty-text">Sem resultados para os filtros selecionados.</div>
-            ) : activeTab === 'consulta' ? (
-              <div className="card-list">
-                {records.map((record) => {
-                  const status = getStatus(statuses, record.estadoId)
-                  const primaryReference = getPrimaryRecordReference(record)
-                  const secondaryReference = getSecondaryRecordReference(record)
-                  const monthYear = `${MONTHS[record.mes - 1] ?? `Mês ${record.mes}`} ${record.ano}`
-                  return (
-                    <article key={record.id} className="result-card clickable-row" onClick={() => setSelectedRecordId(record.id)}>
-                      <div className="result-main">
-                        <div className="result-title">{primaryReference}</div>
-                        <div className="muted">{secondaryReference ? `${secondaryReference} · ${monthYear}` : monthYear}</div>
-                      </div>
-                      <div className="result-entity muted">
-                        <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
-                      </div>
-                      <div className="result-value">{formatCurrency(record.valorEmissao ?? record.valorSemIva ?? record.valorIndicado)}</div>
-                      <div className="card-actions">
-                        <button
-                          className="subtle-btn"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setSelectedRecordId(record.id)
-                            setIsRecordEditing(true)
-                          }}
-                        >
-                          Editar
-                        </button>
-                      </div>
-                      <div className="result-status">
-                        {status ? <StatusPill status={status} /> : <span className="muted">Sem estado</span>}
-                      </div>
-                    </article>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="table-wrapper">
-                <table className="records-table">
-                  <thead>
-                    <tr>
-                      <th></th>
-                      <th>Tipo</th>
-                      <th>Ano/Mês</th>
-                      <th>PE</th>
-                      <th>Processo</th>
-                      <th>Recibo</th>
-                      <th>Gestor/Exequente</th>
-                      <th>Sem IVA</th>
-                      <th>IVA</th>
-                      <th>Retenção</th>
-                      <th>Meu 5%</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.map((record) => {
-                      const status = getStatus(statuses, record.estadoId)
-                      return (
-                        <tr
-                          key={record.id}
-                          style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
-                          onClick={() => setSelectedRecordId(record.id)}
-                        >
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(record.id)}
-                              onClick={(event) => event.stopPropagation()}
-                              onChange={() => toggleSelectRecord(record.id)}
-                            />
-                          </td>
-                          <td>{record.tipo === 'exequente' ? 'Exequente' : 'Executado'}</td>
-                          <td>{record.ano}/{String(record.mes).padStart(2, '0')}</td>
-                          <td>{record.pe || '-'}</td>
-                          <td>{record.processo || '-'}</td>
-                          <td>{record.reciboNumero || '-'}</td>
-                          <td>
-                            <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
-                          </td>
-                          <td>{formatCurrency(record.valorSemIva)}</td>
-                          <td>{formatCurrency(record.iva)}</td>
-                          <td>{formatCurrency(record.retencao)}</td>
-                          <td>{formatCurrency(record.meu5)}</td>
-                          <td>
-                            <div className="status-cell-actions">
-                              <select
-                                value={record.estadoId}
-                                onClick={(event) => event.stopPropagation()}
-                                onChange={(event) => void updateRecordStatus(record.id, event.target.value)}
-                              >
-                                {orderedStatuses.map((statusOption) => (
-                                  <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                                ))}
-                              </select>
-                              <button
-                                className="subtle-btn compact"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  setSelectedRecordId(record.id)
-                                  setIsRecordEditing(true)
-                                }}
-                              >
-                                Editar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeModule === 'recibos' && activeTab === 'dashboards' && (
-          <section className="panel dashboard-experiment">
-            {!isDashboardFocusMode && (
-              <>
-                <div className="row-between wrap">
+              <div className="panel">
+                <div className="row-between">
                   <div>
-                    <h2>Dashboards</h2>
-                    <p className="small-note">Começa vazio e adiciona widgets pré-configurados para foco imediato.</p>
+                    <h2>Novo registo</h2>
+                    <p className="small-note">Campos fiscais calculados automaticamente com base na configuração.</p>
                   </div>
-                  <div className="dashboard-top-actions">
-                    <button className="subtle-btn" type="button" onClick={() => setDashboardFocusMode(true)}>
-                      <Maximize2 size={15} />
-                      Expandir dashboard
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => setDashboardConfigOpen((current) => !current)}>
-                      {dashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
-                      {dashboardConfigOpen ? 'Ocultar painel' : 'Mostrar painel'}
-                    </button>
-                    <button
-                      className="subtle-btn"
-                      type="button"
-                      onClick={() => {
-                        resetDashboardDraft()
-                        setDashboardPickerOpen(true)
-                      }}
-                    >
-                      <Plus size={15} />
-                      Novo dashboard
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => void saveDashboard()}>
-                      <Save size={15} />
-                      Guardar
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => void saveDashboard({ asNew: true })}>
-                      Guardar como
-                    </button>
-                    <button className="subtle-btn" type="button" disabled={!activeDashboardId} onClick={() => void deleteDashboard()}>
-                      <Trash2 size={15} />
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-
-                {dashboardConfigOpen ? (
-                  <>
-                    <div className="dashboard-hero-grid">
-                      <div className="dashboard-hero-card">
-                        <span>Total registos</span>
-                        <strong>{dashboardLoading ? '...' : new Intl.NumberFormat('pt-PT').format(dashboardSummary?.totals.registos ?? 0)}</strong>
-                      </div>
-                      <div className="dashboard-hero-card">
-                        <span>Total emissão</span>
-                        <strong>{dashboardLoading ? '...' : formatCurrency(dashboardSummary?.totals.valorEmissao)}</strong>
-                      </div>
-                      <div className="dashboard-hero-card">
-                        <span>Levantado c/ IVA</span>
-                        <strong>{dashboardLoading ? '...' : formatCurrency(dashboardSummary?.totals.levantadoComIva)}</strong>
-                      </div>
-                    </div>
-
-                    <div className="dashboard-controls-grid simple">
-                      <label className="field">
-                        <span>Dashboard ativo</span>
-                        <select
-                          value={activeDashboardId ?? ''}
-                          onChange={(event) => {
-                            const nextId = event.target.value
-                            if (!nextId) {
-                              resetDashboardDraft()
-                              return
-                            }
-                            const found = dashboardViews.find((view) => view.id === nextId)
-                            if (found) {
-                              loadDashboardView(found)
-                            }
-                          }}
-                        >
-                          <option value="">Rascunho não guardado</option>
-                          {dashboardViews.map((view) => (
-                            <option key={view.id} value={view.id}>
-                              {view.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <LabeledInput label="Nome" value={dashboardName} onChange={(value) => setDashboardName(value)} />
-                    </div>
-
-                    <div className="dashboard-filter-toolbar">
-                      <button className="subtle-btn" type="button" onClick={() => setDashboardFiltersOpen((current) => !current)}>
-                        {dashboardFiltersOpen ? 'Ocultar filtros' : 'Mostrar filtros'}
-                      </button>
-                      <span className="muted">
-                        {dashboardActiveFilterCount} filtros ativos · {dashboardLoading ? 'A calcular...' : `${dashboardSummary?.totals.registos ?? 0} registos`}
-                      </span>
-                      <button
-                        className="subtle-btn"
-                        type="button"
-                        onClick={() => setDashboardFilters(DEFAULT_DASHBOARD_FILTERS)}
-                        disabled={dashboardActiveFilterCount === 0}
-                      >
-                        <FilterX size={15} />
-                        Limpar
-                      </button>
-                    </div>
-
-                    {dashboardFiltersOpen && (
-                      <div className="dashboard-filters-grid">
-                        <LabeledSelect
-                          label="Tipo"
-                          value={String(dashboardFilters.tipo ?? 'todos')}
-                          onChange={(value) => patchDashboardFilters('tipo', value as RecordFilters['tipo'])}
-                          options={[
-                            { value: 'todos', label: 'Todos' },
-                            { value: 'exequente', label: 'Exequentes' },
-                            { value: 'executado', label: 'Executados' },
-                          ]}
-                        />
-                        <LabeledSelect
-                          label="Estado"
-                          value={String(dashboardFilters.estadoId ?? 'todos')}
-                          onChange={(value) => patchDashboardFilters('estadoId', value as RecordFilters['estadoId'])}
-                          options={[{ value: 'todos', label: 'Todos' }, ...orderedStatuses.map((status) => ({ value: status.id, label: status.label }))]}
-                        />
-                        <LabeledSelect
-                          label="Mês"
-                          value={String(dashboardFilters.mes ?? 'todos')}
-                          onChange={(value) => patchDashboardFilters('mes', value === 'todos' ? 'todos' : Number(value))}
-                          options={[{ value: 'todos', label: 'Todos' }, ...MONTHS.map((label, index) => ({ value: String(index + 1), label }))]}
-                        />
-                        <LabeledSelect
-                          label="Ano"
-                          value={String(dashboardFilters.ano ?? 'todos')}
-                          onChange={(value) => patchDashboardFilters('ano', value === 'todos' ? 'todos' : Number(value))}
-                          options={[{ value: 'todos', label: 'Todos' }, ...years.map((year) => ({ value: String(year), label: String(year) }))]}
-                        />
-                        <LabeledSelect
-                          label="Exequente"
-                          value={String(dashboardFilters.exequente ?? '')}
-                          onChange={(value) => patchDashboardFilters('exequente', value)}
-                          options={[{ value: '', label: 'Todos' }, ...exequenteFilterOptions.map((value) => ({ value, label: value }))]}
-                        />
-                        <LabeledSelect
-                          label="Gestor"
-                          value={String(dashboardFilters.gestor ?? '')}
-                          onChange={(value) => patchDashboardFilters('gestor', value)}
-                          options={[{ value: '', label: 'Todos' }, ...gestorFilterOptions.map((value) => ({ value, label: value }))]}
-                        />
-                      </div>
-                    )}
-
-                    <div className="dashboard-picker-wrap">
-                      <button className="subtle-btn" type="button" onClick={() => setDashboardPickerOpen((current) => !current)}>
-                        {dashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
-                      </button>
-                      {dashboardPickerOpen && (
-                        <div className="dashboard-widget-library">
-                          {DASHBOARD_WIDGET_LIBRARY.map((widget) => (
-                            <button
-                              key={widget.type}
-                              className="dashboard-widget-option"
-                              type="button"
-                              onClick={() => addDashboardWidget(widget.type)}
-                            >
-                              <strong>{widget.label}</strong>
-                              <span>{widget.hint}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="dashboard-collapsed-note muted">
-                    Painel de configuração oculto. Use “Mostrar painel” para editar filtros e widgets.
-                  </div>
-                )}
-              </>
-            )}
-
-            {dashboardWidgets.length === 0 ? (
-              <div className="empty-text dashboard-empty">
-                Dashboard vazio. Clique em <strong>Adicionar widgets</strong> para começar.
-              </div>
-            ) : (
-              <div className={`dashboard-grid ${dashboardHasSideStack ? 'with-side-stack' : ''}`}>
-                {dashboardHasSideStack ? (
-                  <>
-                    <div className="dashboard-main-widgets">{dashboardMainWidgets.map((widget) => renderDashboardWidget(widget))}</div>
-                    <aside className="dashboard-side-widgets">{dashboardSideWidgets.map((widget) => renderDashboardWidget(widget))}</aside>
-                  </>
-                ) : dashboardSideWidgets.length > 0 && dashboardMainWidgets.length === 0 ? (
-                  <aside className="dashboard-side-widgets">{dashboardSideWidgets.map((widget) => renderDashboardWidget(widget))}</aside>
-                ) : (
-                  dashboardWidgets.map((widget) => renderDashboardWidget(widget))
-                )}
-              </div>
-            )}
-          </section>
-        )}
-
-        {activeModule === 'recibos' && activeTab === 'importar' && (
-          <RecibosImportar
-            handleImportFile={handleImportFile}
-            exportCurrentSnapshot={exportCurrentSnapshot}
-            loadSeed={loadSeed}
-            refreshImportConflictPreview={refreshImportConflictPreview}
-            runImportCommit={runImportCommit}
-            importLoading={importLoading}
-            importForceRecalculate={importForceRecalculate}
-            setImportForceRecalculate={setImportForceRecalculate}
-            importStrategy={importStrategy}
-            setImportStrategy={setImportStrategy}
-            importPreview={importPreview}
-            importServerPreview={importServerPreview}
-            importColorMapping={importColorMapping}
-            setImportColorMapping={setImportColorMapping}
-            orderedStatuses={orderedStatuses}
-            defaultStatus={defaultStatus}
-          />
-        )}
-
-        {activeModule === 'recibos' && activeTab === 'configuracao' && (
-          <RecibosConfiguracao
-            theme={theme}
-            setTheme={setTheme}
-            orderedStatuses={orderedStatuses}
-            updateStatusLocal={updateStatusLocal}
-            removeStatus={removeStatus}
-            addStatus={addStatus}
-            saveStatuses={saveStatuses}
-            settingsDraft={settingsDraft}
-            updateSettingsDraft={updateSettingsDraft}
-            updateTaxRule={updateTaxRule}
-            saveCalculationSettings={saveCalculationSettings}
-            setActiveTab={setActiveTab}
-          />
-        )}
-
-        {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
-          <div className="record-modal-overlay" onClick={() => setSelectedDsRecordId(null)}>
-            <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="drawer-header">
-                <div className="modal-title-block">
-                  <h3>{selectedDsRecord.referencia || selectedDsRecord.proponentes || 'Detalhe do registo DS'}</h3>
-                  <div className="small-note modal-meta">
-                    {[selectedDsRecord.gestora, selectedDsRecord.entidadeBancaria, selectedDsRecord.dataEscritura].filter(Boolean).join(' · ') || '-'}
-                  </div>
-                </div>
-                <div className="actions-row modal-header-actions">
-                  <button className="subtle-btn" type="button" onClick={() => setIsDsRecordEditing((current) => !current)}>
-                    {isDsRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                    {isDsRecordEditing ? 'Cancelar edição' : 'Editar'}
+                  <button className="subtle-btn" type="button" onClick={() => setEntryForm(applyFormAutoCalculations(entryForm, calculationSettings, true))}>
+                    Recalcular
                   </button>
-                  <button className="subtle-btn" type="button" onClick={() => setSelectedDsRecordId(null)}>Fechar</button>
                 </div>
-              </div>
 
-              {isDsRecordEditing && selectedDsRecordEdit ? (
-                <div className="record-edit-content">
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Gestora"
-                      value={selectedDsRecordEdit.gestora}
-                      onChange={(value) => handleDsRecordEditInput('gestora', value)}
-                      suggestions={dsGestoraFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Proponentes"
-                      value={selectedDsRecordEdit.proponentes}
-                      onChange={(value) => handleDsRecordEditInput('proponentes', value)}
-                      suggestions={dsProponentesSuggestions}
-                    />
-                    <LabeledInput
-                      label="Referência"
-                      value={selectedDsRecordEdit.referencia}
-                      onChange={(value) => handleDsRecordEditInput('referencia', value)}
-                      suggestions={dsReferenciaSuggestions}
-                    />
-                  </div>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Produto"
-                      value={selectedDsRecordEdit.produto}
-                      onChange={(value) => handleDsRecordEditInput('produto', value)}
-                      suggestions={dsProdutoFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Entidade bancária"
-                      value={selectedDsRecordEdit.entidadeBancaria}
-                      onChange={(value) => handleDsRecordEditInput('entidadeBancaria', value)}
-                      suggestions={dsEntidadeFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Líder cálculo"
-                      value={selectedDsRecordEdit.liderCalculo}
-                      onChange={(value) => handleDsRecordEditInput('liderCalculo', value)}
-                    />
-                  </div>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Recibo"
-                      value={selectedDsRecordEdit.recibo}
-                      onChange={(value) => handleDsRecordEditInput('recibo', value)}
-                      suggestions={dsReciboSuggestions}
-                    />
-                    <LabeledInput
-                      label="Falta recibo gestora"
-                      value={selectedDsRecordEdit.faltaReciboGestora}
-                      onChange={(value) => handleDsRecordEditInput('faltaReciboGestora', value)}
-                    />
-                    <LabeledSelect
-                      label="Estado"
-                      value={selectedDsRecordEdit.estadoId}
-                      onChange={(value) => handleDsRecordEditInput('estadoId', value)}
-                      options={dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                    />
-                  </div>
-                  <div className="field-grid five">
-                    <LabeledInput label="Valor" value={selectedDsRecordEdit.valor} onChange={(value) => handleDsRecordEditInput('valor', value)} />
-                    <LabeledInput
-                      label="Comissão loja"
-                      value={selectedDsRecordEdit.comissaoLoja}
-                      onChange={(value) => handleDsRecordEditInput('comissaoLoja', value)}
-                    />
-                    <LabeledInput
-                      label="IVA CGD (raw)"
-                      value={selectedDsRecordEdit.ivaCgdRaw}
-                      onChange={(value) => handleDsRecordEditInput('ivaCgdRaw', value)}
-                    />
-                    <LabeledInput
-                      label="Total comissão c/ IVA"
-                      value={selectedDsRecordEdit.totalComissaoLojaCmIva}
-                      onChange={(value) => handleDsRecordEditInput('totalComissaoLojaCmIva', value)}
-                    />
-                    <LabeledInput
-                      label="Comissão gestor"
-                      value={selectedDsRecordEdit.comissaoGestor}
-                      onChange={(value) => handleDsRecordEditInput('comissaoGestor', value)}
-                    />
-                  </div>
-                  <div className="field-grid four">
-                    <LabeledInput
-                      label="Percentagem"
-                      value={selectedDsRecordEdit.percentagem}
-                      onChange={(value) => handleDsRecordEditInput('percentagem', value)}
-                    />
-                    <LabeledInput
-                      type="date"
-                      label="Data escritura"
-                      value={selectedDsRecordEdit.dataEscritura}
-                      onChange={(value) => handleDsRecordEditInput('dataEscritura', value)}
-                    />
-                    <LabeledInput
-                      type="date"
-                      label="Data fecho CRM"
-                      value={selectedDsRecordEdit.dataFechoCrm}
-                      onChange={(value) => handleDsRecordEditInput('dataFechoCrm', value)}
-                    />
-                    <LabeledInput
-                      label="Pagamento comissão gestor"
-                      value={selectedDsRecordEdit.pagComissaoGestor}
-                      onChange={(value) => handleDsRecordEditInput('pagComissaoGestor', value)}
-                    />
-                  </div>
-                  <div className="actions-row modal-edit-actions">
-                    <button className="primary-btn" type="button" onClick={() => void saveSelectedDsRecordEdits()}>
-                      <Save size={15} />
-                      Guardar alterações
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="detail-grid modal-detail-grid">
-                  <Info label="Gestora" value={selectedDsRecord.gestora || '-'} />
-                  <Info label="Proponentes" value={selectedDsRecord.proponentes || '-'} />
-                  <Info label="Referência" value={selectedDsRecord.referencia || '-'} />
-                  <Info label="Produto" value={selectedDsRecord.produto || '-'} />
-                  <Info label="Entidade bancária" value={selectedDsRecord.entidadeBancaria || '-'} />
-                  <Info label="Líder cálculo" value={selectedDsRecord.liderCalculo || '-'} />
-                  <Info label="Recibo" value={selectedDsRecord.recibo || '-'} />
-                  <Info label="Falta recibo gestora" value={selectedDsRecord.faltaReciboGestora || '-'} />
-                  <Info label="Valor" value={formatCurrency(selectedDsRecord.valor)} />
-                  <Info label="Comissão loja" value={formatCurrency(selectedDsRecord.comissaoLoja)} />
-                  <Info label="Total comissão c/ IVA" value={formatCurrency(selectedDsRecord.totalComissaoLojaCmIva)} />
-                  <Info label="Comissão gestor" value={formatCurrency(selectedDsRecord.comissaoGestor)} />
-                  <Info label="IVA CGD" value={selectedDsRecord.ivaCgdRaw || formatCurrency(selectedDsRecord.ivaCgdValor)} />
-                  <Info label="Percentagem" value={selectedDsRecord.percentagemRaw || toFormNumber(selectedDsRecord.percentagem) || '-'} />
-                  <Info label="Data escritura" value={selectedDsRecord.dataEscritura || '-'} />
-                  <Info label="Data fecho CRM" value={selectedDsRecord.dataFechoCrm || '-'} />
-                  <Info label="Pag. comissão gestor" value={selectedDsRecord.pagComissaoGestor || '-'} />
-                  <div className="field modal-status-field">
-                    <span>Estado</span>
-                    <select value={selectedDsRecord.estadoId} onChange={(event) => void updateDsRecordStatus(selectedDsRecord.id, event.target.value)}>
-                      {dsOrderedStatuses.map((statusOption) => (
-                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <h4 className="modal-section-title">Metadados</h4>
-              <div className="history-list modal-history-list">
-                <div className="history-item">
-                  <div>Criado</div>
-                  <div className="muted">{new Date(selectedDsRecord.createdAt).toLocaleString('pt-PT')}</div>
-                </div>
-                <div className="history-item">
-                  <div>Última atualização</div>
-                  <div className="muted">{new Date(selectedDsRecord.updatedAt).toLocaleString('pt-PT')}</div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        )}
-
-        {activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedPenhorasRecord && (
-          <div className="record-modal-overlay" onClick={() => setSelectedPenhorasRecordId(null)}>
-            <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="drawer-header">
-                <div className="modal-title-block">
-                  <h3>{selectedPenhorasRecord.pe || selectedPenhorasRecord.identificacao || 'Detalhe do registo Penhoras'}</h3>
-                  <div className="small-note modal-meta">
-                    {[selectedPenhorasRecord.gestor, selectedPenhorasRecord.acto, selectedPenhorasRecord.dataPedido].filter(Boolean).join(' · ') || '-'}
-                  </div>
-                </div>
-                <div className="actions-row modal-header-actions">
-                  <button className="subtle-btn" type="button" onClick={() => setIsPenhorasRecordEditing((current) => !current)}>
-                    {isPenhorasRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                    {isPenhorasRecordEditing ? 'Cancelar edição' : 'Editar'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setSelectedPenhorasRecordId(null)}>Fechar</button>
-                </div>
-              </div>
-
-              {isPenhorasRecordEditing && selectedPenhorasRecordEdit ? (
-                <div className="record-edit-content">
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="PE"
-                      value={selectedPenhorasRecordEdit.pe}
-                      onChange={(value) => handlePenhorasRecordEditInput('pe', value)}
-                      suggestions={penhorasPeSuggestions}
-                    />
-                    <LabeledInput
-                      label="Acto"
-                      value={selectedPenhorasRecordEdit.acto}
-                      onChange={(value) => handlePenhorasRecordEditInput('acto', value)}
-                      suggestions={penhorasActoFilterOptions}
-                    />
-                    <LabeledInput
-                      type="date"
-                      label="Data pedido"
-                      value={selectedPenhorasRecordEdit.dataPedido}
-                      onChange={(value) => handlePenhorasRecordEditInput('dataPedido', value)}
-                    />
-                  </div>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Identificação"
-                      value={selectedPenhorasRecordEdit.identificacao}
-                      onChange={(value) => handlePenhorasRecordEditInput('identificacao', value)}
-                    />
-                    <LabeledInput
-                      label="Pedido"
-                      value={selectedPenhorasRecordEdit.pedido}
-                      onChange={(value) => handlePenhorasRecordEditInput('pedido', value)}
-                    />
-                    <LabeledInput
-                      label="Gestor"
-                      value={selectedPenhorasRecordEdit.gestor}
-                      onChange={(value) => handlePenhorasRecordEditInput('gestor', value)}
-                      suggestions={penhorasGestorFilterOptions}
-                    />
-                  </div>
-                  <div className="field-grid three">
-                    <LabeledSelect
-                      label="Estado"
-                      value={selectedPenhorasRecordEdit.estadoId}
-                      onChange={(value) => handlePenhorasRecordEditInput('estadoId', value)}
-                      options={penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                    />
-                  </div>
-                  <div className="actions-row modal-edit-actions">
-                    <button className="primary-btn" type="button" onClick={() => void saveSelectedPenhorasRecordEdits()}>
-                      <Save size={15} />
-                      Guardar alterações
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="detail-grid modal-detail-grid">
-                  <Info label="PE" value={selectedPenhorasRecord.pe || '-'} />
-                  <Info label="Acto" value={selectedPenhorasRecord.acto || '-'} />
-                  <Info label="Data pedido" value={selectedPenhorasRecord.dataPedido || '-'} />
-                  <Info label="Identificação" value={selectedPenhorasRecord.identificacao || '-'} />
-                  <Info label="Pedido" value={selectedPenhorasRecord.pedido || '-'} />
-                  <Info label="Gestor" value={selectedPenhorasRecord.gestor || '-'} />
-                  <div className="field modal-status-field">
-                    <span>Estado</span>
-                    <select value={selectedPenhorasRecord.estadoId} onChange={(event) => void updatePenhorasRecordStatus(selectedPenhorasRecord.id, event.target.value)}>
-                      {!penhorasActiveStatuses.some((statusOption) => statusOption.id === selectedPenhorasRecord.estadoId) && (
-                        <option value="">Selecionar estado...</option>
-                      )}
-                      {penhorasActiveStatuses.map((statusOption) => (
-                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <h4 className="modal-section-title">Metadados</h4>
-              <div className="history-list modal-history-list">
-                <div className="history-item">
-                  <div>Criado</div>
-                  <div className="muted">{new Date(selectedPenhorasRecord.createdAt).toLocaleString('pt-PT')}</div>
-                </div>
-                <div className="history-item">
-                  <div>Última atualização</div>
-                  <div className="muted">{new Date(selectedPenhorasRecord.updatedAt).toLocaleString('pt-PT')}</div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        )}
-
-        {activeModule === 'recibos' && selectedRecord && (
-          <div className="record-modal-overlay" onClick={() => setSelectedRecordId(null)}>
-            <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="drawer-header">
-                <div className="modal-title-block">
-                  <h3>{selectedRecord.processo || selectedRecord.pe || selectedRecord.reciboNumero || 'Detalhe do registo'}</h3>
-                  <div className="small-note modal-meta">
-                    {selectedRecord.pe || '-'} · {MONTHS[selectedRecord.mes - 1]} {selectedRecord.ano}
-                  </div>
-                </div>
-                <div className="actions-row modal-header-actions">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => setIsRecordEditing((current) => !current)}
-                  >
-                    {isRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                    {isRecordEditing ? 'Cancelar edição' : 'Editar'}
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => setSelectedRecordId(null)}>Fechar</button>
-                </div>
-              </div>
-
-              {isRecordEditing && selectedRecordEdit ? (
-                <div className="record-edit-content">
+                <form className="entry-form" onSubmit={(event) => void submitEntry(event, 'save')}>
                   <div className="field-grid three">
                     <LabeledSelect
                       label="Tipo"
-                      value={selectedRecordEdit.tipo}
-                      onChange={(value) => handleRecordEditInput('tipo', value as RecordType)}
+                      value={entryForm.tipo}
+                      onChange={(value) => handleEntryInput('tipo', value as RecordType)}
                       options={[
                         { value: 'exequente', label: 'Exequente' },
                         { value: 'executado', label: 'Executado' },
@@ -6205,115 +4447,666 @@ function App() {
                     />
                     <LabeledSelect
                       label="Mês"
-                      value={String(selectedRecordEdit.mes)}
-                      onChange={(value) => handleRecordEditInput('mes', Number(value))}
+                      value={String(entryForm.mes)}
+                      onChange={(value) => handleEntryInput('mes', Number(value))}
                       options={MONTHS.map((label, index) => ({ value: String(index + 1), label }))}
                     />
                     <LabeledInput
                       label="Ano"
-                      value={String(selectedRecordEdit.ano)}
-                      onChange={(value) => handleRecordEditInput('ano', Number(value) || selectedRecordEdit.ano)}
+                      value={String(entryForm.ano)}
+                      onChange={(value) => handleEntryInput('ano', Number(value) || new Date().getFullYear())}
                     />
                   </div>
 
                   <div className="field-grid three">
-                    <LabeledInput label="Processo" value={selectedRecordEdit.processo} onChange={(value) => handleRecordEditInput('processo', value)} suggestions={recordSuggestions.processo} />
-                    <LabeledInput label="PE" value={selectedRecordEdit.pe} onChange={(value) => handleRecordEditInput('pe', value)} suggestions={recordSuggestions.pe} />
-                    <LabeledInput label="Recibo" value={selectedRecordEdit.reciboNumero} onChange={(value) => handleRecordEditInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
+                    <LabeledInput label="Processo" value={entryForm.processo} onChange={(value) => handleEntryInput('processo', value)} suggestions={recordSuggestions.processo} />
+                    <LabeledInput label="PE" value={entryForm.pe} onChange={(value) => handleEntryInput('pe', value)} suggestions={recordSuggestions.pe} />
+                    <LabeledInput label="N.º de recibo" value={entryForm.reciboNumero} onChange={(value) => handleEntryInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
                   </div>
 
-                  <div className="field-grid five">
-                    <LabeledInput label="Valor indicado" value={selectedRecordEdit.valorIndicado} onChange={(value) => handleRecordEditInput('valorIndicado', value)} />
-                    <LabeledInput label="Valor sem IVA" value={selectedRecordEdit.valorSemIva} onChange={(value) => handleRecordEditInput('valorSemIva', value)} />
-                    <LabeledInput label="IVA" value={selectedRecordEdit.iva} onChange={(value) => handleRecordEditInput('iva', value)} />
-                    <LabeledInput label="Retenção" value={selectedRecordEdit.retencao} onChange={(value) => handleRecordEditInput('retencao', value)} />
-                    <LabeledInput label="Meu 5%" value={selectedRecordEdit.meu5} onChange={(value) => handleRecordEditInput('meu5', value)} />
-                  </div>
-
-                  <div className="field-grid five">
-                    <LabeledInput label="GPESE" value={selectedRecordEdit.gpeSe} onChange={(value) => handleRecordEditInput('gpeSe', value)} />
+                  <div className="field-grid four">
+                    <LabeledInput type="date" label="Data de levantamento" value={entryForm.dataLevantamento} onChange={(value) => handleEntryInput('dataLevantamento', value)} />
+                    <LabeledInput type="date" label="Data de recibo" value={entryForm.dataRecibo} onChange={(value) => handleEntryInput('dataRecibo', value)} />
                     <LabeledInput
                       label="Gestor"
-                      value={selectedRecordEdit.gestor}
-                      onChange={(value) => handleRecordEditInput('gestor', value)}
+                      value={entryForm.gestor}
+                      onChange={(value) => handleEntryInput('gestor', value)}
                       suggestions={gestorSuggestions}
                     />
                     <LabeledInput
                       label="Exequente"
-                      value={selectedRecordEdit.exequente}
-                      onChange={(value) => handleRecordEditInput('exequente', value)}
+                      value={entryForm.exequente}
+                      onChange={(value) => handleEntryInput('exequente', value)}
                       suggestions={exequenteSuggestions}
                     />
-                    <LabeledInput label="Descrição valor" value={selectedRecordEdit.descricaoValor} onChange={(value) => handleRecordEditInput('descricaoValor', value)} />
+                  </div>
+
+                  <div className="field-grid five">
+                    <LabeledInput label="Valor indicado" value={entryForm.valorIndicado} onChange={(value) => handleEntryInput('valorIndicado', value)} />
+                    <LabeledInput label="Valor sem IVA" value={entryForm.valorSemIva} onChange={(value) => handleEntryInput('valorSemIva', value)} />
+                    <LabeledInput label="IVA" value={entryForm.iva} onChange={(value) => handleEntryInput('iva', value)} />
+                    <LabeledInput label="Retenção" value={entryForm.retencao} onChange={(value) => handleEntryInput('retencao', value)} />
+                    <LabeledInput label="Meu 5%" value={entryForm.meu5} onChange={(value) => handleEntryInput('meu5', value)} />
+                  </div>
+
+                  <div className="field-grid five">
+                    <LabeledInput label="GPESE" value={entryForm.gpeSe} onChange={(value) => handleEntryInput('gpeSe', value)} />
+                    <LabeledInput label="Outras taxas" value={entryForm.outrasTaxas} onChange={(value) => handleEntryInput('outrasTaxas', value)} />
+                    <LabeledInput label="Valor emissão" value={entryForm.valorEmissao} onChange={(value) => handleEntryInput('valorEmissao', value)} />
+                    <LabeledInput label="Descrição valor" value={entryForm.descricaoValor} onChange={(value) => handleEntryInput('descricaoValor', value)} />
                     <LabeledSelect
                       label="Estado"
-                      value={selectedRecordEdit.estadoId}
-                      onChange={(value) => handleRecordEditInput('estadoId', value)}
-                      options={orderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                      value={entryForm.estadoId}
+                      onChange={(value) => handleEntryInput('estadoId', value)}
+                      options={activeStatuses.map((status) => ({ value: status.id, label: status.label }))}
                     />
                   </div>
 
                   <div className="field-grid one">
-                    <LabeledInput label="Indicações" value={selectedRecordEdit.indicacoes} onChange={(value) => handleRecordEditInput('indicacoes', value)} />
+                    <LabeledInput label="Indicações de levantamento" value={entryForm.indicacoes} onChange={(value) => handleEntryInput('indicacoes', value)} />
                   </div>
 
-                  <div className="actions-row modal-edit-actions">
+                  <div className="actions-row">
+                    <button type="button" className="subtle-btn" onClick={() => defaultStatus && setEntryForm(getInitialEntryForm(defaultStatus.id))}>
+                      Limpar
+                    </button>
+                    <button type="button" className="subtle-btn" onClick={() => void saveNewEntry()}>
+                      Guardar e novo
+                    </button>
+                    <button type="submit" className="primary-btn">Guardar</button>
+                  </div>
+                </form>
+              </div>
+            </section>
+          )
+        }
+
+        {
+          activeModule === 'recibos' && (activeTab === 'consulta' || activeTab === 'tabela') && (
+            <RecibosConsultaTabela
+              activeTab={activeTab}
+              records={records}
+              recordsLoading={recordsLoading}
+              totalRecords={totalRecords}
+              statuses={statuses}
+              orderedStatuses={orderedStatuses}
+              filters={filters}
+              patchFilters={patchFilters}
+              years={years}
+              exequenteFilterOptions={exequenteFilterOptions}
+              gestorFilterOptions={gestorFilterOptions}
+              clearTableFilters={clearTableFilters}
+              tableViews={tableViews}
+              disabledSavedViewIds={disabledSavedViewIds}
+              activeSavedViewId={activeSavedViewId}
+              applyView={applyView}
+              toggleSavedViewDisabled={toggleSavedViewDisabled}
+              deleteSavedView={deleteSavedView}
+              saveCurrentView={saveCurrentView}
+              globalSearch={globalSearch}
+              totalsHoverOpen={totalsHoverOpen}
+              setTotalsHoverOpen={setTotalsHoverOpen}
+              selectedTotalMetrics={selectedTotalMetrics}
+              toggleTotalMetric={toggleTotalMetric}
+              totalsSnapshot={totalsSnapshot}
+              bulkSectionOpen={bulkSectionOpen}
+              setBulkSectionOpen={setBulkSectionOpen}
+              bulkPanelOpen={bulkPanelOpen}
+              setBulkPanelOpen={setBulkPanelOpen}
+              selectedIds={selectedIds}
+              allSelectedInTable={allSelectedInTable}
+              toggleSelectAllRecords={toggleSelectAllRecords}
+              toggleSelectRecord={toggleSelectRecord}
+              exportCurrentTableToCsv={exportCurrentTableToCsv}
+              bulkStatusId={bulkStatusId}
+              setBulkStatusId={setBulkStatusId}
+              runBulkStatusUpdate={runBulkStatusUpdate}
+              bulkGestor={bulkGestor}
+              setBulkGestor={setBulkGestor}
+              gestorSuggestions={gestorSuggestions}
+              bulkExequente={bulkExequente}
+              setBulkExequente={setBulkExequente}
+              exequenteSuggestions={exequenteSuggestions}
+              bulkIndicacoes={bulkIndicacoes}
+              setBulkIndicacoes={setBulkIndicacoes}
+              bulkForceRecalculate={bulkForceRecalculate}
+              setBulkForceRecalculate={setBulkForceRecalculate}
+              runBulkFieldUpdate={runBulkFieldUpdate}
+              setSelectedRecordId={setSelectedRecordId}
+              setIsRecordEditing={setIsRecordEditing}
+              updateRecordStatus={updateRecordStatus}
+              formatCurrency={formatCurrency}
+            />
+          )
+        }
+
+
+
+
+
+        {
+          activeModule === 'recibos' && activeTab === 'dashboards' && (
+            <RecibosDashboards
+              isDashboardFocusMode={isDashboardFocusMode}
+              setDashboardFocusMode={setDashboardFocusMode}
+              dashboardConfigOpen={dashboardConfigOpen}
+              setDashboardConfigOpen={setDashboardConfigOpen}
+              resetDashboardDraft={resetDashboardDraft}
+              saveDashboard={saveDashboard}
+              deleteDashboard={deleteDashboard}
+              activeDashboardId={activeDashboardId}
+              dashboardViews={dashboardViews}
+              loadDashboardView={loadDashboardView}
+              dashboardName={dashboardName}
+              setDashboardName={setDashboardName}
+              dashboardPickerOpen={dashboardPickerOpen}
+              setDashboardPickerOpen={setDashboardPickerOpen}
+              addDashboardWidget={addDashboardWidget}
+              dashboardFiltersOpen={dashboardFiltersOpen}
+              setDashboardFiltersOpen={setDashboardFiltersOpen}
+              dashboardFilters={dashboardFilters}
+              setDashboardFilters={setDashboardFilters}
+              patchDashboardFilters={patchDashboardFilters}
+              dashboardActiveFilterCount={dashboardActiveFilterCount}
+              dashboardLoading={dashboardLoading}
+              dashboardSummary={dashboardSummary}
+              formatCurrency={formatCurrency}
+              orderedStatuses={orderedStatuses}
+              years={years}
+              exequenteFilterOptions={exequenteFilterOptions}
+              gestorFilterOptions={gestorFilterOptions}
+              dashboardWidgets={dashboardWidgets}
+              dashboardMainWidgets={dashboardMainWidgets}
+              dashboardSideWidgets={dashboardSideWidgets}
+              dashboardHasSideStack={dashboardHasSideStack}
+              renderDashboardWidget={renderDashboardWidget}
+            />
+          )
+        }
+
+        {
+          activeModule === 'recibos' && activeTab === 'importar' && (
+            <RecibosImportar
+              handleImportFile={handleImportFile}
+              exportCurrentSnapshot={exportCurrentSnapshot}
+              loadSeed={loadSeed}
+              refreshImportConflictPreview={refreshImportConflictPreview}
+              runImportCommit={runImportCommit}
+              importLoading={importLoading}
+              importForceRecalculate={importForceRecalculate}
+              setImportForceRecalculate={setImportForceRecalculate}
+              importStrategy={importStrategy}
+              setImportStrategy={setImportStrategy}
+              importPreview={importPreview}
+              importServerPreview={importServerPreview}
+              importColorMapping={importColorMapping}
+              setImportColorMapping={setImportColorMapping}
+              orderedStatuses={orderedStatuses}
+              defaultStatus={defaultStatus}
+            />
+          )
+        }
+
+        {
+          activeModule === 'recibos' && activeTab === 'configuracao' && (
+            <RecibosConfiguracao
+              theme={theme}
+              setTheme={setTheme}
+              orderedStatuses={orderedStatuses}
+              updateStatusLocal={updateStatusLocal}
+              removeStatus={removeStatus}
+              addStatus={addStatus}
+              saveStatuses={saveStatuses}
+              settingsDraft={settingsDraft}
+              updateSettingsDraft={updateSettingsDraft}
+              updateTaxRule={updateTaxRule}
+              saveCalculationSettings={saveCalculationSettings}
+              setActiveTab={setActiveTab}
+            />
+          )
+        }
+
+        {
+          activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
+            <div className="record-modal-overlay" onClick={() => setSelectedDsRecordId(null)}>
+              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="drawer-header">
+                  <div className="modal-title-block">
+                    <h3>{selectedDsRecord.referencia || selectedDsRecord.proponentes || 'Detalhe do registo DS'}</h3>
+                    <div className="small-note modal-meta">
+                      {[selectedDsRecord.gestora, selectedDsRecord.entidadeBancaria, selectedDsRecord.dataEscritura].filter(Boolean).join(' · ') || '-'}
+                    </div>
+                  </div>
+                  <div className="actions-row modal-header-actions">
+                    <button className="subtle-btn" type="button" onClick={() => setIsDsRecordEditing((current) => !current)}>
+                      {isDsRecordEditing ? <X size={15} /> : <Pencil size={15} />}
+                      {isDsRecordEditing ? 'Cancelar edição' : 'Editar'}
+                    </button>
+                    <button className="subtle-btn" type="button" onClick={() => setSelectedDsRecordId(null)}>Fechar</button>
+                  </div>
+                </div>
+
+                {isDsRecordEditing && selectedDsRecordEdit ? (
+                  <div className="record-edit-content">
+                    <div className="field-grid three">
+                      <LabeledInput
+                        label="Gestora"
+                        value={selectedDsRecordEdit.gestora}
+                        onChange={(value) => handleDsRecordEditInput('gestora', value)}
+                        suggestions={dsGestoraFilterOptions}
+                      />
+                      <LabeledInput
+                        label="Proponentes"
+                        value={selectedDsRecordEdit.proponentes}
+                        onChange={(value) => handleDsRecordEditInput('proponentes', value)}
+                        suggestions={dsProponentesSuggestions}
+                      />
+                      <LabeledInput
+                        label="Referência"
+                        value={selectedDsRecordEdit.referencia}
+                        onChange={(value) => handleDsRecordEditInput('referencia', value)}
+                        suggestions={dsReferenciaSuggestions}
+                      />
+                    </div>
+                    <div className="field-grid three">
+                      <LabeledInput
+                        label="Produto"
+                        value={selectedDsRecordEdit.produto}
+                        onChange={(value) => handleDsRecordEditInput('produto', value)}
+                        suggestions={dsProdutoFilterOptions}
+                      />
+                      <LabeledInput
+                        label="Entidade bancária"
+                        value={selectedDsRecordEdit.entidadeBancaria}
+                        onChange={(value) => handleDsRecordEditInput('entidadeBancaria', value)}
+                        suggestions={dsEntidadeFilterOptions}
+                      />
+                      <LabeledInput
+                        label="Líder cálculo"
+                        value={selectedDsRecordEdit.liderCalculo}
+                        onChange={(value) => handleDsRecordEditInput('liderCalculo', value)}
+                      />
+                    </div>
+                    <div className="field-grid three">
+                      <LabeledInput
+                        label="Recibo"
+                        value={selectedDsRecordEdit.recibo}
+                        onChange={(value) => handleDsRecordEditInput('recibo', value)}
+                        suggestions={dsReciboSuggestions}
+                      />
+                      <LabeledInput
+                        label="Falta recibo gestora"
+                        value={selectedDsRecordEdit.faltaReciboGestora}
+                        onChange={(value) => handleDsRecordEditInput('faltaReciboGestora', value)}
+                      />
+                      <LabeledSelect
+                        label="Estado"
+                        value={selectedDsRecordEdit.estadoId}
+                        onChange={(value) => handleDsRecordEditInput('estadoId', value)}
+                        options={dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                      />
+                    </div>
+                    <div className="field-grid five">
+                      <LabeledInput label="Valor" value={selectedDsRecordEdit.valor} onChange={(value) => handleDsRecordEditInput('valor', value)} />
+                      <LabeledInput
+                        label="Comissão loja"
+                        value={selectedDsRecordEdit.comissaoLoja}
+                        onChange={(value) => handleDsRecordEditInput('comissaoLoja', value)}
+                      />
+                      <LabeledInput
+                        label="IVA CGD (raw)"
+                        value={selectedDsRecordEdit.ivaCgdRaw}
+                        onChange={(value) => handleDsRecordEditInput('ivaCgdRaw', value)}
+                      />
+                      <LabeledInput
+                        label="Total comissão c/ IVA"
+                        value={selectedDsRecordEdit.totalComissaoLojaCmIva}
+                        onChange={(value) => handleDsRecordEditInput('totalComissaoLojaCmIva', value)}
+                      />
+                      <LabeledInput
+                        label="Comissão gestor"
+                        value={selectedDsRecordEdit.comissaoGestor}
+                        onChange={(value) => handleDsRecordEditInput('comissaoGestor', value)}
+                      />
+                    </div>
+                    <div className="field-grid four">
+                      <LabeledInput
+                        label="Percentagem"
+                        value={selectedDsRecordEdit.percentagem}
+                        onChange={(value) => handleDsRecordEditInput('percentagem', value)}
+                      />
+                      <LabeledInput
+                        type="date"
+                        label="Data escritura"
+                        value={selectedDsRecordEdit.dataEscritura}
+                        onChange={(value) => handleDsRecordEditInput('dataEscritura', value)}
+                      />
+                      <LabeledInput
+                        type="date"
+                        label="Data fecho CRM"
+                        value={selectedDsRecordEdit.dataFechoCrm}
+                        onChange={(value) => handleDsRecordEditInput('dataFechoCrm', value)}
+                      />
+                      <LabeledInput
+                        label="Pagamento comissão gestor"
+                        value={selectedDsRecordEdit.pagComissaoGestor}
+                        onChange={(value) => handleDsRecordEditInput('pagComissaoGestor', value)}
+                      />
+                    </div>
+                    <div className="actions-row modal-edit-actions">
+                      <button className="primary-btn" type="button" onClick={() => void saveSelectedDsRecordEdits()}>
+                        <Save size={15} />
+                        Guardar alterações
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="detail-grid modal-detail-grid">
+                    <Info label="Gestora" value={selectedDsRecord.gestora || '-'} />
+                    <Info label="Proponentes" value={selectedDsRecord.proponentes || '-'} />
+                    <Info label="Referência" value={selectedDsRecord.referencia || '-'} />
+                    <Info label="Produto" value={selectedDsRecord.produto || '-'} />
+                    <Info label="Entidade bancária" value={selectedDsRecord.entidadeBancaria || '-'} />
+                    <Info label="Líder cálculo" value={selectedDsRecord.liderCalculo || '-'} />
+                    <Info label="Recibo" value={selectedDsRecord.recibo || '-'} />
+                    <Info label="Falta recibo gestora" value={selectedDsRecord.faltaReciboGestora || '-'} />
+                    <Info label="Valor" value={formatCurrency(selectedDsRecord.valor)} />
+                    <Info label="Comissão loja" value={formatCurrency(selectedDsRecord.comissaoLoja)} />
+                    <Info label="Total comissão c/ IVA" value={formatCurrency(selectedDsRecord.totalComissaoLojaCmIva)} />
+                    <Info label="Comissão gestor" value={formatCurrency(selectedDsRecord.comissaoGestor)} />
+                    <Info label="IVA CGD" value={selectedDsRecord.ivaCgdRaw || formatCurrency(selectedDsRecord.ivaCgdValor)} />
+                    <Info label="Percentagem" value={selectedDsRecord.percentagemRaw || toFormNumber(selectedDsRecord.percentagem) || '-'} />
+                    <Info label="Data escritura" value={selectedDsRecord.dataEscritura || '-'} />
+                    <Info label="Data fecho CRM" value={selectedDsRecord.dataFechoCrm || '-'} />
+                    <Info label="Pag. comissão gestor" value={selectedDsRecord.pagComissaoGestor || '-'} />
+                    <div className="field modal-status-field">
+                      <span>Estado</span>
+                      <select value={selectedDsRecord.estadoId} onChange={(event) => void updateDsRecordStatus(selectedDsRecord.id, event.target.value)}>
+                        {dsOrderedStatuses.map((statusOption) => (
+                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <h4 className="modal-section-title">Metadados</h4>
+                <div className="history-list modal-history-list">
+                  <div className="history-item">
+                    <div>Criado</div>
+                    <div className="muted">{new Date(selectedDsRecord.createdAt).toLocaleString('pt-PT')}</div>
+                  </div>
+                  <div className="history-item">
+                    <div>Última atualização</div>
+                    <div className="muted">{new Date(selectedDsRecord.updatedAt).toLocaleString('pt-PT')}</div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )
+        }
+
+        {
+          activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedPenhorasRecord && (
+            <div className="record-modal-overlay" onClick={() => setSelectedPenhorasRecordId(null)}>
+              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="drawer-header">
+                  <div className="modal-title-block">
+                    <h3>{selectedPenhorasRecord.pe || selectedPenhorasRecord.identificacao || 'Detalhe do registo Penhoras'}</h3>
+                    <div className="small-note modal-meta">
+                      {[selectedPenhorasRecord.gestor, selectedPenhorasRecord.acto, selectedPenhorasRecord.dataPedido].filter(Boolean).join(' · ') || '-'}
+                    </div>
+                  </div>
+                  <div className="actions-row modal-header-actions">
+                    <button className="subtle-btn" type="button" onClick={() => setIsPenhorasRecordEditing((current) => !current)}>
+                      {isPenhorasRecordEditing ? <X size={15} /> : <Pencil size={15} />}
+                      {isPenhorasRecordEditing ? 'Cancelar edição' : 'Editar'}
+                    </button>
+                    <button className="subtle-btn" type="button" onClick={() => setSelectedPenhorasRecordId(null)}>Fechar</button>
+                  </div>
+                </div>
+
+                {isPenhorasRecordEditing && selectedPenhorasRecordEdit ? (
+                  <div className="record-edit-content">
+                    <div className="field-grid three">
+                      <LabeledInput
+                        label="PE"
+                        value={selectedPenhorasRecordEdit.pe}
+                        onChange={(value) => handlePenhorasRecordEditInput('pe', value)}
+                        suggestions={penhorasPeSuggestions}
+                      />
+                      <LabeledInput
+                        label="Acto"
+                        value={selectedPenhorasRecordEdit.acto}
+                        onChange={(value) => handlePenhorasRecordEditInput('acto', value)}
+                        suggestions={penhorasActoFilterOptions}
+                      />
+                      <LabeledInput
+                        type="date"
+                        label="Data pedido"
+                        value={selectedPenhorasRecordEdit.dataPedido}
+                        onChange={(value) => handlePenhorasRecordEditInput('dataPedido', value)}
+                      />
+                    </div>
+                    <div className="field-grid three">
+                      <LabeledInput
+                        label="Identificação"
+                        value={selectedPenhorasRecordEdit.identificacao}
+                        onChange={(value) => handlePenhorasRecordEditInput('identificacao', value)}
+                      />
+                      <LabeledInput
+                        label="Pedido"
+                        value={selectedPenhorasRecordEdit.pedido}
+                        onChange={(value) => handlePenhorasRecordEditInput('pedido', value)}
+                      />
+                      <LabeledInput
+                        label="Gestor"
+                        value={selectedPenhorasRecordEdit.gestor}
+                        onChange={(value) => handlePenhorasRecordEditInput('gestor', value)}
+                        suggestions={penhorasGestorFilterOptions}
+                      />
+                    </div>
+                    <div className="field-grid three">
+                      <LabeledSelect
+                        label="Estado"
+                        value={selectedPenhorasRecordEdit.estadoId}
+                        onChange={(value) => handlePenhorasRecordEditInput('estadoId', value)}
+                        options={penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                      />
+                    </div>
+                    <div className="actions-row modal-edit-actions">
+                      <button className="primary-btn" type="button" onClick={() => void saveSelectedPenhorasRecordEdits()}>
+                        <Save size={15} />
+                        Guardar alterações
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="detail-grid modal-detail-grid">
+                    <Info label="PE" value={selectedPenhorasRecord.pe || '-'} />
+                    <Info label="Acto" value={selectedPenhorasRecord.acto || '-'} />
+                    <Info label="Data pedido" value={selectedPenhorasRecord.dataPedido || '-'} />
+                    <Info label="Identificação" value={selectedPenhorasRecord.identificacao || '-'} />
+                    <Info label="Pedido" value={selectedPenhorasRecord.pedido || '-'} />
+                    <Info label="Gestor" value={selectedPenhorasRecord.gestor || '-'} />
+                    <div className="field modal-status-field">
+                      <span>Estado</span>
+                      <select value={selectedPenhorasRecord.estadoId} onChange={(event) => void updatePenhorasRecordStatus(selectedPenhorasRecord.id, event.target.value)}>
+                        {!penhorasActiveStatuses.some((statusOption) => statusOption.id === selectedPenhorasRecord.estadoId) && (
+                          <option value="">Selecionar estado...</option>
+                        )}
+                        {penhorasActiveStatuses.map((statusOption) => (
+                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <h4 className="modal-section-title">Metadados</h4>
+                <div className="history-list modal-history-list">
+                  <div className="history-item">
+                    <div>Criado</div>
+                    <div className="muted">{new Date(selectedPenhorasRecord.createdAt).toLocaleString('pt-PT')}</div>
+                  </div>
+                  <div className="history-item">
+                    <div>Última atualização</div>
+                    <div className="muted">{new Date(selectedPenhorasRecord.updatedAt).toLocaleString('pt-PT')}</div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          )
+        }
+
+        {
+          activeModule === 'recibos' && selectedRecord && (
+            <div className="record-modal-overlay" onClick={() => setSelectedRecordId(null)}>
+              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
+                <div className="drawer-header">
+                  <div className="modal-title-block">
+                    <h3>{selectedRecord.processo || selectedRecord.pe || selectedRecord.reciboNumero || 'Detalhe do registo'}</h3>
+                    <div className="small-note modal-meta">
+                      {selectedRecord.pe || '-'} · {MONTHS[selectedRecord.mes - 1]} {selectedRecord.ano}
+                    </div>
+                  </div>
+                  <div className="actions-row modal-header-actions">
                     <button
                       className="subtle-btn"
                       type="button"
-                      onClick={() => setSelectedRecordEdit(applyFormAutoCalculations(selectedRecordEdit, calculationSettings, true))}
+                      onClick={() => setIsRecordEditing((current) => !current)}
                     >
-                      Recalcular
+                      {isRecordEditing ? <X size={15} /> : <Pencil size={15} />}
+                      {isRecordEditing ? 'Cancelar edição' : 'Editar'}
                     </button>
-                    <button className="primary-btn" type="button" onClick={() => void saveSelectedRecordEdits()}>
-                      <Save size={15} />
-                      Guardar alterações
-                    </button>
+                    <button className="subtle-btn" type="button" onClick={() => setSelectedRecordId(null)}>Fechar</button>
                   </div>
                 </div>
-              ) : (
-                <div className="detail-grid modal-detail-grid">
-                  <Info label="Tipo" value={selectedRecord.tipo === 'exequente' ? 'Exequente' : 'Executado'} />
-                  <Info label="PE" value={selectedRecord.pe || '-'} />
-                  <Info label="Processo" value={selectedRecord.processo || '-'} />
-                  <Info label="Recibo" value={selectedRecord.reciboNumero || '-'} />
-                  <Info label="Gestor" value={selectedRecord.gestor || '-'} />
-                  <Info label="Exequente" value={selectedRecord.exequente || '-'} />
-                  <Info label="Valor sem IVA" value={formatCurrency(selectedRecord.valorSemIva)} />
-                  <Info label="IVA" value={formatCurrency(selectedRecord.iva)} />
-                  <Info label="Retenção" value={formatCurrency(selectedRecord.retencao)} />
-                  <Info label="Meu 5%" value={formatCurrency(selectedRecord.meu5)} />
-                  <Info label="GPESE" value={selectedRecordIndicacoes.gpeSe || '-'} />
-                  <Info label="Indicações" value={selectedRecordIndicacoes.text || '-'} />
-                  <div className="field modal-status-field">
-                    <span>Estado</span>
-                    <select value={selectedRecord.estadoId} onChange={(event) => void updateRecordStatus(selectedRecord.id, event.target.value)}>
-                      {orderedStatuses.map((statusOption) => (
-                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
 
-              <h4 className="modal-section-title">Histórico</h4>
-              <div className="history-list modal-history-list">
-                {selectedRecord.history.length === 0 ? (
-                  <div className="empty-text">Sem histórico.</div>
-                ) : (
-                  selectedRecord.history.map((item) => (
-                    <div key={item.id} className="history-item">
-                      <div>{item.message}</div>
-                      <div className="muted">{new Date(item.at).toLocaleString('pt-PT')}</div>
+                {isRecordEditing && selectedRecordEdit ? (
+                  <div className="record-edit-content">
+                    <div className="field-grid three">
+                      <LabeledSelect
+                        label="Tipo"
+                        value={selectedRecordEdit.tipo}
+                        onChange={(value) => handleRecordEditInput('tipo', value as RecordType)}
+                        options={[
+                          { value: 'exequente', label: 'Exequente' },
+                          { value: 'executado', label: 'Executado' },
+                        ]}
+                      />
+                      <LabeledSelect
+                        label="Mês"
+                        value={String(selectedRecordEdit.mes)}
+                        onChange={(value) => handleRecordEditInput('mes', Number(value))}
+                        options={MONTHS.map((label, index) => ({ value: String(index + 1), label }))}
+                      />
+                      <LabeledInput
+                        label="Ano"
+                        value={String(selectedRecordEdit.ano)}
+                        onChange={(value) => handleRecordEditInput('ano', Number(value) || selectedRecordEdit.ano)}
+                      />
                     </div>
-                  ))
+
+                    <div className="field-grid three">
+                      <LabeledInput label="Processo" value={selectedRecordEdit.processo} onChange={(value) => handleRecordEditInput('processo', value)} suggestions={recordSuggestions.processo} />
+                      <LabeledInput label="PE" value={selectedRecordEdit.pe} onChange={(value) => handleRecordEditInput('pe', value)} suggestions={recordSuggestions.pe} />
+                      <LabeledInput label="Recibo" value={selectedRecordEdit.reciboNumero} onChange={(value) => handleRecordEditInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
+                    </div>
+
+                    <div className="field-grid five">
+                      <LabeledInput label="Valor indicado" value={selectedRecordEdit.valorIndicado} onChange={(value) => handleRecordEditInput('valorIndicado', value)} />
+                      <LabeledInput label="Valor sem IVA" value={selectedRecordEdit.valorSemIva} onChange={(value) => handleRecordEditInput('valorSemIva', value)} />
+                      <LabeledInput label="IVA" value={selectedRecordEdit.iva} onChange={(value) => handleRecordEditInput('iva', value)} />
+                      <LabeledInput label="Retenção" value={selectedRecordEdit.retencao} onChange={(value) => handleRecordEditInput('retencao', value)} />
+                      <LabeledInput label="Meu 5%" value={selectedRecordEdit.meu5} onChange={(value) => handleRecordEditInput('meu5', value)} />
+                    </div>
+
+                    <div className="field-grid five">
+                      <LabeledInput label="GPESE" value={selectedRecordEdit.gpeSe} onChange={(value) => handleRecordEditInput('gpeSe', value)} />
+                      <LabeledInput
+                        label="Gestor"
+                        value={selectedRecordEdit.gestor}
+                        onChange={(value) => handleRecordEditInput('gestor', value)}
+                        suggestions={gestorSuggestions}
+                      />
+                      <LabeledInput
+                        label="Exequente"
+                        value={selectedRecordEdit.exequente}
+                        onChange={(value) => handleRecordEditInput('exequente', value)}
+                        suggestions={exequenteSuggestions}
+                      />
+                      <LabeledInput label="Descrição valor" value={selectedRecordEdit.descricaoValor} onChange={(value) => handleRecordEditInput('descricaoValor', value)} />
+                      <LabeledSelect
+                        label="Estado"
+                        value={selectedRecordEdit.estadoId}
+                        onChange={(value) => handleRecordEditInput('estadoId', value)}
+                        options={orderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
+                      />
+                    </div>
+
+                    <div className="field-grid one">
+                      <LabeledInput label="Indicações" value={selectedRecordEdit.indicacoes} onChange={(value) => handleRecordEditInput('indicacoes', value)} />
+                    </div>
+
+                    <div className="actions-row modal-edit-actions">
+                      <button
+                        className="subtle-btn"
+                        type="button"
+                        onClick={() => setSelectedRecordEdit(applyFormAutoCalculations(selectedRecordEdit, calculationSettings, true))}
+                      >
+                        Recalcular
+                      </button>
+                      <button className="primary-btn" type="button" onClick={() => void saveSelectedRecordEdits()}>
+                        <Save size={15} />
+                        Guardar alterações
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="detail-grid modal-detail-grid">
+                    <Info label="Tipo" value={selectedRecord.tipo === 'exequente' ? 'Exequente' : 'Executado'} />
+                    <Info label="PE" value={selectedRecord.pe || '-'} />
+                    <Info label="Processo" value={selectedRecord.processo || '-'} />
+                    <Info label="Recibo" value={selectedRecord.reciboNumero || '-'} />
+                    <Info label="Gestor" value={selectedRecord.gestor || '-'} />
+                    <Info label="Exequente" value={selectedRecord.exequente || '-'} />
+                    <Info label="Valor sem IVA" value={formatCurrency(selectedRecord.valorSemIva)} />
+                    <Info label="IVA" value={formatCurrency(selectedRecord.iva)} />
+                    <Info label="Retenção" value={formatCurrency(selectedRecord.retencao)} />
+                    <Info label="Meu 5%" value={formatCurrency(selectedRecord.meu5)} />
+                    <Info label="GPESE" value={selectedRecordIndicacoes.gpeSe || '-'} />
+                    <Info label="Indicações" value={selectedRecordIndicacoes.text || '-'} />
+                    <div className="field modal-status-field">
+                      <span>Estado</span>
+                      <select value={selectedRecord.estadoId} onChange={(event) => void updateRecordStatus(selectedRecord.id, event.target.value)}>
+                        {orderedStatuses.map((statusOption) => (
+                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 )}
-              </div>
-            </aside>
-          </div>
-        )}
-      </main>
-    </div>
+
+                <h4 className="modal-section-title">Histórico</h4>
+                <div className="history-list modal-history-list">
+                  {selectedRecord.history.length === 0 ? (
+                    <div className="empty-text">Sem histórico.</div>
+                  ) : (
+                    selectedRecord.history.map((item) => (
+                      <div key={item.id} className="history-item">
+                        <div>{item.message}</div>
+                        <div className="muted">{new Date(item.at).toLocaleString('pt-PT')}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </aside>
+            </div>
+          )
+        }
+      </main >
+    </div >
   )
 }
 
