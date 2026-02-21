@@ -1,5 +1,6 @@
 import type { CalculationSettings, StatusDefinition, TabId, TaxRule } from '../../types'
-import { STATUS_ICON_OPTIONS, THEME_OPTIONS, ThemeId, toColor } from '../../constants/configuracao'
+import type { ThemeId } from '../../constants/configuracao'
+import { STATUS_ICON_OPTIONS, THEME_OPTIONS, toColor } from '../../constants/configuracao'
 import { StatusIcon } from '../shared/StatusComponents'
 
 export interface RecibosConfiguracaoProps {

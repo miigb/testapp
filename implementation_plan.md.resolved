@@ -1,0 +1,74 @@
+# Implementation Plan: Extract `Entrada` Components
+
+This plan covers the final part of **Phase 4** of the [IMPROVEMENT_PLAN.md](file:///Users/miguelbrito/Development/codex/testapp/IMPROVEMENT_PLAN.md): extracting the three entry form components out of the monolithic [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx). 
+
+## User Review Required
+
+> [!WARNING]
+> This refactor will move over 300 lines of JSX per module from [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx) into dedicated component files. While no business logic changes will occur, these components will require many props to be passed down from [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx) because we haven't implemented context/state slicing yet (Phase 5). This is expected and follows the incremental plan.
+
+## Proposed Changes
+
+We will extract the "Entrada" tab content for all three modules into their respective folders.
+
+---
+
+### DS Module
+
+#### [NEW] [DsEntrada.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/components/ds/DsEntrada.tsx)
+Extract rendering logic for `activeModule === 'ds' && activeTab === 'entrada'` from [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx) lines ~3888-4070.
+Props required by this component will include:
+- `dsRecentRecords`, `dsStatuses`, `dsOrderedStatuses`, `dsDefaultStatus`
+- Form state: `dsEntryForm`, `setDsEntryForm`
+- Actions: [submitDsEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1918-1952), [saveNewDsEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1953-1957), [handleDsEntryInput](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1869-1872)
+- Suggestions/options: `dsGestoraFilterOptions`, `dsProponentesSuggestions`, etc.
+- Navigation/selection: `setActiveTab`, `setSelectedDsRecordId`
+
+#### [MODIFY] [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx)
+Replace the inline DS Entry JSX with `<DsEntrada {...props} />`.
+
+---
+
+### Penhoras Module
+
+#### [NEW] [PenhorasEntrada.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/components/penhoras/PenhorasEntrada.tsx)
+Extract rendering logic for `activeModule === 'penhoras' && activeTab === 'entrada'` from [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx) lines ~4166-4293.
+Props required:
+- `penhorasRecentRecords`, `penhorasStatuses`, `penhorasActiveStatuses`, `penhorasDefaultStatus`
+- Form state: `penhorasEntryForm`, `setPenhorasEntryForm`
+- Actions: [submitPenhorasEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1958-1982), [saveNewPenhorasEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1983-1987), [handlePenhorasEntryInput](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1880-1883)
+- Suggestions: `penhorasPeSuggestions`, `penhorasActoFilterOptions`, etc.
+- Navigation/selection: `setActiveTab`, `setSelectedPenhorasRecordId`
+
+#### [MODIFY] [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx)
+Replace the inline Penhoras Entry JSX with `<PenhorasEntrada {...props} />`.
+
+---
+
+### Recibos Module
+
+#### [NEW] [RecibosEntrada.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/components/recibos/RecibosEntrada.tsx)
+Extract rendering logic for `activeModule === 'recibos' && activeTab === 'entrada'` from [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx) lines ~4391-4521.
+Props required:
+- `recentRecords`, `statuses`, `activeStatuses`, `defaultStatus`
+- Form state: `entryForm`, `setEntryForm`, `calculationSettings`
+- Actions: [submitEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1891-1912), [saveNewEntry](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1913-1917), [handleEntryInput](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx#1848-1857), `applyFormAutoCalculations`
+- Suggestions/options: `recordSuggestions`, `gestorSuggestions`, `exequenteSuggestions`
+- Navigation/selection: `setActiveTab`, `setSelectedRecordId`
+
+#### [MODIFY] [App.tsx](file:///Users/miguelbrito/Development/codex/testapp/src/App.tsx)
+Replace the inline Recibos Entry JSX with `<RecibosEntrada {...props} />`.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Run `npx tsc --noEmit` to ensure no Typescript compilation errors were introduced by the prop extraction.
+- The `npm run dev` Vite server will compile the app and we will verify there are zero build-time warnings regarding missing imports.
+
+### Manual Verification
+1. I will ask you to open the application in the browser.
+2. Navigate to the **"Nova entrada"** tab in each module (Recibos, DS, Penhoras).
+3. Ensure the forms render correctly and the sidebar with recent records works.
+4. Verify that changing inputs (like Gestor or Processo) works without crashing.

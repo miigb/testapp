@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Dispatch, SetStateAction } from 'react'
 import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2 } from 'lucide-react'
 import type { DsRecordFilters, StatusDefinition } from '../../types'
 import type { DsDashboardWidget, DsDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { DS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultDsDashboardWidgets } from '../../lib/dashboardWidgets'
-import type { SavedView } from '../../types'
+import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -20,16 +20,16 @@ export interface DsDashboardsProps {
     toggleDsSavedViewDisabled: (id: string) => void
     deleteDsSavedView: (id: string) => Promise<void>
     clearDsFilters: () => void
-    saveCurrentView: (scope: string, state: unknown) => Promise<void>
+    saveCurrentView: (scope: SavedViewScope, state: Record<string, unknown>) => Promise<void>
     dsFilters: DsRecordFilters
     globalSearch: string
     // Config panel
     dsDashboardConfigOpen: boolean
-    setDsDashboardConfigOpen: (updater: (prev: boolean) => boolean) => void
+    setDsDashboardConfigOpen: Dispatch<SetStateAction<boolean>>
     dsDashboardWidgetsOpen: boolean
-    setDsDashboardWidgetsOpen: (v: boolean) => void
+    setDsDashboardWidgetsOpen: Dispatch<SetStateAction<boolean>>
     dsDashboardPickerOpen: boolean
-    setDsDashboardPickerOpen: (updater: (prev: boolean) => boolean) => void
+    setDsDashboardPickerOpen: Dispatch<SetStateAction<boolean>>
     // Widgets
     dsDashboardWidgets: DsDashboardWidget[]
     setDsDashboardWidgets: (widgets: DsDashboardWidget[]) => void
@@ -47,7 +47,7 @@ export interface DsDashboardsProps {
     dsGestoraFilterOptions: string[]
     dsEntidadeFilterOptions: string[]
     dsProdutoFilterOptions: string[]
-    patchDsFilters: (key: keyof DsRecordFilters, value: unknown) => void
+    patchDsFilters: <K extends keyof DsRecordFilters>(key: K, value: DsRecordFilters[K]) => void
     dsRecordsLoading: boolean
     dsTotalRecords: number
 }

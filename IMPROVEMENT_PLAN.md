@@ -217,24 +217,22 @@ Risk: **Low.** These components have no internal state or hooks.
 
 ---
 
-### Phase 3 — Extract Custom Hooks (medium risk)
+### Phase 3 — Extract Custom Hooks (Completed)
 **Goal:** Pull data-fetching and state logic out of `App()` into named hooks.
 
-Key hooks to extract:
-- `useTheme()` — theme state + localStorage sync + `document.documentElement` attribute
-- `useUndoStack()` — undo action queue management
-- `useQuickTools()` — notes/calculator/smart-notes panel open state, pinned state, drag state, positions
-- `useBootstrap()` — initial API load (statuses, calcSettings, savedViews, record count)
-- `useRecords(filters)` — records fetch, loading, pagination, CRUD operations
-- `useDsRecords(filters)` — same for DS
-- `usePenhorasRecords(filters)` — same for Penhoras
-- `useDashboard(filters)` — analytics summary fetch, widget layout, drag/resize state
-- `useSavedViews(scope)` — saved views fetch, CRUD
-- `useSmartNotes()` — smart notes text, evaluation, pinning, saved entries
+Key hooks extracted:
+- ✅ `useTheme()` 
+- ✅ `useUndoStack()` 
+- ✅ `useQuickTools()` 
+- ✅ `useBootstrap()` 
+- ✅ `useRecords(filters)` 
+- ✅ `useDsRecords(filters)` 
+- ✅ `usePenhorasRecords(filters)` 
+- ✅ `useDashboard(filters)` 
+- ✅ `useSavedViews(scope)` 
+- ✅ `useSmartNotes()` 
 
-**Strategy:**
-1. Identify all state that belongs to a hook.
-2. Create hook file.
+**Outcome:** All state and data-fetching logic has successfully been decentralized from `App.tsx` into isolated files under `src/hooks/`.
 3. Move state + effects + callbacks into hook.
 4. Call hook in `App()`, spread returned values.
 5. Verify identical behaviour.
@@ -271,9 +269,9 @@ Order of extraction (least to most connected):
 13. ~~`RecibosTabela`~~ (merged into RecibosConsultaTabela)
 14. ~~`DsTabela`~~ (merged into DsConsultaTabela)
 15. ~~`PenhorasTabela`~~ (merged into PenhorasConsultaTabela)
-16. `RecibosEntrada` — entry form
-17. `DsEntrada`
-18. `PenhorasEntrada`
+16. ✅ `RecibosEntrada` — entry form
+17. ✅ `DsEntrada`
+18. ✅ `PenhorasEntrada`
 
 Risk: **Medium-High.** Props interfaces will be wide initially. That's OK — reduce after Phase 5.
 
@@ -338,7 +336,7 @@ Risk: **Medium.** Routes are isolated by path prefix — use those as natural ex
 | 1 - Extract utils | � Files created, wiring pending | `tsc --noEmit` = 0 errors |
 | 2 - Extract UI components | � Files created, wiring pending | Components in `src/components/shared/` |
 | 3 - Extract hooks | 🔲 Not started | Next after wiring |
-| 4 - Extract module components | 🔲 Not started | |
+| 4 - Extract module components | ✅ Done | Separated Recibos, DS and Penhoras into Tabs, Dashboards, and Entries |
 | 5 - Context/state slicing | 🔲 Not started | Optional |
 | 6 - Server refactor | 🔲 Not started | Independent |
 | 7 - Tests & polish | 🔲 Not started | Ongoing |
@@ -352,6 +350,32 @@ Risk: **Medium.** Routes are isolated by path prefix — use those as natural ex
 - Redesigning the UI.
 - Switching to a different state management library (Zustand, Jotai) unless Phase 5 finds it necessary.
 - Changing the database layer or Prisma schema.
+
+---
+
+## Phase 6: Advanced Export System (New)
+
+**Goal:** Create an advanced export composer for all three modules (Recibos, DS, Penhoras) supporting XLS, CSV, and PDF formats, with layout configuration and AI summaries.
+
+**Tasks:**
+1.  **Export Composer UI (`ExportComposer.tsx`)**:
+    - Build a dialog/modal component accessible from Dashboards and Tables.
+    - Add data selection options (Consulta, Tabela records, Dashboard metrics).
+    - Add output format selector (Excel, CSV, PDF).
+    - Add aesthetic configurations for PDF/Excel.
+
+2.  **AI Summary Integration**:
+    - Add an API endpoint `POST /api/ai/summary` utilizing `@google/genai` to generate insights based on given structured data payload.
+    - Integrate the AI summary toggle into the Export Composer UI.
+
+3.  **Data Generators**:
+    - Implement CSV generator (client-side or server-side).
+    - Implement XLS generator using `exceljs` with formatting (colors, bold headers, dashboard metrics).
+    - Implement PDF generator using `jspdf` and html2canvas or raw drawing for a premium look.
+
+4.  **Module Integration**:
+    - Add export buttons to `Recibos`, `DS`, and `Penhoras` views.
+    - Wire current table configurations (filters, visible columns) and dashboard data into the Export Context.
 
 ---
 

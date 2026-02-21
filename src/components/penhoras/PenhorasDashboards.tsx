@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, Dispatch, SetStateAction } from 'react'
 import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2 } from 'lucide-react'
 import type { PenhorasRecordFilters, StatusDefinition } from '../../types'
 import type { PenhorasDashboardWidget, PenhorasDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { PENHORAS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultPenhorasDashboardWidgets } from '../../lib/dashboardWidgets'
-import type { SavedView } from '../../types'
+import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -18,15 +18,15 @@ export interface PenhorasDashboardsProps {
     togglePenhorasSavedViewDisabled: (id: string) => void
     deletePenhorasSavedView: (id: string) => Promise<void>
     clearPenhorasFilters: () => void
-    saveCurrentView: (scope: string, state: unknown) => Promise<void>
+    saveCurrentView: (scope: SavedViewScope, state: Record<string, unknown>) => Promise<void>
     penhorasFilters: PenhorasRecordFilters
     globalSearch: string
     penhorasDashboardConfigOpen: boolean
-    setPenhorasDashboardConfigOpen: (updater: (prev: boolean) => boolean) => void
+    setPenhorasDashboardConfigOpen: Dispatch<SetStateAction<boolean>>
     penhorasDashboardWidgetsOpen: boolean
-    setPenhorasDashboardWidgetsOpen: (v: boolean) => void
+    setPenhorasDashboardWidgetsOpen: Dispatch<SetStateAction<boolean>>
     penhorasDashboardPickerOpen: boolean
-    setPenhorasDashboardPickerOpen: (updater: (prev: boolean) => boolean) => void
+    setPenhorasDashboardPickerOpen: Dispatch<SetStateAction<boolean>>
     penhorasDashboardWidgets: PenhorasDashboardWidget[]
     setPenhorasDashboardWidgets: (widgets: PenhorasDashboardWidget[]) => void
     penhorasDashboardMainWidgets: PenhorasDashboardWidget[]
@@ -39,7 +39,7 @@ export interface PenhorasDashboardsProps {
     penhorasYears: number[]
     penhorasGestorFilterOptions: string[]
     penhorasActoFilterOptions: string[]
-    patchPenhorasFilters: (key: keyof PenhorasRecordFilters, value: unknown) => void
+    patchPenhorasFilters: <K extends keyof PenhorasRecordFilters>(key: K, value: PenhorasRecordFilters[K]) => void
     penhorasRecordsLoading: boolean
     penhorasTotalRecords: number
 }

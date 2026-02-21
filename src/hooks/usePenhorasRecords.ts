@@ -1,12 +1,10 @@
 import { useState, useCallback } from 'react'
 import { api } from '../api'
-import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition } from '../types'
+import type { PenhorasRecord, PenhorasRecordFilters } from '../types'
 import { DEFAULT_PENHORAS_FILTERS } from '../constants'
 
 export function usePenhorasRecords(
     globalSearch: string,
-    penhorasStatuses: StatusDefinition[],
-    setPenhorasStatuses: (statuses: StatusDefinition[]) => void,
     setFeedback: (msg: string) => void
 ) {
     const [penhorasRecords, setPenhorasRecords] = useState<PenhorasRecord[]>([])
@@ -17,21 +15,15 @@ export function usePenhorasRecords(
     const refreshPenhorasRecords = useCallback(async () => {
         setPenhorasRecordsLoading(true)
         try {
-            const [response, fallbackStatuses] = await Promise.all([
-                api.getPenhorasRecords({ ...penhorasFilters, q: globalSearch }),
-                penhorasStatuses.length === 0 ? api.getPenhorasStatuses().catch(() => []) : Promise.resolve([] as StatusDefinition[]),
-            ])
+            const response = await api.getPenhorasRecords({ ...penhorasFilters, q: globalSearch })
             setPenhorasRecords(response.items)
             setPenhorasTotalRecords(response.total)
-            if (fallbackStatuses.length > 0) {
-                setPenhorasStatuses(fallbackStatuses)
-            }
         } catch (error) {
             setFeedback(error instanceof Error ? error.message : 'Falha ao carregar registos Penhoras.')
         } finally {
             setPenhorasRecordsLoading(false)
         }
-    }, [penhorasFilters, globalSearch, penhorasStatuses.length, setPenhorasStatuses, setFeedback])
+    }, [penhorasFilters, globalSearch, setFeedback])
 
     return {
         penhorasRecords,

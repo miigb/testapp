@@ -34,7 +34,7 @@ export interface RecibosDashboardsProps {
     setDashboardFiltersOpen: (updater: (prev: boolean) => boolean) => void
     dashboardFilters: RecordFilters
     setDashboardFilters: (filters: RecordFilters) => void
-    patchDashboardFilters: (key: keyof RecordFilters, value: unknown) => void
+    patchDashboardFilters: <K extends keyof RecordFilters>(key: K, value: RecordFilters[K]) => void
     dashboardActiveFilterCount: number
     // Loading / summary
     dashboardLoading: boolean

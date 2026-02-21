@@ -482,11 +482,9 @@ a {
 
 .module-brand-card.module-ds {
   border-color: color-mix(in oklab, #d00772 46%, var(--line) 54%);
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklab, var(--surface) 88%, #fde3f0 12%),
-    color-mix(in oklab, var(--surface) 90%, #f8d7e8 10%)
-  );
+  background: linear-gradient(135deg,
+      color-mix(in oklab, var(--surface) 88%, #fde3f0 12%),
+      color-mix(in oklab, var(--surface) 90%, #f8d7e8 10%));
 }
 
 .module-brand-card.module-ds .brand-logo-img {
@@ -500,11 +498,9 @@ a {
 
 .module-brand-card.module-penhoras {
   border-color: color-mix(in oklab, #a24f00 44%, var(--line) 56%);
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklab, var(--surface) 88%, #fce9d8 12%),
-    color-mix(in oklab, var(--surface) 90%, #f3dac8 10%)
-  );
+  background: linear-gradient(135deg,
+      color-mix(in oklab, var(--surface) 88%, #fce9d8 12%),
+      color-mix(in oklab, var(--surface) 90%, #f3dac8 10%));
 }
 
 .module-brand-card.module-penhoras .brand-logo-img {
@@ -749,7 +745,7 @@ a {
   position: relative;
 }
 
-.autocomplete-input > input {
+.autocomplete-input>input {
   width: 100%;
 }
 
@@ -1741,7 +1737,7 @@ a {
   gap: 7px;
 }
 
-.ds-filters-row .field > span {
+.ds-filters-row .field>span {
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2136,7 +2132,7 @@ a {
   background: var(--surface-strong);
   padding: 11px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr auto;
   gap: 10px;
   min-height: 112px;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, opacity 120ms ease;
@@ -2227,20 +2223,28 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .dashboard-widget-head h4 {
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .dashboard-widget-actions {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   opacity: 0;
   transform: translateY(-2px);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
+  min-width: 0;
 }
 
 .dashboard-widget-card:hover .dashboard-widget-actions,
@@ -2764,7 +2768,7 @@ tbody tr:hover {
   gap: 7px;
 }
 
-.record-edit-content .field > span {
+.record-edit-content .field>span {
   font-size: 0.79rem;
   text-transform: uppercase;
   letter-spacing: 0.01em;
@@ -2815,7 +2819,7 @@ tbody tr:hover {
   min-width: 0;
 }
 
-.entity-with-logo > span:last-child {
+.entity-with-logo>span:last-child {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2874,12 +2878,12 @@ tbody tr:hover {
   flex: 0 0 auto;
 }
 
-.status-list + .actions-row {
+.status-list+.actions-row {
   margin-top: 10px;
   margin-bottom: 12px;
 }
 
-.rules-table + .actions-row {
+.rules-table+.actions-row {
   margin-top: 12px;
 }
 

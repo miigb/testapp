@@ -1,5 +1,8 @@
-import { Eye, EyeOff, FilterX, Trash2, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { Eye, EyeOff, FilterX, Trash2, AlertTriangle, Download } from 'lucide-react'
 import type { DsRecord, DsRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
+import { ExportComposer } from '../shared/ExportComposer'
+import type { ExportColumn } from '../../lib/exportGenerators'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
@@ -72,6 +75,27 @@ export function DsConsultaTabela({
     updateDsRecordStatus,
     formatCurrency,
 }: DsConsultaTabelaProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
+    const exportColumns: ExportColumn[] = [
+        { header: 'Proponentes', key: 'proponentes', width: 30 },
+        { header: 'Ref.', key: 'referencia', width: 15 },
+        { header: 'Gestor(a)', key: 'gestora', width: 25 },
+        { header: 'Produto', key: 'produto', width: 20 },
+        { header: 'Entidade Bancária', key: 'entidadeBancaria', width: 20 },
+        { header: 'Data Escritura', key: 'dataEscritura', width: 15 },
+        { header: 'Valor', key: 'valor', width: 15 },
+        { header: 'Comissão Loja', key: 'comissaoLoja', width: 15 },
+        { header: 'Comissão Gestor', key: 'comissaoGestor', width: 15 },
+        { header: 'Falta Recibo', key: 'faltaReciboGestora', width: 25 },
+        { header: 'Estado', key: 'estadoId', width: 25 },
+    ]
+
+    const exportData = dsRecords.map(r => ({
+        ...r,
+        estadoId: getStatus(dsStatuses, r.estadoId)?.label || r.estadoId || 'Sem estado',
+    }))
+
     return (
         <section className="panel ds-panel ds-results-panel">
             <div className="row-between wrap">
@@ -121,6 +145,10 @@ export function DsConsultaTabela({
                     </button>
                     <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('ds-tabela', { ...dsFilters, q: globalSearch })}>
                         Guardar vista
+                    </button>
+                    <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                        <Download size={15} />
+                        Exportar
                     </button>
                 </div>
             </div>
@@ -286,6 +314,14 @@ export function DsConsultaTabela({
                     </table>
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="DS (Escrituras)"
+                columns={exportColumns}
+                data={exportData}
+            />
         </section>
     )
 }

@@ -7,6 +7,8 @@ import path from 'node:path'
 import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus, type Status, type TaxRule } from '@prisma/client'
 import { z } from 'zod'
 
+import { aiRouter } from './routes/ai'
+
 import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES, DEFAULT_STATUSES, DEFAULT_TAX_RULES } from './defaults'
 import {
   applyCalculations,
@@ -1424,6 +1426,8 @@ function toNumberFromDecimal(value: Prisma.Decimal | number | null | undefined):
   if (value === null || value === undefined) return 0
   return typeof value === 'number' ? value : Number(value)
 }
+
+app.use('/api/ai', aiRouter)
 
 app.get('/api/health', async (_req, res) => {
   try {

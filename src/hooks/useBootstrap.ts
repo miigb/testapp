@@ -6,40 +6,38 @@ import { getInitialDsEntryForm } from '../lib/dsHelpers'
 import { getInitialPenhorasEntryForm } from '../lib/penhorasHelpers'
 
 export interface BootstrapControls {
-    setStatuses: React.Dispatch<React.SetStateAction<StatusDefinition[]>>
     setSavedViews: React.Dispatch<React.SetStateAction<SavedView[]>>
-    setCalculationSettings: React.Dispatch<React.SetStateAction<CalculationSettings>>
-    setSettingsDraft: React.Dispatch<React.SetStateAction<CalculationSettings>>
-    setDsStatuses: React.Dispatch<React.SetStateAction<StatusDefinition[]>>
-    setPenhorasStatuses: React.Dispatch<React.SetStateAction<StatusDefinition[]>>
     setEntryForm: React.Dispatch<React.SetStateAction<EntryForm>>
     setBulkStatusId: React.Dispatch<React.SetStateAction<string>>
     setDsEntryForm: React.Dispatch<React.SetStateAction<DsEntryForm>>
     setPenhorasEntryForm: React.Dispatch<React.SetStateAction<PenhorasEntryForm>>
     setFeedback: (msg: string) => void
-    refreshRecords: () => Promise<void>
-    refreshDsRecords: () => Promise<void>
-    refreshPenhorasRecords: () => Promise<void>
+    setSettingsDraft: React.Dispatch<React.SetStateAction<CalculationSettings>>
 }
 
 export function useBootstrap({
-    setStatuses,
     setSavedViews,
-    setCalculationSettings,
-    setSettingsDraft,
-    setDsStatuses,
-    setPenhorasStatuses,
     setEntryForm,
     setBulkStatusId,
     setDsEntryForm,
     setPenhorasEntryForm,
     setFeedback,
-    refreshRecords,
-    refreshDsRecords,
-    refreshPenhorasRecords,
+    setSettingsDraft,
 }: BootstrapControls) {
     const [bootstrapLoading, setBootstrapLoading] = useState(true)
     const [pageError, setPageError] = useState('')
+
+    const [statuses, setStatuses] = useState<StatusDefinition[]>([])
+    const [calculationSettings, setCalculationSettings] = useState<CalculationSettings>({
+        id: 'default',
+        autoApplyRules: true,
+        autoComputeValorSemIva: true,
+        autoComputeValorEmissao: false,
+        roundTo: 2,
+        taxRules: [],
+    })
+    const [dsStatuses, setDsStatuses] = useState<StatusDefinition[]>([])
+    const [penhorasStatuses, setPenhorasStatuses] = useState<StatusDefinition[]>([])
 
     async function migrateLegacyLocalStorageIfPresent() {
         const rawRecords = localStorage.getItem('mesa-recibos-records')
@@ -114,10 +112,6 @@ export function useBootstrap({
                     const seed = await api.seedDatabase(false)
                     setFeedback(`Dados base carregados: ${seed.created} novos registos.`)
                 }
-
-                await refreshRecords()
-                await refreshDsRecords()
-                await refreshPenhorasRecords()
             } catch (error) {
                 setPageError(error instanceof Error ? error.message : 'Falha ao carregar aplicação.')
             } finally {
@@ -127,5 +121,17 @@ export function useBootstrap({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    return { bootstrapLoading, pageError, setPageError }
+    return {
+        bootstrapLoading,
+        pageError,
+        setPageError,
+        statuses,
+        setStatuses,
+        calculationSettings,
+        setCalculationSettings,
+        dsStatuses,
+        setDsStatuses,
+        penhorasStatuses,
+        setPenhorasStatuses,
+    }
 }

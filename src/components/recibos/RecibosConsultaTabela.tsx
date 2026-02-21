@@ -1,4 +1,5 @@
-import { Eye, EyeOff, FilterX, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { ReceiptRecord, RecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import type { TotalMetricKey } from '../../constants'
 import { TOTAL_METRIC_OPTIONS } from '../../constants'
@@ -8,6 +9,8 @@ import { colorWithAlpha } from '../../lib/formatters'
 import { getPrimaryRecordReference, getSecondaryRecordReference } from '../../lib/recordHelpers'
 import { StatusPill, EntityIdentity } from '../shared/StatusComponents'
 import { LabeledSelect, AutocompleteInput } from '../shared/FormInputs'
+import { ExportComposer } from '../shared/ExportComposer'
+import type { ExportColumn } from '../../lib/exportGenerators'
 
 function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
     if (!statusId) return undefined
@@ -54,7 +57,6 @@ export interface RecibosConsultaTabelaProps {
     allSelectedInTable: boolean
     toggleSelectAllRecords: () => void
     toggleSelectRecord: (id: string) => void
-    exportCurrentTableToCsv: () => void
     bulkStatusId: string
     setBulkStatusId: (v: string) => void
     runBulkStatusUpdate: () => Promise<void>
@@ -111,7 +113,6 @@ export function RecibosConsultaTabela({
     allSelectedInTable,
     toggleSelectAllRecords,
     toggleSelectRecord,
-    exportCurrentTableToCsv,
     bulkStatusId,
     setBulkStatusId,
     runBulkStatusUpdate,
@@ -131,6 +132,31 @@ export function RecibosConsultaTabela({
     updateRecordStatus,
     formatCurrency,
 }: RecibosConsultaTabelaProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
+    const exportColumns: ExportColumn[] = [
+        { header: 'Tipo', key: 'tipo', width: 15 },
+        { header: 'Nº Recibo', key: 'reciboNumero', width: 15 },
+        { header: 'Processo', key: 'processo', width: 20 },
+        { header: 'PE', key: 'pe', width: 15 },
+        { header: 'Mês', key: 'mes', width: 12 },
+        { header: 'Ano', key: 'ano', width: 12 },
+        { header: 'Honorários', key: 'honorarios', width: 15 },
+        { header: 'Custas', key: 'custas', width: 15 },
+        { header: 'Iva', key: 'iva', width: 12 },
+        { header: 'Exequente', key: 'exequente', width: 25 },
+        { header: 'Executado', key: 'executado', width: 25 },
+        { header: 'Gestor(a)', key: 'gestor', width: 20 },
+        { header: 'Estado', key: 'estadoId', width: 20 },
+    ]
+
+    const recordsToExport = selectedIds.length > 0 ? records.filter(r => selectedIds.includes(r.id)) : records
+
+    const exportData = recordsToExport.map(r => ({
+        ...r,
+        estadoId: getStatus(statuses, r.estadoId)?.label || r.estadoId || 'Sem estado',
+    }))
+
     return (
         <section className="panel">
             <div className="row-between wrap">
@@ -230,6 +256,14 @@ export function RecibosConsultaTabela({
                     >
                         Guardar vista
                     </button>
+                    <button
+                        className="subtle-btn"
+                        type="button"
+                        onClick={() => setIsExportOpen(true)}
+                    >
+                        <Download size={15} />
+                        Exportar
+                    </button>
                 </div>
             </div>
 
@@ -307,8 +341,9 @@ export function RecibosConsultaTabela({
                                     <input type="checkbox" checked={allSelectedInTable} onChange={toggleSelectAllRecords} />
                                     Selecionar todos
                                 </label>
-                                <button className="subtle-btn" type="button" onClick={exportCurrentTableToCsv}>
-                                    Exportar CSV
+                                <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                                    <Download size={15} />
+                                    Exportar {selectedIds.length > 0 ? "Selecionados" : "Vista Atual"}
                                 </button>
                             </div>
 
@@ -498,6 +533,14 @@ export function RecibosConsultaTabela({
                     </table>
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="Recibos"
+                columns={exportColumns}
+                data={exportData}
+            />
         </section>
     )
 }

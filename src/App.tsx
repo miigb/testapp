@@ -3,16 +3,7 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 
 import { jsPDF } from 'jspdf'
 import {
-  AlertTriangle,
-  Ban,
   Calculator,
-  CheckCircle2,
-  Circle,
-  Clock3,
-
-  FileClock,
-  FileSearch,
-  Hammer,
   GripVertical,
   Maximize2,
   Minimize2,
@@ -20,17 +11,12 @@ import {
   PinOff,
   Plus,
   Minus,
-  OctagonAlert,
   Pencil,
-  ReceiptText,
   Save,
-  SearchCheck,
-  ShieldAlert,
   SquareFunction,
   StickyNote,
   Trash2,
   Undo2,
-  UserRound,
   Wrench,
   X,
 } from 'lucide-react'
@@ -80,6 +66,9 @@ import { RecibosImportar } from './components/recibos/RecibosImportar'
 import { DsDashboards } from './components/ds/DsDashboards'
 import { PenhorasDashboards } from './components/penhoras/PenhorasDashboards'
 import { RecibosDashboards } from './components/recibos/RecibosDashboards'
+import { DsEntrada } from './components/ds/DsEntrada'
+import { PenhorasEntrada } from './components/penhoras/PenhorasEntrada'
+import { RecibosEntrada } from './components/recibos/RecibosEntrada'
 import { DsConsultaTabela } from './components/ds/DsConsultaTabela'
 import { PenhorasConsultaTabela } from './components/penhoras/PenhorasConsultaTabela'
 import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabela'
@@ -274,67 +263,6 @@ function isDarkLikeTheme(theme: ThemeId): boolean {
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
-const EMPTY_CALC_SETTINGS: CalculationSettings = {
-  id: 'default',
-  autoApplyRules: true,
-  autoComputeValorSemIva: true,
-  autoComputeValorEmissao: false,
-  roundTo: 2,
-  taxRules: [],
-}
-
-
-const LOGO_DEV_TOKEN = (import.meta.env.VITE_LOGO_DEV_TOKEN as string | undefined) ?? 'pk_J_6gnc2JTzKtdVlXmGyzvA'
-
-const EXEQUENTE_DOMAIN_MAP: Record<string, string> = {
-  MONTEPIO: 'montepio.pt',
-  CGD: 'cgd.pt',
-  'CGD.': 'cgd.pt',
-  CAIXA: 'cgd.pt',
-  'CAIXA GERAL': 'cgd.pt',
-  'CAIXA GERL': 'cgd.pt',
-  CGA: 'cgd.pt',
-  SANTANDER: 'santander.pt',
-  'SANTANDER -SPS': 'santander.pt',
-  BCP: 'millenniumbcp.pt',
-  'NOVO BANCO': 'novobanco.pt',
-  BPI: 'bancobpi.pt',
-  CREDIBOM: 'credibom.pt',
-  SERVDEBT: 'servdebt.com',
-  SERVDBET: 'servdebt.com',
-  EOS: 'eos-solutions.pt',
-  'DUO CAPITAL': 'duocapital.com',
-  NOS: 'nos.pt',
-  ORTHONAVE: 'orthonave.pt',
-  DOCAPESCA: 'docapesca.pt',
-  'DATA REDE': 'datarede.pt',
-  'ARES LUSITANI': 'areslusitani.pt',
-  'LC ASSET': 'lcasset.pt',
-  RCI: 'rcibankandservices.com',
-  ZARCO: 'zarco.pt',
-  ALGEBRA: 'algebra-capital.com',
-  HEFESTO: 'hefesto.pt',
-  HEFETO: 'hefesto.pt',
-  HEFETSO: 'hefesto.pt',
-  HESFESTO: 'hefesto.pt',
-  BTL: 'btlireland.com',
-  'BTL IRELAND': 'btlireland.com',
-}
-
-const EXEQUENTE_KEYWORD_DOMAIN: Array<{ keyword: string; domain: string }> = [
-  { keyword: 'SANTANDER', domain: 'santander.pt' },
-  { keyword: 'MONTEPIO', domain: 'montepio.pt' },
-  { keyword: 'CAIXA', domain: 'cgd.pt' },
-  { keyword: 'CGD', domain: 'cgd.pt' },
-  { keyword: 'SERVDEBT', domain: 'servdebt.com' },
-  { keyword: 'CREDIBOM', domain: 'credibom.pt' },
-  { keyword: 'EOS', domain: 'eos-solutions.pt' },
-  { keyword: 'NOVO BANCO', domain: 'novobanco.pt' },
-  { keyword: 'BPI', domain: 'bancobpi.pt' },
-  { keyword: 'BCP', domain: 'millenniumbcp.pt' },
-  { keyword: 'NOS', domain: 'nos.pt' },
-]
-
 
 
 function normalizeText(value: unknown): string {
@@ -349,41 +277,6 @@ function normalizeText(value: unknown): string {
 function formatCurrency(value?: number): string {
   if (typeof value !== 'number') return '-'
   return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
-}
-
-function toColor(color: string): string {
-  const value = color.trim().toUpperCase()
-  if (/^#[0-9A-F]{6}$/.test(value)) return value
-  return '#BFC4CC'
-}
-
-function colorWithAlpha(color: string, alphaHex: string): string {
-  if (typeof document !== 'undefined') {
-    const theme = document.documentElement.getAttribute('data-theme')
-    const darkTheme =
-      theme === 'dark' ||
-      theme === 'tokyo-night' ||
-      theme === 'synthwave-84' ||
-      theme === 'one-dark-pro' ||
-      theme === 'night-owl' ||
-      theme === 'github-dark'
-    if (darkTheme && alphaHex === '1F') {
-      return `${toColor(color)}14`
-    }
-  }
-  return `${toColor(color)}${alphaHex}`
-}
-
-function getUniqueRecordReferences(record: ReceiptRecord): string[] {
-  const candidates = [record.processo, record.pe, record.reciboNumero]
-    .map((value) => value?.trim())
-    .filter((value): value is string => Boolean(value))
-
-  return candidates.filter((value, index, list) => list.findIndex((candidate) => normalizeText(candidate) === normalizeText(value)) === index)
-}
-
-function getPrimaryRecordReference(record: ReceiptRecord): string {
-  return getUniqueRecordReferences(record)[0] ?? 'Sem referência'
 }
 
 
@@ -680,45 +573,6 @@ function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefin
   return statuses.find((status) => status.id === statusId)
 }
 
-function renderStatusIcon(iconName: string, size = 14) {
-  if (iconName === 'hammer') return <Hammer size={size} />
-  if (iconName === 'clock3') return <Clock3 size={size} />
-  if (iconName === 'search-check') return <SearchCheck size={size} />
-  if (iconName === 'receipt-text') return <ReceiptText size={size} />
-  if (iconName === 'octagon-alert') return <OctagonAlert size={size} />
-  if (iconName === 'check-circle2') return <CheckCircle2 size={size} />
-  if (iconName === 'shield-alert') return <ShieldAlert size={size} />
-  if (iconName === 'file-search') return <FileSearch size={size} />
-  if (iconName === 'file-clock') return <FileClock size={size} />
-  if (iconName === 'ban') return <Ban size={size} />
-  if (iconName === 'alert-triangle') return <AlertTriangle size={size} />
-  return <Circle size={size} />
-}
-
-function getExequenteLogoUrl(name?: string): string | undefined {
-  if (!name || !LOGO_DEV_TOKEN) {
-    return undefined
-  }
-
-  const normalized = normalizeText(name)
-
-  // If user typed a domain-like value, use it directly.
-  if (/^[A-Z0-9.-]+\\.[A-Z]{2,}$/i.test(name.trim())) {
-    return `https://img.logo.dev/${name.trim().toLowerCase()}?token=${encodeURIComponent(LOGO_DEV_TOKEN)}&size=64&format=png`
-  }
-
-  const mappedDomain = EXEQUENTE_DOMAIN_MAP[normalized]
-  if (mappedDomain) {
-    return `https://img.logo.dev/${mappedDomain}?token=${encodeURIComponent(LOGO_DEV_TOKEN)}&size=64&format=png`
-  }
-
-  const keywordMatch = EXEQUENTE_KEYWORD_DOMAIN.find((entry) => normalized.includes(entry.keyword))
-  if (keywordMatch) {
-    return `https://img.logo.dev/${keywordMatch.domain}?token=${encodeURIComponent(LOGO_DEV_TOKEN)}&size=64&format=png`
-  }
-
-  return undefined
-}
 
 function App() {
   const { theme, setTheme } = useTheme()
@@ -734,9 +588,6 @@ function App() {
 
   const [activeModule, setActiveModule] = useState<ModuleId>('recibos')
   const [activeTab, setActiveTab] = useState<TabId>('entrada')
-  const [statuses, setStatuses] = useState<StatusDefinition[]>([])
-  const [calculationSettings, setCalculationSettings] = useState<CalculationSettings>(EMPTY_CALC_SETTINGS)
-
   const [feedback, setFeedback] = useState('')
   const [feedbackClosing, setFeedbackClosing] = useState(false)
 
@@ -785,23 +636,19 @@ function App() {
   const [importStrategy, setImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [importForceRecalculate, setImportForceRecalculate] = useState(false)
 
-  const [dsStatuses, setDsStatuses] = useState<StatusDefinition[]>([])
   const [dsImportLoading, setDsImportLoading] = useState(false)
   const [dsImportPreview, setDsImportPreview] = useState<DsParsedImport | null>(null)
   const [dsImportServerPreview, setDsImportServerPreview] = useState<ImportPreviewResponse | null>(null)
   const [dsImportStrategy, setDsImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [dsEntryForm, setDsEntryForm] = useState<DsEntryForm>(getInitialDsEntryForm(''))
 
-  const [penhorasStatuses, setPenhorasStatuses] = useState<StatusDefinition[]>([])
   const [penhorasImportLoading, setPenhorasImportLoading] = useState(false)
   const [penhorasImportPreview, setPenhorasImportPreview] = useState<PenhorasParsedImport | null>(null)
   const [penhorasImportServerPreview, setPenhorasImportServerPreview] = useState<ImportPreviewResponse | null>(null)
   const [penhorasImportStrategy, setPenhorasImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
 
-  const [settingsDraft, setSettingsDraft] = useState<CalculationSettings>(EMPTY_CALC_SETTINGS)
 
-  // HOOKS
   const {
     records,
     totalRecords,
@@ -831,7 +678,7 @@ function App() {
     penhorasFilters,
     setPenhorasFilters,
     refreshPenhorasRecords,
-  } = usePenhorasRecords(globalSearch, penhorasStatuses, setPenhorasStatuses, setFeedback)
+  } = usePenhorasRecords(globalSearch, setFeedback)
 
   const {
     smartNotesText,
@@ -1003,23 +850,35 @@ function App() {
     smartNotesWindowZIndex,
   } = useQuickTools(evaluateCalculator)
 
-  const { bootstrapLoading } = useBootstrap({
+  const [settingsDraft, setSettingsDraft] = useState<CalculationSettings>({
+    id: 'default',
+    autoApplyRules: true,
+    autoComputeValorSemIva: true,
+    autoComputeValorEmissao: false,
+    roundTo: 2,
+    taxRules: [],
+  })
+
+  // HOOKS - Bootstrap comes last to access all extracted setters
+  const {
+    bootstrapLoading,
+    statuses,
     setStatuses,
-    setSavedViews,
+    calculationSettings,
     setCalculationSettings,
-    setSettingsDraft,
+    dsStatuses,
     setDsStatuses,
+    penhorasStatuses,
     setPenhorasStatuses,
+  } = useBootstrap({
+    setSavedViews,
     setEntryForm,
     setBulkStatusId,
     setDsEntryForm,
     setPenhorasEntryForm,
     setFeedback,
-    refreshRecords,
-    refreshDsRecords,
-    refreshPenhorasRecords,
+    setSettingsDraft,
   })
-
 
   const orderedStatuses = useMemo(
     () => [...statuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
@@ -1573,20 +1432,17 @@ function App() {
     if (!bootstrapLoading && activeModule === 'recibos') {
       void refreshRecords()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, globalSearch, bootstrapLoading, activeModule])
+  }, [filters, globalSearch, bootstrapLoading, activeModule, refreshRecords])
 
   useEffect(() => {
     if (bootstrapLoading || activeModule !== 'ds') return
     void refreshDsRecords()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bootstrapLoading, activeModule, dsFilters, globalSearch])
+  }, [bootstrapLoading, activeModule, dsFilters, globalSearch, refreshDsRecords])
 
   useEffect(() => {
     if (bootstrapLoading || activeModule !== 'penhoras') return
     void refreshPenhorasRecords()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bootstrapLoading, activeModule, penhorasFilters, globalSearch])
+  }, [bootstrapLoading, activeModule, penhorasFilters, globalSearch, refreshPenhorasRecords])
 
   useEffect(() => {
     if (activeModule !== 'recibos') {
@@ -2157,39 +2013,6 @@ function App() {
       return
     }
     setSelectedIds(records.map((record) => record.id))
-  }
-
-  function exportCurrentTableToCsv() {
-    const header = ['Tipo', 'Ano', 'Mês', 'PE', 'Processo', 'Recibo', 'Gestor', 'Exequente', 'Valor sem IVA', 'IVA', 'Retenção', 'Meu 5%', 'Estado']
-    const rows = records.map((record) => {
-      const status = getStatus(statuses, record.estadoId)
-      return [
-        record.tipo,
-        String(record.ano),
-        MONTHS[record.mes - 1] ?? String(record.mes),
-        record.pe ?? '',
-        record.processo ?? '',
-        record.reciboNumero ?? '',
-        record.gestor ?? '',
-        record.exequente ?? '',
-        record.valorSemIva?.toString() ?? '',
-        record.iva?.toString() ?? '',
-        record.retencao?.toString() ?? '',
-        record.meu5?.toString() ?? '',
-        status?.label ?? '',
-      ]
-    })
-
-    const csv = [header, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
-      .join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `mesa-recibos-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
   }
 
   async function exportCurrentSnapshot() {
@@ -2943,7 +2766,7 @@ function App() {
         key={widget.id}
         className={`dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''} ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''
           } ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ height: `${widget.minHeight}px` }}
+        style={{ minHeight: `${widget.minHeight}px` }}
         draggable={!resizingDashboardWidgetId}
         onDragStart={(event) => {
           if (resizingDashboardWidgetId) {
@@ -3104,7 +2927,7 @@ function App() {
         key={widget.id}
         className={`dashboard-widget-card ds-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
           } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ height: `${widget.minHeight}px` }}
+        style={{ minHeight: `${widget.minHeight}px` }}
         draggable={!resizingDashboardWidgetId}
         onDragStart={(event) => {
           if (resizingDashboardWidgetId) {
@@ -3249,9 +3072,9 @@ function App() {
     return (
       <article
         key={widget.id}
-        className={`dashboard-widget-card ds-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
+        className={`dashboard-widget-card penhoras-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
           } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ height: `${widget.minHeight}px` }}
+        style={{ minHeight: `${widget.minHeight}px` }}
         draggable={!resizingDashboardWidgetId}
         onDragStart={(event) => {
           if (resizingDashboardWidgetId) {
@@ -3886,187 +3709,25 @@ function App() {
 
       <main className="main-grid">
         {activeModule === 'ds' && activeTab === 'entrada' && (
-          <section className="panel entrada-layout">
-            <aside className="panel side-list">
-              <div className="row-between">
-                <h2>Registos recentes DS</h2>
-                <span className="recent-mode-badge">Lista</span>
-              </div>
-              <div className="small-note">Últimas alterações</div>
-              <div className="recent-list compact ds-recent-list">
-                {dsRecentRecords.length === 0 ? (
-                  <div className="empty-text">Ainda não existem registos DS.</div>
-                ) : (
-                  dsRecentRecords.map((record) => {
-                    const status = getStatus(dsStatuses, record.estadoId)
-                    const reference = record.referencia || record.proponentes || 'Sem referência'
-                    const details = [record.gestora, record.produto].filter((value): value is string => Boolean(value?.trim())).join(' · ')
-                    return (
-                      <button
-                        key={record.id}
-                        className="recent-card ds-recent-card"
-                        type="button"
-                        onClick={() => {
-                          setSelectedDsRecordId(record.id)
-                          setActiveTab('consulta')
-                        }}
-                      >
-                        <span className="ds-recent-ref">{reference}</span>
-                        <span className="muted ds-recent-meta">{details || '-'}</span>
-                        {status ? (
-                          <StatusPill status={status} compact />
-                        ) : (
-                          <span className="status-pill compact ds-status-fallback">
-                            <Circle size={14} />
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </aside>
-
-            <div className="panel ds-panel ds-entry-panel">
-              <div className="row-between">
-                <div>
-                  <h2>Entrada DS</h2>
-                  <p className="small-note">Registo manual de escrituras concretizadas no módulo DS.</p>
-                </div>
-              </div>
-
-              <form className="entry-form ds-entry-form" onSubmit={(event) => void submitDsEntry(event, 'save')}>
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Identificação</h3>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Gestora"
-                      value={dsEntryForm.gestora}
-                      onChange={(value) => handleDsEntryInput('gestora', value)}
-                      suggestions={dsGestoraFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Proponentes"
-                      value={dsEntryForm.proponentes}
-                      onChange={(value) => handleDsEntryInput('proponentes', value)}
-                      suggestions={dsProponentesSuggestions}
-                    />
-                    <LabeledInput
-                      label="Referência"
-                      value={dsEntryForm.referencia}
-                      onChange={(value) => handleDsEntryInput('referencia', value)}
-                      suggestions={dsReferenciaSuggestions}
-                    />
-                  </div>
-                </section>
-
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Contexto operacional</h3>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Produto"
-                      value={dsEntryForm.produto}
-                      onChange={(value) => handleDsEntryInput('produto', value)}
-                      suggestions={dsProdutoFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Entidade bancária"
-                      value={dsEntryForm.entidadeBancaria}
-                      onChange={(value) => handleDsEntryInput('entidadeBancaria', value)}
-                      suggestions={dsEntidadeFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Líder cálculo"
-                      value={dsEntryForm.liderCalculo}
-                      onChange={(value) => handleDsEntryInput('liderCalculo', value)}
-                    />
-                  </div>
-
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Recibo"
-                      value={dsEntryForm.recibo}
-                      onChange={(value) => handleDsEntryInput('recibo', value)}
-                      suggestions={dsReciboSuggestions}
-                    />
-                    <LabeledInput
-                      label="Falta recibo gestora"
-                      value={dsEntryForm.faltaReciboGestora}
-                      onChange={(value) => handleDsEntryInput('faltaReciboGestora', value)}
-                    />
-                    <LabeledSelect
-                      label="Estado"
-                      value={dsEntryForm.estadoId}
-                      onChange={(value) => handleDsEntryInput('estadoId', value)}
-                      options={
-                        dsOrderedStatuses.length > 0
-                          ? dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))
-                          : [{ value: dsEntryForm.estadoId || '', label: 'Sem estado' }]
-                      }
-                    />
-                  </div>
-                </section>
-
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Financeiro</h3>
-                  <div className="field-grid three">
-                    <LabeledInput label="Valor" value={dsEntryForm.valor} onChange={(value) => handleDsEntryInput('valor', value)} />
-                    <LabeledInput label="Comissão loja" value={dsEntryForm.comissaoLoja} onChange={(value) => handleDsEntryInput('comissaoLoja', value)} />
-                    <LabeledInput
-                      label="Total comissão loja c/ IVA"
-                      value={dsEntryForm.totalComissaoLojaCmIva}
-                      onChange={(value) => handleDsEntryInput('totalComissaoLojaCmIva', value)}
-                    />
-                  </div>
-
-                  <div className="field-grid three">
-                    <LabeledInput label="IVA CGD (raw)" value={dsEntryForm.ivaCgdRaw} onChange={(value) => handleDsEntryInput('ivaCgdRaw', value)} />
-                    <LabeledInput label="Comissão gestor" value={dsEntryForm.comissaoGestor} onChange={(value) => handleDsEntryInput('comissaoGestor', value)} />
-                    <LabeledInput label="Percentagem" value={dsEntryForm.percentagem} onChange={(value) => handleDsEntryInput('percentagem', value)} />
-                  </div>
-                </section>
-
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Datas e pagamento</h3>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Data escritura"
-                      type="date"
-                      value={dsEntryForm.dataEscritura}
-                      onChange={(value) => handleDsEntryInput('dataEscritura', value)}
-                    />
-                    <LabeledInput
-                      label="Data fecho CRM"
-                      type="date"
-                      value={dsEntryForm.dataFechoCrm}
-                      onChange={(value) => handleDsEntryInput('dataFechoCrm', value)}
-                    />
-                    <LabeledInput
-                      label="Pagamento comissão gestor"
-                      value={dsEntryForm.pagComissaoGestor}
-                      onChange={(value) => handleDsEntryInput('pagComissaoGestor', value)}
-                    />
-                  </div>
-                </section>
-
-                <div className="actions-row ds-entry-actions">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => setDsEntryForm(getInitialDsEntryForm(dsDefaultStatus?.id ?? dsEntryForm.estadoId))}
-                  >
-                    Limpar
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => void saveNewDsEntry()}>
-                    Guardar e novo
-                  </button>
-                  <button className="primary-btn" type="submit">
-                    Guardar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
+          <DsEntrada
+            dsRecentRecords={dsRecentRecords}
+            dsStatuses={dsStatuses}
+            dsOrderedStatuses={dsOrderedStatuses}
+            dsDefaultStatus={dsDefaultStatus}
+            dsEntryForm={dsEntryForm}
+            setDsEntryForm={setDsEntryForm}
+            submitDsEntry={submitDsEntry}
+            saveNewDsEntry={saveNewDsEntry}
+            handleDsEntryInput={handleDsEntryInput}
+            dsGestoraFilterOptions={dsGestoraFilterOptions}
+            dsProponentesSuggestions={dsProponentesSuggestions}
+            dsReferenciaSuggestions={dsReferenciaSuggestions}
+            dsProdutoFilterOptions={dsProdutoFilterOptions}
+            dsEntidadeFilterOptions={dsEntidadeFilterOptions}
+            dsReciboSuggestions={dsReciboSuggestions}
+            setActiveTab={setActiveTab}
+            setSelectedDsRecordId={setSelectedDsRecordId}
+          />
         )}
 
         {activeModule === 'ds' && activeTab === 'dashboards' && (
@@ -4164,132 +3825,22 @@ function App() {
         )}
 
         {activeModule === 'penhoras' && activeTab === 'entrada' && (
-          <section className="panel entrada-layout">
-            <aside className="panel side-list">
-              <div className="row-between">
-                <h2>Registos recentes Penhoras</h2>
-                <span className="recent-mode-badge">Lista</span>
-              </div>
-              <div className="small-note">Últimas alterações</div>
-              <div className="recent-list compact penhoras-recent-list">
-                {penhorasRecentRecords.length === 0 ? (
-                  <div className="empty-text">Ainda não existem registos de penhoras.</div>
-                ) : (
-                  penhorasRecentRecords.map((record) => {
-                    const status = getStatus(penhorasStatuses, record.estadoId)
-                    const reference = record.pe || record.pedido || record.identificacao || 'Sem referência'
-                    const details = [record.gestor, record.acto].filter((value): value is string => Boolean(value?.trim())).join(' · ')
-                    return (
-                      <button
-                        key={record.id}
-                        className="recent-card penhoras-recent-card"
-                        type="button"
-                        onClick={() => {
-                          setSelectedPenhorasRecordId(record.id)
-                          setActiveTab('consulta')
-                        }}
-                      >
-                        <span className="penhoras-recent-ref">{reference}</span>
-                        <span className="muted penhoras-recent-meta">{details || '-'}</span>
-                        {status ? (
-                          <StatusPill status={status} compact />
-                        ) : (
-                          <span className="status-pill compact ds-status-fallback">
-                            <Circle size={14} />
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </aside>
-
-            <div className="panel ds-panel penhoras-panel penhoras-entry-panel">
-              <div className="row-between">
-                <div>
-                  <h2>Entrada Penhoras</h2>
-                  <p className="small-note">Registo manual de penhoras com dados isolados dos módulos de recibos e DS.</p>
-                </div>
-              </div>
-
-              <form className="entry-form ds-entry-form" onSubmit={(event) => void submitPenhorasEntry(event, 'save')}>
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Identificação</h3>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="PE"
-                      value={penhorasEntryForm.pe}
-                      onChange={(value) => handlePenhorasEntryInput('pe', value)}
-                      suggestions={penhorasPeSuggestions}
-                    />
-                    <LabeledInput
-                      label="Acto"
-                      value={penhorasEntryForm.acto}
-                      onChange={(value) => handlePenhorasEntryInput('acto', value)}
-                      suggestions={penhorasActoFilterOptions}
-                    />
-                    <LabeledInput
-                      label="Data pedido"
-                      type="date"
-                      value={penhorasEntryForm.dataPedido}
-                      onChange={(value) => handlePenhorasEntryInput('dataPedido', value)}
-                    />
-                  </div>
-                </section>
-
-                <section className="ds-form-section">
-                  <h3 className="ds-form-section-title">Contexto operacional</h3>
-                  <div className="field-grid three">
-                    <LabeledInput
-                      label="Identificação"
-                      value={penhorasEntryForm.identificacao}
-                      onChange={(value) => handlePenhorasEntryInput('identificacao', value)}
-                    />
-                    <LabeledInput
-                      label="Pedido"
-                      value={penhorasEntryForm.pedido}
-                      onChange={(value) => handlePenhorasEntryInput('pedido', value)}
-                    />
-                    <LabeledInput
-                      label="Gestor"
-                      value={penhorasEntryForm.gestor}
-                      onChange={(value) => handlePenhorasEntryInput('gestor', value)}
-                      suggestions={penhorasGestorFilterOptions}
-                    />
-                  </div>
-                  <div className="field-grid three">
-                    <LabeledSelect
-                      label="Estado"
-                      value={penhorasEntryForm.estadoId}
-                      onChange={(value) => handlePenhorasEntryInput('estadoId', value)}
-                      options={
-                        penhorasActiveStatuses.length > 0
-                          ? penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))
-                          : [{ value: penhorasEntryForm.estadoId || '', label: 'Sem estado' }]
-                      }
-                    />
-                  </div>
-                </section>
-
-                <div className="actions-row ds-entry-actions">
-                  <button
-                    className="subtle-btn"
-                    type="button"
-                    onClick={() => setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasDefaultStatus?.id ?? penhorasEntryForm.estadoId))}
-                  >
-                    Limpar
-                  </button>
-                  <button className="subtle-btn" type="button" onClick={() => void saveNewPenhorasEntry()}>
-                    Guardar e novo
-                  </button>
-                  <button className="primary-btn" type="submit">
-                    Guardar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </section>
+          <PenhorasEntrada
+            penhorasRecentRecords={penhorasRecentRecords}
+            penhorasStatuses={penhorasStatuses}
+            penhorasActiveStatuses={penhorasActiveStatuses}
+            penhorasDefaultStatus={penhorasDefaultStatus}
+            penhorasEntryForm={penhorasEntryForm}
+            setPenhorasEntryForm={setPenhorasEntryForm}
+            submitPenhorasEntry={submitPenhorasEntry}
+            saveNewPenhorasEntry={saveNewPenhorasEntry}
+            handlePenhorasEntryInput={handlePenhorasEntryInput}
+            penhorasPeSuggestions={penhorasPeSuggestions}
+            penhorasActoFilterOptions={penhorasActoFilterOptions}
+            penhorasGestorFilterOptions={penhorasGestorFilterOptions}
+            setActiveTab={setActiveTab}
+            setSelectedPenhorasRecordId={setSelectedPenhorasRecordId}
+          />
         )}
 
         {activeModule === 'penhoras' && activeTab === 'dashboards' && (
@@ -4389,135 +3940,23 @@ function App() {
 
         {
           activeModule === 'recibos' && activeTab === 'entrada' && (
-            <section className="panel entrada-layout">
-              <aside className="panel side-list">
-                <div className="row-between">
-                  <h2>Registos recentes</h2>
-                  <span className="recent-mode-badge">Lista</span>
-                </div>
-                <div className="small-note">Últimas alterações</div>
-                <div className="recent-list compact">
-                  {recentRecords.length === 0 ? (
-                    <div className="empty-text">Ainda não existem registos.</div>
-                  ) : (
-                    recentRecords.map((record) => {
-                      const status = getStatus(statuses, record.estadoId)
-                      const reference = getPrimaryRecordReference(record)
-                      return (
-                        <button
-                          key={record.id}
-                          className="recent-card"
-                          type="button"
-                          onClick={() => {
-                            setSelectedRecordId(record.id)
-                            setActiveTab('consulta')
-                          }}
-                        >
-                          <span>{reference}</span>
-                          <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
-                          {status && <StatusPill status={status} compact />}
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </aside>
-
-              <div className="panel">
-                <div className="row-between">
-                  <div>
-                    <h2>Novo registo</h2>
-                    <p className="small-note">Campos fiscais calculados automaticamente com base na configuração.</p>
-                  </div>
-                  <button className="subtle-btn" type="button" onClick={() => setEntryForm(applyFormAutoCalculations(entryForm, calculationSettings, true))}>
-                    Recalcular
-                  </button>
-                </div>
-
-                <form className="entry-form" onSubmit={(event) => void submitEntry(event, 'save')}>
-                  <div className="field-grid three">
-                    <LabeledSelect
-                      label="Tipo"
-                      value={entryForm.tipo}
-                      onChange={(value) => handleEntryInput('tipo', value as RecordType)}
-                      options={[
-                        { value: 'exequente', label: 'Exequente' },
-                        { value: 'executado', label: 'Executado' },
-                      ]}
-                    />
-                    <LabeledSelect
-                      label="Mês"
-                      value={String(entryForm.mes)}
-                      onChange={(value) => handleEntryInput('mes', Number(value))}
-                      options={MONTHS.map((label, index) => ({ value: String(index + 1), label }))}
-                    />
-                    <LabeledInput
-                      label="Ano"
-                      value={String(entryForm.ano)}
-                      onChange={(value) => handleEntryInput('ano', Number(value) || new Date().getFullYear())}
-                    />
-                  </div>
-
-                  <div className="field-grid three">
-                    <LabeledInput label="Processo" value={entryForm.processo} onChange={(value) => handleEntryInput('processo', value)} suggestions={recordSuggestions.processo} />
-                    <LabeledInput label="PE" value={entryForm.pe} onChange={(value) => handleEntryInput('pe', value)} suggestions={recordSuggestions.pe} />
-                    <LabeledInput label="N.º de recibo" value={entryForm.reciboNumero} onChange={(value) => handleEntryInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
-                  </div>
-
-                  <div className="field-grid four">
-                    <LabeledInput type="date" label="Data de levantamento" value={entryForm.dataLevantamento} onChange={(value) => handleEntryInput('dataLevantamento', value)} />
-                    <LabeledInput type="date" label="Data de recibo" value={entryForm.dataRecibo} onChange={(value) => handleEntryInput('dataRecibo', value)} />
-                    <LabeledInput
-                      label="Gestor"
-                      value={entryForm.gestor}
-                      onChange={(value) => handleEntryInput('gestor', value)}
-                      suggestions={gestorSuggestions}
-                    />
-                    <LabeledInput
-                      label="Exequente"
-                      value={entryForm.exequente}
-                      onChange={(value) => handleEntryInput('exequente', value)}
-                      suggestions={exequenteSuggestions}
-                    />
-                  </div>
-
-                  <div className="field-grid five">
-                    <LabeledInput label="Valor indicado" value={entryForm.valorIndicado} onChange={(value) => handleEntryInput('valorIndicado', value)} />
-                    <LabeledInput label="Valor sem IVA" value={entryForm.valorSemIva} onChange={(value) => handleEntryInput('valorSemIva', value)} />
-                    <LabeledInput label="IVA" value={entryForm.iva} onChange={(value) => handleEntryInput('iva', value)} />
-                    <LabeledInput label="Retenção" value={entryForm.retencao} onChange={(value) => handleEntryInput('retencao', value)} />
-                    <LabeledInput label="Meu 5%" value={entryForm.meu5} onChange={(value) => handleEntryInput('meu5', value)} />
-                  </div>
-
-                  <div className="field-grid five">
-                    <LabeledInput label="GPESE" value={entryForm.gpeSe} onChange={(value) => handleEntryInput('gpeSe', value)} />
-                    <LabeledInput label="Outras taxas" value={entryForm.outrasTaxas} onChange={(value) => handleEntryInput('outrasTaxas', value)} />
-                    <LabeledInput label="Valor emissão" value={entryForm.valorEmissao} onChange={(value) => handleEntryInput('valorEmissao', value)} />
-                    <LabeledInput label="Descrição valor" value={entryForm.descricaoValor} onChange={(value) => handleEntryInput('descricaoValor', value)} />
-                    <LabeledSelect
-                      label="Estado"
-                      value={entryForm.estadoId}
-                      onChange={(value) => handleEntryInput('estadoId', value)}
-                      options={activeStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                    />
-                  </div>
-
-                  <div className="field-grid one">
-                    <LabeledInput label="Indicações de levantamento" value={entryForm.indicacoes} onChange={(value) => handleEntryInput('indicacoes', value)} />
-                  </div>
-
-                  <div className="actions-row">
-                    <button type="button" className="subtle-btn" onClick={() => defaultStatus && setEntryForm(getInitialEntryForm(defaultStatus.id))}>
-                      Limpar
-                    </button>
-                    <button type="button" className="subtle-btn" onClick={() => void saveNewEntry()}>
-                      Guardar e novo
-                    </button>
-                    <button type="submit" className="primary-btn">Guardar</button>
-                  </div>
-                </form>
-              </div>
-            </section>
+            <RecibosEntrada
+              recentRecords={recentRecords}
+              statuses={statuses}
+              activeStatuses={activeStatuses}
+              defaultStatus={defaultStatus}
+              entryForm={entryForm}
+              setEntryForm={setEntryForm}
+              calculationSettings={calculationSettings}
+              submitEntry={submitEntry}
+              saveNewEntry={saveNewEntry}
+              handleEntryInput={handleEntryInput}
+              recordSuggestions={recordSuggestions}
+              gestorSuggestions={gestorSuggestions}
+              exequenteSuggestions={exequenteSuggestions}
+              setActiveTab={setActiveTab}
+              setSelectedRecordId={setSelectedRecordId}
+            />
           )
         }
 
@@ -4557,7 +3996,6 @@ function App() {
               allSelectedInTable={allSelectedInTable}
               toggleSelectAllRecords={toggleSelectAllRecords}
               toggleSelectRecord={toggleSelectRecord}
-              exportCurrentTableToCsv={exportCurrentTableToCsv}
               bulkStatusId={bulkStatusId}
               setBulkStatusId={setBulkStatusId}
               runBulkStatusUpdate={runBulkStatusUpdate}
@@ -5256,98 +4694,6 @@ function LabeledSelect({ label, value, onChange, options }: LabeledSelectProps) 
   )
 }
 
-type StatusPillProps = {
-  status: StatusDefinition
-  compact?: boolean
-}
-
-function StatusPill({ status, compact }: StatusPillProps) {
-  return (
-    <span className={`status-pill ${compact ? 'compact' : ''}`} style={{ borderColor: status.color, backgroundColor: colorWithAlpha(status.color, '26') }}>
-      {renderStatusIcon(status.icon, 14)}
-      {!compact && <span>{status.label}</span>}
-    </span>
-  )
-}
-
-
-type ExequenteLogoProps = {
-  name?: string
-  size?: number
-}
-
-function ExequenteLogo({ name, size = 18 }: ExequenteLogoProps) {
-  const [hasError, setHasError] = useState(false)
-  const logoUrl = getExequenteLogoUrl(name)
-  const letter = name?.trim().charAt(0)?.toUpperCase() || '•'
-
-  if (!logoUrl || hasError) {
-    return (
-      <span className="logo-fallback" style={{ width: size, height: size }}>
-        {letter}
-      </span>
-    )
-  }
-
-  return (
-    <img
-      className="exequente-logo"
-      src={logoUrl}
-      alt={name ?? 'Logo exequente'}
-      width={size}
-      height={size}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setHasError(true)}
-    />
-  )
-}
-
-type EntityIdentityProps = {
-  gestor?: string
-  exequente?: string
-}
-
-function GestorAvatar({ gestor, size = 18 }: { gestor?: string; size?: number }) {
-  const initial = gestor?.trim()?.charAt(0)?.toUpperCase()
-  return (
-    <span className="gestor-avatar" style={{ width: size, height: size }}>
-      {initial || <UserRound size={Math.max(11, size - 6)} />}
-    </span>
-  )
-}
-
-function EntityIdentity({ gestor, exequente }: EntityIdentityProps) {
-  const gestorValue = gestor?.trim()
-  const exequenteValue = exequente?.trim()
-  const label = gestorValue || exequenteValue
-
-  if (gestorValue) {
-    return (
-      <span className="entity-with-logo">
-        <GestorAvatar gestor={gestorValue} />
-        <span>{label}</span>
-      </span>
-    )
-  }
-
-  if (!exequenteValue) {
-    return (
-      <span className="entity-with-logo entity-empty" aria-label="Sem entidade">
-        <span className="entity-empty-icon">
-          <Minus size={11} />
-        </span>
-      </span>
-    )
-  }
-
-  return (
-    <span className="entity-with-logo">
-      <ExequenteLogo name={exequenteValue} />
-      <span>{exequenteValue}</span>
-    </span>
-  )
-}
 
 type InfoProps = {
   label: string

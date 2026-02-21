@@ -1,5 +1,8 @@
-import { Eye, EyeOff, FilterX, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
+import { ExportComposer } from '../shared/ExportComposer'
+import type { ExportColumn } from '../../lib/exportGenerators'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
@@ -70,6 +73,23 @@ export function PenhorasConsultaTabela({
     setIsPenhorasRecordEditing,
     updatePenhorasRecordStatus,
 }: PenhorasConsultaTabelaProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
+    const exportColumns: ExportColumn[] = [
+        { header: 'PE', key: 'pe', width: 15 },
+        { header: 'Identificação', key: 'identificacao', width: 30 },
+        { header: 'Pedido', key: 'pedido', width: 30 },
+        { header: 'Gestor(a)', key: 'gestor', width: 20 },
+        { header: 'Acto', key: 'acto', width: 20 },
+        { header: 'Data do Pedido', key: 'dataPedido', width: 15 },
+        { header: 'Estado', key: 'estadoId', width: 25 },
+    ]
+
+    const exportData = penhorasRecords.map(r => ({
+        ...r,
+        estadoId: getStatus(penhorasStatuses, r.estadoId)?.label || r.estadoId || 'Sem estado',
+    }))
+
     return (
         <section className="panel ds-panel penhoras-panel penhoras-results-panel">
             <div className="row-between wrap">
@@ -119,6 +139,10 @@ export function PenhorasConsultaTabela({
                     </button>
                     <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('penhoras-tabela', { ...penhorasFilters, q: globalSearch })}>
                         Guardar vista
+                    </button>
+                    <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                        <Download size={15} />
+                        Exportar
                     </button>
                 </div>
             </div>
@@ -274,6 +298,14 @@ export function PenhorasConsultaTabela({
                     </table>
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="Penhoras"
+                columns={exportColumns}
+                data={exportData}
+            />
         </section>
     )
 }
