@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { FileText, FileSpreadsheet, FileImage, Sparkles, X, Loader2 } from 'lucide-react'
 import { exportToCsv, exportToExcel, exportToPdf, type ExportColumn } from '../../lib/exportGenerators'
 
@@ -9,6 +9,8 @@ interface ExportComposerProps {
     columns: ExportColumn[]
     data: Record<string, unknown>[]
     dashboardElementId?: string
+    themeColor?: string
+    dashboardName?: string
 }
 
 export function ExportComposer({
@@ -18,9 +20,12 @@ export function ExportComposer({
     columns,
     data,
     dashboardElementId,
+    themeColor,
+    dashboardName,
 }: ExportComposerProps) {
     const [format, setFormat] = useState<'excel' | 'csv' | 'pdf'>('excel')
     const [useAi, setUseAi] = useState(false)
+    const [exportName, setExportName] = useState(dashboardName || '')
     const [isExporting, setIsExporting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -54,11 +59,17 @@ export function ExportComposer({
                 summaryText = resData.summary
             }
 
+            let finalTitle = `Exportação de ${moduleName}`
+            if (dashboardElementId && format === 'pdf') {
+                finalTitle = exportName ? `Exportação de Dashboard ${exportName}` : `Exportação de Dashboard`
+            }
+
             const exportData = {
-                title: `Exportação de ${moduleName}`,
+                title: finalTitle,
                 columns,
                 rows: data,
                 summaryText,
+                themeColor,
             }
 
             const filename = `${moduleName.toLowerCase()}_export_${new Date().toISOString().slice(0, 10)}`
@@ -148,19 +159,36 @@ export function ExportComposer({
                         </div>
                     </div>
 
+                    {dashboardElementId && format === 'pdf' && (
+                        <div className="filter-group" style={{ marginTop: '16px' }}>
+                            <label className="filter-label">Nome da Exportação</label>
+                            <input
+                                type="text"
+                                className="styled-input"
+                                value={exportName}
+                                onChange={(e) => setExportName(e.target.value)}
+                                placeholder="Insira o nome (ex: Dashboard Q1)"
+                                disabled={isExporting}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                    )}
+
                     <div className="filter-group" style={{ marginTop: '16px' }}>
                         <label
                             className="checkbox-label"
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '8px',
+                                gap: '10px',
                                 cursor: isExporting ? 'not-allowed' : 'pointer',
-                                padding: '12px',
-                                border: '1px solid var(--line)',
+                                padding: '14px',
+                                border: '1px solid',
                                 borderRadius: 'var(--radius-md)',
-                                background: useAi ? 'color-mix(in oklab, var(--brand) 6%, transparent)' : 'transparent',
+                                background: useAi ? 'color-mix(in oklab, var(--brand) 6%, transparent)' : 'var(--surface)',
                                 borderColor: useAi ? 'var(--brand)' : 'var(--line)',
+                                boxShadow: useAi ? '0 0 0 1px var(--brand) inset' : '0 1px 2px rgba(0,0,0,0.02)',
+                                transition: 'all 0.2s ease',
                                 opacity: isExporting ? 0.7 : 1,
                             }}
                         >
@@ -175,8 +203,8 @@ export function ExportComposer({
                                 Gerar Resumo Inteligente (Opcional)
                             </span>
                         </label>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginTop: '6px', lineHeight: 1.4 }}>
-                            Adiciona um resumo executivo gerado por IA (Gemini) no topo do ficheiro baseado numa amostra dos dados selecionados.
+                        <p style={{ fontSize: '0.82rem', color: 'var(--ink-muted)', marginTop: '8px', lineHeight: 1.5, paddingLeft: '2px' }}>
+                            Adiciona um resumo executivo gerado por IA (Gemini) no topo do ficheiro baseado numa amostra dos dados selecionados. Esta análise pode atrasar a exportação uns segundos.
                         </p>
                     </div>
 

@@ -1,10 +1,11 @@
-import type { ReactNode, Dispatch, SetStateAction } from 'react'
-import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2 } from 'lucide-react'
+import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
+import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2, Download } from 'lucide-react'
 import type { PenhorasRecordFilters, StatusDefinition } from '../../types'
 import type { PenhorasDashboardWidget, PenhorasDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { PENHORAS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultPenhorasDashboardWidgets } from '../../lib/dashboardWidgets'
 import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
+import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -79,8 +80,10 @@ export function PenhorasDashboards({
     penhorasRecordsLoading,
     penhorasTotalRecords,
 }: PenhorasDashboardsProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
     return (
-        <section className="panel dashboard-experiment ds-panel penhoras-panel penhoras-dashboard-panel">
+        <section className="panel dashboard-experiment ds-panel penhoras-panel penhoras-dashboard-panel" id="penhoras-dashboard-view">
             {!isDashboardFocusMode && (
                 <>
                     <div className="row-between wrap">
@@ -138,7 +141,7 @@ export function PenhorasDashboards({
                         </div>
                     </div>
 
-                    <div className="dashboard-top-actions">
+                    <div className="dashboard-top-actions no-export">
                         <button
                             className="subtle-btn"
                             type="button"
@@ -149,6 +152,10 @@ export function PenhorasDashboards({
                         >
                             <Maximize2 size={15} />
                             Expandir dashboard
+                        </button>
+                        <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                            <Download size={15} />
+                            Exportar
                         </button>
                         <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardConfigOpen((current) => !current)}>
                             {penhorasDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -183,7 +190,7 @@ export function PenhorasDashboards({
                                 </article>
                             </div>
 
-                            <div className="filters-row seven ds-filters-row">
+                            <div className="filters-row seven ds-filters-row no-export">
                                 <LabeledSelect
                                     label="Estado"
                                     value={String(penhorasFilters.estadoId ?? 'todos')}
@@ -224,7 +231,7 @@ export function PenhorasDashboards({
                                 </div>
                             </div>
 
-                            <div className="dashboard-picker-wrap">
+                            <div className="dashboard-picker-wrap no-export">
                                 <button className="subtle-btn" type="button" onClick={() => setPenhorasDashboardPickerOpen((current) => !current)}>
                                     {penhorasDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
                                 </button>
@@ -246,7 +253,7 @@ export function PenhorasDashboards({
                             </div>
                         </>
                     ) : (
-                        <div className="dashboard-collapsed-note muted">
+                        <div className="dashboard-collapsed-note muted no-export">
                             Painel de configuração oculto. Use &ldquo;Mostrar painel&rdquo; para editar filtros.
                         </div>
                     )}
@@ -286,6 +293,26 @@ export function PenhorasDashboards({
                     Widgets ocultos. Use &ldquo;Mostrar widgets&rdquo; para voltar a apresentar o dashboard.
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="Dashboard Penhoras"
+                columns={[
+                    { header: 'Registos', key: 'registos', width: 15 },
+                    { header: 'Com Data Pedido', key: 'comDataPedido', width: 20 },
+                    { header: 'Recusados/Desistência', key: 'recusados', width: 20 },
+                    { header: 'Pendentes de Registo', key: 'pendentes', width: 20 },
+                ]}
+                data={penhorasDashboardTotals ? [{
+                    registos: penhorasDashboardTotals.registos,
+                    comDataPedido: penhorasDashboardTotals.comDataPedido,
+                    recusados: penhorasDashboardTotals.recusados,
+                    pendentes: penhorasDashboardTotals.pendentes
+                }] : []}
+                dashboardElementId="penhoras-dashboard-view"
+                themeColor="#d97706"
+            />
         </section>
     )
 }

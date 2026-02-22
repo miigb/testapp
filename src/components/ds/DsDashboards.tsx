@@ -1,10 +1,11 @@
-import type { ReactNode, Dispatch, SetStateAction } from 'react'
-import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2 } from 'lucide-react'
+import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
+import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2, Download } from 'lucide-react'
 import type { DsRecordFilters, StatusDefinition } from '../../types'
 import type { DsDashboardWidget, DsDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { DS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultDsDashboardWidgets } from '../../lib/dashboardWidgets'
 import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
+import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -50,6 +51,7 @@ export interface DsDashboardsProps {
     patchDsFilters: <K extends keyof DsRecordFilters>(key: K, value: DsRecordFilters[K]) => void
     dsRecordsLoading: boolean
     dsTotalRecords: number
+    dashboardName?: string
 }
 
 export function DsDashboards({
@@ -88,9 +90,12 @@ export function DsDashboards({
     patchDsFilters,
     dsRecordsLoading,
     dsTotalRecords,
+    dashboardName,
 }: DsDashboardsProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
     return (
-        <section className="panel dashboard-experiment ds-panel ds-dashboard-panel">
+        <section className="panel dashboard-experiment ds-panel ds-dashboard-panel" id="ds-dashboard-view">
             {!isDashboardFocusMode && (
                 <>
                     <div className="row-between wrap">
@@ -148,7 +153,7 @@ export function DsDashboards({
                         </div>
                     </div>
 
-                    <div className="dashboard-top-actions">
+                    <div className="dashboard-top-actions no-export">
                         <button
                             className="subtle-btn"
                             type="button"
@@ -159,6 +164,10 @@ export function DsDashboards({
                         >
                             <Maximize2 size={15} />
                             Expandir dashboard
+                        </button>
+                        <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                            <Download size={15} />
+                            Exportar
                         </button>
                         <button className="subtle-btn" type="button" onClick={() => setDsDashboardConfigOpen((current) => !current)}>
                             {dsDashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -193,7 +202,7 @@ export function DsDashboards({
                                 </article>
                             </div>
 
-                            <div className="filters-row eight ds-filters-row">
+                            <div className="filters-row eight ds-filters-row no-export">
                                 <LabeledSelect
                                     label="Estado"
                                     value={String(dsFilters.estadoId ?? 'todos')}
@@ -246,7 +255,7 @@ export function DsDashboards({
                                 </div>
                             </div>
 
-                            <div className="dashboard-picker-wrap">
+                            <div className="dashboard-picker-wrap no-export">
                                 <button className="subtle-btn" type="button" onClick={() => setDsDashboardPickerOpen((current) => !current)}>
                                     {dsDashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
                                 </button>
@@ -268,7 +277,7 @@ export function DsDashboards({
                             </div>
                         </>
                     ) : (
-                        <div className="dashboard-collapsed-note muted">
+                        <div className="dashboard-collapsed-note muted no-export">
                             Painel de configuração oculto. Use &ldquo;Mostrar painel&rdquo; para editar filtros.
                         </div>
                     )}
@@ -302,6 +311,25 @@ export function DsDashboards({
                     Widgets ocultos. Use &ldquo;Mostrar widgets&rdquo; para voltar a apresentar o dashboard.
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="Dashboard DS"
+                columns={[
+                    { header: 'Registos', key: 'registos', width: 15 },
+                    { header: 'Passaporte', key: 'passaporte', width: 20 },
+                    { header: 'Total C/Iva', key: 'totalComIva', width: 20 },
+                ]}
+                data={dsDashboardTotals ? [{
+                    registos: dsDashboardTotals.registos,
+                    passaporte: dsDashboardTotals.comissaoLoja,
+                    totalComIva: dsDashboardTotals.totalComissaoLojaCmIva
+                }] : []}
+                dashboardElementId="ds-dashboard-view"
+                themeColor="#0c6ea8"
+                dashboardName={dashboardName}
+            />
         </section>
     )
 }

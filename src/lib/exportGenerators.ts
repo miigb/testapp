@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
+import { toPng } from 'html-to-image'
 
 export type ExportColumn = {
     header: string
@@ -10,9 +10,10 @@ export type ExportColumn = {
 
 export type ExportData = {
     columns: ExportColumn[]
-    rows: Record<string, any>[]
+    rows: Record<string, unknown>[]
     summaryText?: string
     title?: string
+    themeColor?: string
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -61,7 +62,7 @@ export async function exportToExcel(data: ExportData, filename: string) {
         sheet.addRow([]) // empty row
     }
 
-    const headerRowPos = data.summaryText ? 4 : 1
+
 
     const headerRow = sheet.addRow(data.columns.map((c) => c.header))
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
@@ -91,12 +92,25 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
     const pdf = new jsPDF(orientation, 'pt', 'a4')
 
     const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
     let currentY = 40
 
+    // Draw header thick line
+    if (data.themeColor) {
+        pdf.setFillColor(data.themeColor)
+        pdf.rect(0, 0, pageWidth, 12, 'F')
+        currentY = 50
+    }
+
     if (data.title) {
-        pdf.setFontSize(18)
+        if (data.themeColor) {
+            pdf.setTextColor(data.themeColor)
+        }
+        pdf.setFontSize(22)
+        pdf.setFont('helvetica', 'bold')
         pdf.text(data.title, 40, currentY)
-        currentY += 30
+        pdf.setTextColor('#000000') // reset
+        currentY += 35
     }
 
     if (data.summaryText) {
@@ -109,29 +123,82 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         pdf.setFontSize(10)
 
         const lines = pdf.splitTextToSize(data.summaryText, pageWidth - 80)
+        pdf.setTextColor('#4b5563')
         pdf.text(lines, 40, currentY)
+        pdf.setTextColor('#000000')
         currentY += (lines.length * 14) + 20
     }
+
+    // Render dashboard summary cards
+    if (dashboardElementId && data.rows && data.rows.length === 1 && data.columns && data.columns.length > 0) {
+        const row = data.rows[0];
+        const cardWidth = 160;
+        const cardHeight = 50;
+        const spacing = 16;
+        let cx = 40;
+
+        data.columns.forEach((col) => {
+            const val = row[col.key];
+
+            // Draw box
+            pdf.setDrawColor('#e5e7eb') // border
+            pdf.setFillColor('#f9fafb') // bg
+            pdf.roundedRect(cx, currentY, cardWidth, cardHeight, 4, 4, 'FD')
+
+            // Draw label
+            pdf.setFont('helvetica', 'normal')
+            pdf.setTextColor('#6b7280')
+            pdf.setFontSize(8)
+            pdf.text(col.header.toUpperCase(), cx + 10, currentY + 20)
+
+            // Draw value
+            pdf.setFont('helvetica', 'bold')
+            pdf.setTextColor('#111827')
+            pdf.setFontSize(16)
+            pdf.text(String(val), cx + 10, currentY + 40)
+
+            cx += cardWidth + spacing
+        });
+
+        currentY += cardHeight + 20;
+    }
+
 
     if (dashboardElementId) {
         const el = document.getElementById(dashboardElementId)
         if (el) {
             try {
-                const canvas = await html2canvas(el, { scale: 2, useCORS: true })
-                const imgData = canvas.toDataURL('image/png')
+                // We use html-to-image instead of html2canvas because it supports modern CSS like color-mix natively.
+                // We also filter out the modal overlay so it doesn't cover the dashboard in the screenshot.
+                const imgData = await toPng(el, {
+                    pixelRatio: 2,
+                    skipFonts: true, // Prevents hanging on font load errors if any
+                    filter: (node) => {
+                        if (node instanceof HTMLElement) {
+                            if (node.classList?.contains('record-modal-overlay') || node.classList?.contains('no-export')) {
+                                return false
+                            }
+                        }
+                        return true
+                    }
+                })
 
                 // Calculate image dimensions to fit within PDF page width
-                const imgWidth = pageWidth - 80
-                const ratio = canvas.height / canvas.width
-                const imgHeight = imgWidth * ratio
+                let imgWidth = pageWidth - 80
+                const ratio = el.offsetHeight / el.offsetWidth
+                let imgHeight = imgWidth * ratio
 
-                // Check if image fits on current page, if not, add new page
-                if (currentY + imgHeight > pdf.internal.pageSize.getHeight() - 40) {
-                    pdf.addPage()
-                    currentY = 40
+                // Force to fit on the same page
+                const availableHeight = pageHeight - currentY - 40
+                if (imgHeight > availableHeight) {
+                    imgHeight = availableHeight
+                    imgWidth = imgHeight / ratio
                 }
 
-                pdf.addImage(imgData, 'PNG', 40, currentY, imgWidth, imgHeight)
+                // Center if scaled down by height
+                const xOffset = 40 + (pageWidth - 80 - imgWidth) / 2
+
+                pdf.addImage(imgData, 'PNG', xOffset, currentY, imgWidth, imgHeight)
                 currentY += imgHeight + 30
             } catch (err) {
                 console.error('Failed to capture dashboard snapshot', err)
@@ -139,9 +206,9 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         }
     }
 
-    // Draw simple table if rows exist
-    if (data.rows.length > 0) {
-        if (currentY > pdf.internal.pageSize.getHeight() - 100) {
+    // Draw simple table if rows exist and no dashboard was specified to take up the page
+    if (data.rows.length > 0 && !dashboardElementId) {
+        if (currentY > pageHeight - 100) {
             pdf.addPage()
             currentY = 40
         }

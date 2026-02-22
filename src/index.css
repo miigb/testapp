@@ -2665,6 +2665,8 @@ tbody tr:hover {
   max-height: calc(100vh - 40px);
   overflow: auto;
   border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--line) inset;
   border-radius: calc(var(--radius-lg) + 2px);
   padding: 16px;
 }

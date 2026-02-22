@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
-import { Eye, EyeOff, FilterX, Maximize2, Plus, Save, Trash2 } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Eye, EyeOff, FilterX, Maximize2, Plus, Save, Trash2, Download } from 'lucide-react'
 import type { RecordFilters, StatusDefinition, SavedView } from '../../types'
 import type { DashboardWidget, DashboardWidgetType } from '../../lib/dashboardWidgets'
 import { DASHBOARD_WIDGET_LIBRARY } from '../../lib/dashboardWidgets'
 import { DEFAULT_DASHBOARD_FILTERS } from '../../constants'
 import { LabeledSelect } from '../shared/FormInputs'
 import { LabeledInput } from '../shared/FormInputs'
+import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -88,11 +89,13 @@ export function RecibosDashboards({
     dashboardHasSideStack,
     renderDashboardWidget,
 }: RecibosDashboardsProps) {
+    const [isExportOpen, setIsExportOpen] = useState(false)
+
     return (
-        <section className="panel dashboard-experiment">
+        <section className="panel dashboard-experiment" id="recibos-dashboard-view">
             {!isDashboardFocusMode && (
                 <>
-                    <div className="row-between wrap">
+                    <div className="row-between wrap no-export">
                         <div>
                             <h2>Dashboards</h2>
                             <p className="small-note">Começa vazio e adiciona widgets pré-configurados para foco imediato.</p>
@@ -101,6 +104,10 @@ export function RecibosDashboards({
                             <button className="subtle-btn" type="button" onClick={() => setDashboardFocusMode(true)}>
                                 <Maximize2 size={15} />
                                 Expandir dashboard
+                            </button>
+                            <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                                <Download size={15} />
+                                Exportar
                             </button>
                             <button className="subtle-btn" type="button" onClick={() => setDashboardConfigOpen((current) => !current)}>
                                 {dashboardConfigOpen ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -148,7 +155,7 @@ export function RecibosDashboards({
                                 </div>
                             </div>
 
-                            <div className="dashboard-controls-grid simple">
+                            <div className="dashboard-controls-grid simple no-export">
                                 <label className="field">
                                     <span>Dashboard ativo</span>
                                     <select
@@ -176,7 +183,7 @@ export function RecibosDashboards({
                                 <LabeledInput label="Nome" value={dashboardName} onChange={(value) => setDashboardName(value)} />
                             </div>
 
-                            <div className="dashboard-filter-toolbar">
+                            <div className="dashboard-filter-toolbar no-export">
                                 <button className="subtle-btn" type="button" onClick={() => setDashboardFiltersOpen((current) => !current)}>
                                     {dashboardFiltersOpen ? 'Ocultar filtros' : 'Mostrar filtros'}
                                 </button>
@@ -195,7 +202,7 @@ export function RecibosDashboards({
                             </div>
 
                             {dashboardFiltersOpen && (
-                                <div className="dashboard-filters-grid">
+                                <div className="dashboard-filters-grid no-export">
                                     <LabeledSelect
                                         label="Tipo"
                                         value={String(dashboardFilters.tipo ?? 'todos')}
@@ -239,7 +246,7 @@ export function RecibosDashboards({
                                 </div>
                             )}
 
-                            <div className="dashboard-picker-wrap">
+                            <div className="dashboard-picker-wrap no-export">
                                 <button className="subtle-btn" type="button" onClick={() => setDashboardPickerOpen((current) => !current)}>
                                     {dashboardPickerOpen ? 'Ocultar widgets' : 'Adicionar widgets'}
                                 </button>
@@ -261,7 +268,7 @@ export function RecibosDashboards({
                             </div>
                         </>
                     ) : (
-                        <div className="dashboard-collapsed-note muted">
+                        <div className="dashboard-collapsed-note muted no-export">
                             Painel de configuração oculto. Use &ldquo;Mostrar painel&rdquo; para editar filtros e widgets.
                         </div>
                     )}
@@ -279,13 +286,30 @@ export function RecibosDashboards({
                             <div className="dashboard-main-widgets">{dashboardMainWidgets.map((widget) => renderDashboardWidget(widget))}</div>
                             <aside className="dashboard-side-widgets">{dashboardSideWidgets.map((widget) => renderDashboardWidget(widget))}</aside>
                         </>
-                    ) : dashboardSideWidgets.length > 0 && dashboardMainWidgets.length === 0 ? (
-                        <aside className="dashboard-side-widgets">{dashboardSideWidgets.map((widget) => renderDashboardWidget(widget))}</aside>
                     ) : (
                         dashboardWidgets.map((widget) => renderDashboardWidget(widget))
                     )}
                 </div>
             )}
+
+            <ExportComposer
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                moduleName="Dashboard Recibos"
+                columns={[
+                    { header: 'Registos Totais', key: 'registos', width: 15 },
+                    { header: 'Valor Emissão', key: 'valorEmissao', width: 20 },
+                    { header: 'Levantado c/ IVA', key: 'levantado', width: 20 },
+                ]}
+                data={dashboardSummary ? [{
+                    registos: dashboardSummary.totals.registos,
+                    valorEmissao: dashboardSummary.totals.valorEmissao,
+                    levantado: dashboardSummary.totals.levantadoComIva
+                }] : []}
+                dashboardElementId="recibos-dashboard-view"
+                themeColor="#be185d"
+                dashboardName={dashboardName}
+            />
         </section>
     )
 }
