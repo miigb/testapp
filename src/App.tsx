@@ -4,8 +4,6 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { jsPDF } from 'jspdf'
 import {
   Calculator,
-  GripVertical,
-  Maximize2,
   Minimize2,
   Pin,
   PinOff,
@@ -23,22 +21,17 @@ import {
 
 import { api } from './api'
 import { applyFormAutoCalculations, parseFormNumber } from './lib/calculations'
-import { parseDsWorkbook, parseImportedWorkbook, parsePenhorasWorkbook } from './lib/importParser'
 import type {
   AnalyticsSummary,
   CalculationSettings,
   DsEntryForm,
-  DsParsedImport,
   DsRecord,
   DsRecordFilters,
   EntryForm,
-  ImportPreviewResponse,
   ModuleId,
   PenhorasEntryForm,
-  PenhorasParsedImport,
   PenhorasRecord,
   PenhorasRecordFilters,
-  ParsedImport,
   ReceiptRecord,
   RecordFilters,
   RecordType,
@@ -57,6 +50,10 @@ import { useSmartNotes } from './hooks/useSmartNotes'
 import { useSavedViews } from './hooks/useSavedViews'
 import { useDashboard } from './hooks/useDashboard'
 import { useBootstrap } from './hooks/useBootstrap'
+import { useImport } from './hooks/useImport'
+import { useSettings } from './hooks/useSettings'
+import { useEntryForm } from './hooks/useEntryForm'
+import { useRecordActions } from './hooks/useRecordActions'
 import { DsConfiguracao } from './components/ds/DsConfiguracao'
 import { PenhorasConfiguracao } from './components/penhoras/PenhorasConfiguracao'
 import { RecibosConfiguracao } from './components/recibos/RecibosConfiguracao'
@@ -85,20 +82,9 @@ import { PenhorasDashboardWidgetCard } from './components/penhoras/PenhorasDashb
 import { TABS, DEFAULT_DASHBOARD_FILTERS, MONTHS, CALCULATOR_KEYS } from './constants'
 import type { LayoutMode, QuickToolId, CalculatorKey, TotalMetricKey } from './constants'
 import type {
-  DashboardWidgetType,
-  DashboardWidgetSize,
-  DashboardWidgetColumn,
   DashboardWidget,
-  DsDashboardWidgetType,
   DsDashboardWidget,
-  PenhorasDashboardWidgetType,
   PenhorasDashboardWidget,
-} from './lib/dashboardWidgets'
-import {
-  DASHBOARD_WIDGET_MIN_COL_SPAN,
-  DASHBOARD_WIDGET_MAX_COL_SPAN,
-  DASHBOARD_WIDGET_LIBRARY,
-  clampDashboardWidgetColSpan,
 } from './lib/dashboardWidgets'
 import { formatCurrency, normalizeText, toFormNumber } from './lib/formatters'
 import { resolveInitialQuickNotes } from './lib/localStorage'
@@ -179,23 +165,7 @@ function App() {
   const [bulkSectionOpen, setBulkSectionOpen] = useState(false)
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false)
 
-  const [importLoading, setImportLoading] = useState(false)
-  const [importPreview, setImportPreview] = useState<ParsedImport | null>(null)
-  const [importColorMapping, setImportColorMapping] = useState<Record<string, string>>({})
-  const [importServerPreview, setImportServerPreview] = useState<ImportPreviewResponse | null>(null)
-  const [importStrategy, setImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
-  const [importForceRecalculate, setImportForceRecalculate] = useState(false)
-
-  const [dsImportLoading, setDsImportLoading] = useState(false)
-  const [dsImportPreview, setDsImportPreview] = useState<DsParsedImport | null>(null)
-  const [dsImportServerPreview, setDsImportServerPreview] = useState<ImportPreviewResponse | null>(null)
-  const [dsImportStrategy, setDsImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [dsEntryForm, setDsEntryForm] = useState<DsEntryForm>(getInitialDsEntryForm(''))
-
-  const [penhorasImportLoading, setPenhorasImportLoading] = useState(false)
-  const [penhorasImportPreview, setPenhorasImportPreview] = useState<PenhorasParsedImport | null>(null)
-  const [penhorasImportServerPreview, setPenhorasImportServerPreview] = useState<ImportPreviewResponse | null>(null)
-  const [penhorasImportStrategy, setPenhorasImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
 
   const {
@@ -438,6 +408,46 @@ function App() {
 
   const defaultStatus = useMemo(() => activeStatuses[0] ?? orderedStatuses[0], [activeStatuses, orderedStatuses])
 
+  const {
+    importLoading,
+    importPreview,
+    importColorMapping,
+    setImportColorMapping,
+    importServerPreview,
+    importStrategy,
+    setImportStrategy,
+    importForceRecalculate,
+    setImportForceRecalculate,
+    handleImportFile,
+    refreshImportConflictPreview,
+    runImportCommit,
+    dsImportLoading,
+    dsImportPreview,
+    dsImportServerPreview,
+    dsImportStrategy,
+    setDsImportStrategy,
+    handleDsImportFile,
+    refreshDsImportPreview,
+    runDsImportCommit,
+    penhorasImportLoading,
+    penhorasImportPreview,
+    penhorasImportServerPreview,
+    penhorasImportStrategy,
+    setPenhorasImportStrategy,
+    handlePenhorasImportFile,
+    refreshPenhorasImportPreview,
+    runPenhorasImportCommit,
+    loadSeed,
+  } = useImport({
+    setFeedback,
+    refreshRecords,
+    refreshDsRecords,
+    refreshPenhorasRecords,
+    setActiveTab,
+    orderedStatuses,
+    defaultStatus,
+  })
+
   const years = useMemo(() => {
     const values = new Set(records.map((record) => record.ano))
     return [...values].sort((a, b) => b - a)
@@ -520,6 +530,42 @@ function App() {
   )
   const penhorasActiveStatuses = useMemo(() => penhorasOrderedStatuses.filter((status) => status.active), [penhorasOrderedStatuses])
   const penhorasDefaultStatus = useMemo(() => penhorasActiveStatuses[0] ?? penhorasOrderedStatuses[0], [penhorasActiveStatuses, penhorasOrderedStatuses])
+
+  const {
+    updateSettingsDraft,
+    updateTaxRule,
+    saveCalculationSettings,
+    saveStatuses,
+    saveDsStatuses,
+    savePenhorasStatuses,
+    addStatus,
+    addDsStatus,
+    addPenhorasStatus,
+    removeStatus,
+    removeDsStatus,
+    removePenhorasStatus,
+    updateStatusLocal,
+    updateDsStatusLocal,
+    updatePenhorasStatusLocal,
+  } = useSettings({
+    settingsDraft,
+    setSettingsDraft,
+    setCalculationSettings,
+    statuses,
+    setStatuses,
+    dsStatuses,
+    setDsStatuses,
+    penhorasStatuses,
+    setPenhorasStatuses,
+    orderedStatuses,
+    dsOrderedStatuses,
+    penhorasOrderedStatuses,
+    refreshRecords,
+    refreshDsRecords,
+    refreshPenhorasRecords,
+    setFeedback,
+    setEntryForm,
+  })
 
   const penhorasYears = useMemo(() => {
     const values = new Set(
@@ -1760,418 +1806,6 @@ function App() {
     }
   }
 
-  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setImportLoading(true)
-    setFeedback('')
-
-    try {
-      const parsed = await parseImportedWorkbook(file.name, await file.arrayBuffer())
-      setImportPreview(parsed)
-
-      const mapping: Record<string, string> = {}
-      for (const color of Object.keys(parsed.colorCount)) {
-        const statusByColor = orderedStatuses.find((status) => normalizeText(status.color) === normalizeText(color))
-        mapping[color] = statusByColor?.id ?? defaultStatus?.id ?? ''
-      }
-      setImportColorMapping(mapping)
-
-      const preview = await api.previewImport({ rows: parsed.rows, colorMapping: mapping })
-      setImportServerPreview(preview)
-      setFeedback(`Pré-visualização pronta: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setImportPreview(null)
-      setImportServerPreview(null)
-      setFeedback(error instanceof Error ? error.message : 'Falha ao processar importação.')
-    } finally {
-      setImportLoading(false)
-      event.target.value = ''
-    }
-  }
-
-  async function refreshImportConflictPreview() {
-    if (!importPreview) return
-    try {
-      const preview = await api.previewImport({ rows: importPreview.rows, colorMapping: importColorMapping })
-      setImportServerPreview(preview)
-      setFeedback(`Pré-visualização atualizada: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha a rever conflitos.')
-    }
-  }
-
-  async function runImportCommit() {
-    if (!importPreview) return
-
-    try {
-      const result = await api.commitImport({
-        rows: importPreview.rows,
-        colorMapping: importColorMapping,
-        strategy: importStrategy,
-        forceRecalculate: importForceRecalculate,
-      })
-      setFeedback(`Importação concluída (${importStrategy}): ${JSON.stringify(result.summary)}`)
-      setImportPreview(null)
-      setImportServerPreview(null)
-      await refreshRecords()
-      setActiveTab('tabela')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao concluir importação.')
-    }
-  }
-
-  async function handleDsImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setDsImportLoading(true)
-    setFeedback('')
-
-    try {
-      const parsed = await parseDsWorkbook(file.name, await file.arrayBuffer())
-      setDsImportPreview(parsed)
-      const preview = await api.previewDsImport({ rows: parsed.rows })
-      setDsImportServerPreview(preview)
-      setFeedback(`Pré-visualização DS pronta: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setDsImportPreview(null)
-      setDsImportServerPreview(null)
-      setFeedback(error instanceof Error ? error.message : 'Falha ao processar importação DS.')
-    } finally {
-      setDsImportLoading(false)
-      event.target.value = ''
-    }
-  }
-
-  async function refreshDsImportPreview() {
-    if (!dsImportPreview) return
-    try {
-      const preview = await api.previewDsImport({ rows: dsImportPreview.rows })
-      setDsImportServerPreview(preview)
-      setFeedback(`Pré-visualização DS atualizada: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha a rever conflitos DS.')
-    }
-  }
-
-  async function runDsImportCommit() {
-    if (!dsImportPreview) return
-    try {
-      const result = await api.commitDsImport({
-        rows: dsImportPreview.rows,
-        strategy: dsImportStrategy,
-      })
-      setFeedback(`Importação DS concluída (${dsImportStrategy}): ${JSON.stringify(result.summary)}`)
-      setDsImportPreview(null)
-      setDsImportServerPreview(null)
-      await refreshDsRecords()
-      setActiveTab('tabela')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao concluir importação DS.')
-    }
-  }
-
-  async function handlePenhorasImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setPenhorasImportLoading(true)
-    setFeedback('')
-
-    try {
-      const parsed = await parsePenhorasWorkbook(file.name, await file.arrayBuffer())
-      setPenhorasImportPreview(parsed)
-      const preview = await api.previewPenhorasImport({ rows: parsed.rows })
-      setPenhorasImportServerPreview(preview)
-      setFeedback(`Pré-visualização Penhoras pronta: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setPenhorasImportPreview(null)
-      setPenhorasImportServerPreview(null)
-      setFeedback(error instanceof Error ? error.message : 'Falha ao processar importação Penhoras.')
-    } finally {
-      setPenhorasImportLoading(false)
-      event.target.value = ''
-    }
-  }
-
-  async function refreshPenhorasImportPreview() {
-    if (!penhorasImportPreview) return
-    try {
-      const preview = await api.previewPenhorasImport({ rows: penhorasImportPreview.rows })
-      setPenhorasImportServerPreview(preview)
-      setFeedback(`Pré-visualização Penhoras atualizada: ${preview.summary.valid} válidas, ${preview.summary.conflicts} conflitos.`)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha a rever conflitos Penhoras.')
-    }
-  }
-
-  async function runPenhorasImportCommit() {
-    if (!penhorasImportPreview) return
-    try {
-      const result = await api.commitPenhorasImport({
-        rows: penhorasImportPreview.rows,
-        strategy: penhorasImportStrategy,
-      })
-      setFeedback(`Importação Penhoras concluída (${penhorasImportStrategy}): ${JSON.stringify(result.summary)}`)
-      setPenhorasImportPreview(null)
-      setPenhorasImportServerPreview(null)
-      await refreshPenhorasRecords()
-      setActiveTab('tabela')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao concluir importação Penhoras.')
-    }
-  }
-
-  async function loadSeed(replace = false) {
-    try {
-      const response = await api.seedDatabase(replace)
-      setFeedback(`Seed aplicada. Criados: ${response.created}, atualizados: ${response.updated}.`)
-      await refreshRecords()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar seed.')
-    }
-  }
-
-  function updateSettingsDraft(patch: Partial<CalculationSettings>) {
-    setSettingsDraft((current) => ({ ...current, ...patch }))
-  }
-
-  function updateTaxRule(ruleId: string, patch: Partial<TaxRule>) {
-    setSettingsDraft((current) => ({
-      ...current,
-      taxRules: current.taxRules.map((rule) => (rule.id === ruleId ? { ...rule, ...patch } : rule)),
-    }))
-  }
-
-  async function saveCalculationSettings() {
-    try {
-      const updated = await api.updateCalculationSettings(settingsDraft)
-      setCalculationSettings(updated)
-      setSettingsDraft(updated)
-      setFeedback('Configuração de cálculos guardada.')
-      setEntryForm((current) => applyFormAutoCalculations(current, updated))
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar configurações.')
-    }
-  }
-
-  async function saveStatuses() {
-    try {
-      for (const status of statuses) {
-        await api.updateStatus(status.id, {
-          key: status.key,
-          label: status.label,
-          icon: status.icon,
-          color: status.color,
-          active: status.active,
-          order: status.order,
-        })
-      }
-      setFeedback('Estados atualizados.')
-      const refreshedStatuses = await api.getStatuses()
-      setStatuses(refreshedStatuses)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar estados.')
-    }
-  }
-
-  async function saveDsStatuses() {
-    try {
-      for (const status of dsStatuses) {
-        await api.updateDsStatus(status.id, {
-          key: status.key,
-          label: status.label,
-          icon: status.icon,
-          color: status.color,
-          active: status.active,
-          order: status.order,
-        })
-      }
-      setFeedback('Estados DS atualizados.')
-      const refreshedStatuses = await api.getDsStatuses()
-      setDsStatuses(refreshedStatuses)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar estados DS.')
-    }
-  }
-
-  async function savePenhorasStatuses() {
-    try {
-      for (const status of penhorasStatuses) {
-        await api.updatePenhorasStatus(status.id, {
-          key: status.key,
-          label: status.label,
-          icon: status.icon,
-          color: status.color,
-          active: status.active,
-          order: status.order,
-        })
-      }
-      setFeedback('Estados Penhoras atualizados.')
-      const refreshedStatuses = await api.getPenhorasStatuses()
-      setPenhorasStatuses(refreshedStatuses)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar estados Penhoras.')
-    }
-  }
-
-  async function addStatus() {
-    try {
-      const created = await api.createStatus({
-        key: `custom-${crypto.randomUUID().slice(0, 8)}`,
-        label: 'Novo estado',
-        icon: 'circle',
-        color: '#D9E2EC',
-        active: true,
-        order: statuses.length + 1,
-      })
-      setStatuses((current) => [...current, created])
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado.')
-    }
-  }
-
-  async function addDsStatus() {
-    try {
-      const created = await api.createDsStatus({
-        key: `ds-custom-${crypto.randomUUID().slice(0, 8)}`,
-        label: 'Novo estado DS',
-        icon: 'circle',
-        color: '#D9E2EC',
-        active: true,
-        order: dsStatuses.length + 1,
-      })
-      setDsStatuses((current) => [...current, created])
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado DS.')
-    }
-  }
-
-  async function addPenhorasStatus() {
-    try {
-      const created = await api.createPenhorasStatus({
-        key: `penhoras-custom-${crypto.randomUUID().slice(0, 8)}`,
-        label: 'Novo estado Penhoras',
-        icon: 'circle',
-        color: '#D9E2EC',
-        active: true,
-        order: penhorasStatuses.length + 1,
-      })
-      setPenhorasStatuses((current) => [...current, created])
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao criar estado Penhoras.')
-    }
-  }
-
-  async function removeStatus(statusId: string) {
-    try {
-      await api.deleteStatus(statusId)
-      setStatuses((current) => current.filter((status) => status.id !== statusId))
-      setFeedback('Estado removido.')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao remover estado.'
-      if (message.includes('Estado em uso')) {
-        const fallbackStatus = orderedStatuses.find((status) => status.id !== statusId && status.active) ?? orderedStatuses.find((status) => status.id !== statusId)
-        if (!fallbackStatus) {
-          setFeedback('Não existe estado alternativo para reatribuição dos registos.')
-          return
-        }
-
-        const confirmed = window.confirm(
-          `Este estado está em uso. Pretende reatribuir os registos para "${fallbackStatus.label}" e remover mesmo assim?`,
-        )
-        if (!confirmed) {
-          return
-        }
-
-        try {
-          await api.deleteStatus(statusId, { reassignToStatusId: fallbackStatus.id })
-          const refreshedStatuses = await api.getStatuses()
-          setStatuses(refreshedStatuses)
-          await refreshRecords()
-          setFeedback(`Estado removido e registos reatribuídos para "${fallbackStatus.label}".`)
-          return
-        } catch (reassignError) {
-          setFeedback(reassignError instanceof Error ? reassignError.message : 'Falha ao remover estado com reatribuição.')
-          return
-        }
-      }
-      setFeedback(message)
-    }
-  }
-
-  async function removeDsStatus(statusId: string) {
-    try {
-      await api.deleteDsStatus(statusId)
-      setDsStatuses((current) => current.filter((status) => status.id !== statusId))
-      setFeedback('Estado DS removido.')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao remover estado DS.'
-      if (message.includes('Estado DS em uso')) {
-        const fallbackStatus =
-          dsOrderedStatuses.find((status) => status.id !== statusId && status.active) ??
-          dsOrderedStatuses.find((status) => status.id !== statusId)
-        if (!fallbackStatus) {
-          setFeedback('Não existe estado DS alternativo para reatribuição.')
-          return
-        }
-        const confirmed = window.confirm(
-          `Este estado DS está em uso. Pretende reatribuir os registos para "${fallbackStatus.label}" e remover mesmo assim?`,
-        )
-        if (!confirmed) return
-        try {
-          await api.deleteDsStatus(statusId, { reassignToStatusId: fallbackStatus.id })
-          const refreshedStatuses = await api.getDsStatuses()
-          setDsStatuses(refreshedStatuses)
-          await refreshDsRecords()
-          setFeedback(`Estado DS removido e registos reatribuídos para "${fallbackStatus.label}".`)
-          return
-        } catch (reassignError) {
-          setFeedback(reassignError instanceof Error ? reassignError.message : 'Falha ao remover estado DS com reatribuição.')
-          return
-        }
-      }
-      setFeedback(message)
-    }
-  }
-
-  async function removePenhorasStatus(statusId: string) {
-    try {
-      await api.deletePenhorasStatus(statusId)
-      setPenhorasStatuses((current) => current.filter((status) => status.id !== statusId))
-      setFeedback('Estado Penhoras removido.')
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao remover estado Penhoras.'
-      if (message.includes('Estado Penhoras em uso')) {
-        const fallbackStatus =
-          penhorasOrderedStatuses.find((status) => status.id !== statusId && status.active) ??
-          penhorasOrderedStatuses.find((status) => status.id !== statusId)
-        if (!fallbackStatus) {
-          setFeedback('Não existe estado Penhoras alternativo para reatribuição.')
-          return
-        }
-        const confirmed = window.confirm(
-          `Este estado Penhoras está em uso. Pretende reatribuir os registos para "${fallbackStatus.label}" e remover mesmo assim?`,
-        )
-        if (!confirmed) return
-        try {
-          await api.deletePenhorasStatus(statusId, { reassignToStatusId: fallbackStatus.id })
-          const refreshedStatuses = await api.getPenhorasStatuses()
-          setPenhorasStatuses(refreshedStatuses)
-          await refreshPenhorasRecords()
-          setFeedback(`Estado Penhoras removido e registos reatribuídos para "${fallbackStatus.label}".`)
-          return
-        } catch (reassignError) {
-          setFeedback(reassignError instanceof Error ? reassignError.message : 'Falha ao remover estado Penhoras com reatribuição.')
-          return
-        }
-      }
-      setFeedback(message)
-    }
-  }
-
   function toggleTotalMetric(metric: TotalMetricKey) {
     setSelectedTotalMetrics((current) => {
       if (current.includes(metric)) {
@@ -2180,18 +1814,6 @@ function App() {
       }
       return [...current, metric]
     })
-  }
-
-  function updateStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
-    setStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
-  }
-
-  function updateDsStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
-    setDsStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
-  }
-
-  function updatePenhorasStatusLocal(statusId: string, patch: Partial<StatusDefinition>) {
-    setPenhorasStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
   }
 
   function renderDashboardWidget(widget: DashboardWidget) {
@@ -2217,312 +1839,54 @@ function App() {
   }
 
   function renderDsDashboardWidget(widget: DsDashboardWidget) {
-    const effectiveColSpan = widget.column === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || 1)
-    const canShrinkWidth = widget.column !== 'side' && effectiveColSpan > DASHBOARD_WIDGET_MIN_COL_SPAN
-    const canGrowWidth = widget.column !== 'side' && effectiveColSpan < DASHBOARD_WIDGET_MAX_COL_SPAN
-
-    const headerLabel =
-      widget.type === 'ds-status'
-        ? 'Estado DS'
-        : widget.type === 'ds-top-gestoras'
-          ? 'Top gestoras'
-          : widget.type === 'ds-top-entidades'
-            ? 'Top entidades'
-            : widget.type === 'ds-mensal'
-              ? 'Tendência mensal (12 meses)'
-              : 'Recibos'
-
-    let content: ReactNode
-    if (widget.type === 'ds-status') {
-      content = renderDashboardBars(dsDashboardByStatus)
-    } else if (widget.type === 'ds-top-gestoras') {
-      content = renderDashboardBars(dsDashboardTopGestoras)
-    } else if (widget.type === 'ds-top-entidades') {
-      content = renderDashboardBars(dsDashboardTopEntidades)
-    } else if (widget.type === 'ds-mensal') {
-      content = renderDashboardBars(dsDashboardByMonth, { currency: true })
-    } else {
-      content = (
-        <>
-          {renderDashboardKpi('Com recibo', dsDashboardTotals.comRecibo)}
-          {renderDashboardKpi('Sem recibo', dsDashboardTotals.semRecibo)}
-          {renderDashboardKpi('Comissão gestor', dsDashboardTotals.comissaoGestor, true)}
-        </>
-      )
-    }
-
     return (
-      <article
+      <DsDashboardWidgetCard
         key={widget.id}
-        className={`dashboard-widget-card ds-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
-          } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ minHeight: `${widget.minHeight}px` }}
-        draggable={!resizingDashboardWidgetId}
-        onDragStart={(event) => {
-          if (resizingDashboardWidgetId) {
-            event.preventDefault()
-            return
-          }
-          setDraggedDashboardWidgetId(widget.id)
-          setDropDashboardWidgetId(widget.id)
-          event.dataTransfer.effectAllowed = 'move'
-          event.dataTransfer.setData('text/plain', widget.id)
-        }}
-        onDragOver={(event) => {
-          event.preventDefault()
-          if (dropDashboardWidgetId !== widget.id) {
-            setDropDashboardWidgetId(widget.id)
-          }
-        }}
-        onDrop={(event) => {
-          event.preventDefault()
-          const sourceWidgetId = event.dataTransfer.getData('text/plain') || draggedDashboardWidgetId
-          if (sourceWidgetId) {
-            reorderDsDashboardWidgets(sourceWidgetId, widget.id)
-          }
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-        onDragEnd={() => {
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-      >
-        <div className="dashboard-widget-head">
-          <h4>{headerLabel}</h4>
-          <div className="dashboard-widget-actions">
-            <button className="subtle-btn icon-btn micro drag-handle-btn" type="button" title="Arrastar widget">
-              <GripVertical size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mover para coluna principal' : 'Mover para coluna lateral'}
-              onClick={() => toggleDsDashboardWidgetColumn(widget.id)}
-            >
-              {widget.column === 'side' ? '↤' : '↦'}
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Diminuir largura'}
-              onClick={() => adjustDsDashboardWidgetWidth(widget.id, -1)}
-              disabled={!canShrinkWidth}
-            >
-              <Minimize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Aumentar largura'}
-              onClick={() => adjustDsDashboardWidgetWidth(widget.id, 1)}
-              disabled={!canGrowWidth}
-            >
-              <Maximize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Diminuir altura"
-              onClick={() => adjustDsDashboardWidgetHeight(widget.id, -80)}
-            >
-              <Minus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Aumentar altura"
-              onClick={() => adjustDsDashboardWidgetHeight(widget.id, 80)}
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para cima"
-              onClick={() => moveDsDashboardWidget(widget.id, -1)}
-            >
-              ↑
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para baixo"
-              onClick={() => moveDsDashboardWidget(widget.id, 1)}
-            >
-              ↓
-            </button>
-            <button
-              className="subtle-btn icon-btn micro danger"
-              type="button"
-              title="Remover widget"
-              onClick={() => removeDsDashboardWidget(widget.id)}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-        <div className="dashboard-widget-content">
-          {dsRecordsLoading && dsRecords.length === 0 ? <div className="small-note">A carregar dados…</div> : content}
-        </div>
-        <div className="dashboard-widget-footer">
-          <button
-            className="subtle-btn icon-btn micro resize-widget-handle"
-            type="button"
-            title="Arrastar para redimensionar altura"
-            onMouseDown={(event) => startDashboardWidgetResize(event, 'ds', widget.id, widget.minHeight)}
-          >
-            ⇳
-          </button>
-        </div>
-      </article>
+        widget={widget}
+        isLoading={dsRecordsLoading && dsRecords.length === 0}
+        byStatus={dsDashboardByStatus}
+        topGestoras={dsDashboardTopGestoras}
+        topEntidades={dsDashboardTopEntidades}
+        byMonth={dsDashboardByMonth}
+        totals={dsDashboardTotals}
+        draggedWidgetId={draggedDashboardWidgetId}
+        dropWidgetId={dropDashboardWidgetId}
+        resizingWidgetId={resizingDashboardWidgetId}
+        onSetDraggedId={setDraggedDashboardWidgetId}
+        onSetDropId={setDropDashboardWidgetId}
+        onReorder={reorderDsDashboardWidgets}
+        onToggleColumn={toggleDsDashboardWidgetColumn}
+        onAdjustWidth={adjustDsDashboardWidgetWidth}
+        onAdjustHeight={adjustDsDashboardWidgetHeight}
+        onMove={moveDsDashboardWidget}
+        onRemove={removeDsDashboardWidget}
+        onStartResize={(event, widgetId, minHeight) => startDashboardWidgetResize(event, 'ds', widgetId, minHeight)}
+      />
     )
   }
 
   function renderPenhorasDashboardWidget(widget: PenhorasDashboardWidget) {
-    const effectiveColSpan = widget.column === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || 1)
-    const canShrinkWidth = widget.column !== 'side' && effectiveColSpan > DASHBOARD_WIDGET_MIN_COL_SPAN
-    const canGrowWidth = widget.column !== 'side' && effectiveColSpan < DASHBOARD_WIDGET_MAX_COL_SPAN
-
-    const headerLabel =
-      widget.type === 'penhoras-status'
-        ? 'Estado Penhoras'
-        : widget.type === 'penhoras-top-gestores'
-          ? 'Top gestores'
-          : 'Tendência mensal (12 meses)'
-
-    const content =
-      widget.type === 'penhoras-status'
-        ? renderDashboardBars(penhorasDashboardByStatus)
-        : widget.type === 'penhoras-top-gestores'
-          ? renderDashboardBars(penhorasDashboardTopGestores)
-          : renderDashboardBars(penhorasDashboardByMonth)
-
     return (
-      <article
+      <PenhorasDashboardWidgetCard
         key={widget.id}
-        className={`dashboard-widget-card penhoras-dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''
-          } ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''} ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ minHeight: `${widget.minHeight}px` }}
-        draggable={!resizingDashboardWidgetId}
-        onDragStart={(event) => {
-          if (resizingDashboardWidgetId) {
-            event.preventDefault()
-            return
-          }
-          setDraggedDashboardWidgetId(widget.id)
-          setDropDashboardWidgetId(widget.id)
-          event.dataTransfer.effectAllowed = 'move'
-          event.dataTransfer.setData('text/plain', widget.id)
-        }}
-        onDragOver={(event) => {
-          event.preventDefault()
-          if (dropDashboardWidgetId !== widget.id) {
-            setDropDashboardWidgetId(widget.id)
-          }
-        }}
-        onDrop={(event) => {
-          event.preventDefault()
-          const sourceWidgetId = event.dataTransfer.getData('text/plain') || draggedDashboardWidgetId
-          if (sourceWidgetId) {
-            reorderPenhorasDashboardWidgets(sourceWidgetId, widget.id)
-          }
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-        onDragEnd={() => {
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-      >
-        <div className="dashboard-widget-head">
-          <h4>{headerLabel}</h4>
-          <div className="dashboard-widget-actions">
-            <button className="subtle-btn icon-btn micro drag-handle-btn" type="button" title="Arrastar widget">
-              <GripVertical size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mover para coluna principal' : 'Mover para coluna lateral'}
-              onClick={() => togglePenhorasDashboardWidgetColumn(widget.id)}
-            >
-              {widget.column === 'side' ? '↤' : '↦'}
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Diminuir largura'}
-              onClick={() => adjustPenhorasDashboardWidgetWidth(widget.id, -1)}
-              disabled={!canShrinkWidth}
-            >
-              <Minimize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Aumentar largura'}
-              onClick={() => adjustPenhorasDashboardWidgetWidth(widget.id, 1)}
-              disabled={!canGrowWidth}
-            >
-              <Maximize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Diminuir altura"
-              onClick={() => adjustPenhorasDashboardWidgetHeight(widget.id, -80)}
-            >
-              <Minus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Aumentar altura"
-              onClick={() => adjustPenhorasDashboardWidgetHeight(widget.id, 80)}
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para cima"
-              onClick={() => movePenhorasDashboardWidget(widget.id, -1)}
-            >
-              ↑
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para baixo"
-              onClick={() => movePenhorasDashboardWidget(widget.id, 1)}
-            >
-              ↓
-            </button>
-            <button
-              className="subtle-btn icon-btn micro danger"
-              type="button"
-              title="Remover widget"
-              onClick={() => removePenhorasDashboardWidget(widget.id)}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-        <div className="dashboard-widget-content">
-          {penhorasRecordsLoading && penhorasRecords.length === 0 ? <div className="small-note">A carregar dados…</div> : content}
-        </div>
-        <div className="dashboard-widget-footer">
-          <button
-            className="subtle-btn icon-btn micro resize-widget-handle"
-            type="button"
-            title="Arrastar para redimensionar altura"
-            onMouseDown={(event) => startDashboardWidgetResize(event, 'penhoras', widget.id, widget.minHeight)}
-          >
-            ⇳
-          </button>
-        </div>
-      </article>
+        widget={widget}
+        isLoading={penhorasRecordsLoading && penhorasRecords.length === 0}
+        byStatus={penhorasDashboardByStatus}
+        topGestores={penhorasDashboardTopGestores}
+        byMonth={penhorasDashboardByMonth}
+        draggedWidgetId={draggedDashboardWidgetId}
+        dropWidgetId={dropDashboardWidgetId}
+        resizingWidgetId={resizingDashboardWidgetId}
+        onSetDraggedId={setDraggedDashboardWidgetId}
+        onSetDropId={setDropDashboardWidgetId}
+        onReorder={reorderPenhorasDashboardWidgets}
+        onToggleColumn={togglePenhorasDashboardWidgetColumn}
+        onAdjustWidth={adjustPenhorasDashboardWidgetWidth}
+        onAdjustHeight={adjustPenhorasDashboardWidgetHeight}
+        onMove={movePenhorasDashboardWidget}
+        onRemove={removePenhorasDashboardWidget}
+        onStartResize={(event, widgetId, minHeight) => startDashboardWidgetResize(event, 'penhoras', widgetId, minHeight)}
+      />
     )
   }
 
