@@ -10,40 +10,45 @@ import { parseFormNumber } from './calculations'
 
 // ---- Indicacoes parsing ------------------------------------------------
 
-const GPE_SE_PREFIX = 'GPE/SE: '
 const INDICACOES_SEPARATOR = ' | '
 
+export function extractGpeSeFromIndicacoes(indicacoes?: string): { gpeSe: string; text: string } {
+    if (!indicacoes) return { gpeSe: '', text: '' }
+
+    const chunks = indicacoes
+        .split('|')
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+    let gpeSe = ''
+    const remaining: string[] = []
+
+    for (const chunk of chunks) {
+        const match = chunk.match(/^GPESE:\s*(.+)$/i)
+        if (match) {
+            gpeSe = match[1].trim()
+            continue
+        }
+        remaining.push(chunk)
+    }
+
+    return { gpeSe, text: remaining.join(' | ') }
+}
+
 export function composeIndicacoes(gpeSe: string, indicacoes: string): string | undefined {
-    const trimmedGpeSe = gpeSe.trim()
-    const trimmedIndicacoes = indicacoes.trim()
     const chunks: string[] = []
+    const parsedGpeSe = parseFormNumber(gpeSe)
+    const trimmedGpeSe = typeof parsedGpeSe === 'number' ? toFormNumber(parsedGpeSe) : gpeSe.trim()
+    const trimmedIndicacoes = indicacoes.trim()
 
     if (trimmedGpeSe) {
-        const numericGpeSe = parseFormNumber(trimmedGpeSe)
-        if (numericGpeSe !== undefined) {
-            chunks.push(`${GPE_SE_PREFIX}${numericGpeSe.toFixed(2)}`)
-        } else {
-            chunks.push(`${GPE_SE_PREFIX}${trimmedGpeSe}`)
-        }
+        chunks.push(`GPESE: ${trimmedGpeSe}`)
     }
     if (trimmedIndicacoes) {
         chunks.push(trimmedIndicacoes)
     }
 
     return chunks.length > 0 ? chunks.join(INDICACOES_SEPARATOR) : undefined
-}
-
-export function extractGpeSeFromIndicacoes(indicacoes?: string): { gpeSe: string; text: string } {
-    if (!indicacoes) return { gpeSe: '', text: '' }
-
-    const lines = indicacoes.split(INDICACOES_SEPARATOR)
-    const gpeLine = lines.find((line) => line.startsWith(GPE_SE_PREFIX))
-    const restLines = lines.filter((line) => !line.startsWith(GPE_SE_PREFIX))
-
-    return {
-        gpeSe: gpeLine ? gpeLine.slice(GPE_SE_PREFIX.length).trim() : '',
-        text: restLines.join(INDICACOES_SEPARATOR).trim(),
-    }
 }
 
 // ---- Form helpers -------------------------------------------------------

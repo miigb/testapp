@@ -47,7 +47,7 @@ import type {
   TaxRule,
 } from './types'
 
-import { useTheme } from './hooks/useTheme'
+import { isDarkLikeTheme, useTheme } from './hooks/useTheme'
 import { useUndoStack } from './hooks/useUndoStack'
 import { useQuickTools } from './hooks/useQuickTools'
 import { useRecords } from './hooks/useRecords'
@@ -72,507 +72,57 @@ import { RecibosEntrada } from './components/recibos/RecibosEntrada'
 import { DsConsultaTabela } from './components/ds/DsConsultaTabela'
 import { PenhorasConsultaTabela } from './components/penhoras/PenhorasConsultaTabela'
 import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabela'
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'entrada', label: 'Entrada' },
-  { id: 'consulta', label: 'Consulta' },
-  { id: 'tabela', label: 'Tabela' },
-  { id: 'dashboards', label: 'Dashboards' },
-  { id: 'configuracao', label: 'Configuração' },
-]
-
-
-const DEFAULT_DASHBOARD_FILTERS: RecordFilters = {
-  tipo: 'todos',
-  estadoId: 'todos',
-  mes: 'todos',
-  ano: 'todos',
-  exequente: '',
-  gestor: '',
-  page: 1,
-  pageSize: 300,
-}
-
-
-
-type DashboardWidgetType =
-  | 'kpi-registos'
-  | 'kpi-valor-sem-iva'
-  | 'kpi-iva'
-  | 'kpi-retencao'
-  | 'kpi-levantado-com-iva'
-  | 'chart-status'
-  | 'chart-tipo'
-  | 'chart-mensal-emissao'
-  | 'list-top-gestores'
-  | 'list-top-exequentes'
-
-type DashboardWidgetSize = 'kpi' | 'normal' | 'wide'
-type DashboardWidgetColumn = 'main' | 'side'
-
-type DashboardWidget = {
-  id: string
-  type: DashboardWidgetType
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-}
-
-const DASHBOARD_WIDGET_MIN_COL_SPAN = 1
-const DASHBOARD_WIDGET_MAX_COL_SPAN = 3
-
-const DASHBOARD_WIDGET_LIBRARY: Array<{ type: DashboardWidgetType; label: string; hint: string }> = [
-  { type: 'kpi-registos', label: 'Total registos', hint: 'KPI' },
-  { type: 'kpi-valor-sem-iva', label: 'Total sem IVA', hint: 'KPI' },
-  { type: 'kpi-iva', label: 'Total IVA', hint: 'KPI' },
-  { type: 'kpi-retencao', label: 'Total retenção', hint: 'KPI' },
-  { type: 'kpi-levantado-com-iva', label: 'Levantado c/ IVA', hint: 'KPI' },
-  { type: 'chart-status', label: 'Distribuição por estado', hint: 'Gráfico barras' },
-  { type: 'chart-tipo', label: 'Distribuição por tipo', hint: 'Gráfico barras' },
-  { type: 'chart-mensal-emissao', label: 'Tendência mensal emissão', hint: 'Últimos 12 meses' },
-  { type: 'list-top-gestores', label: 'Top gestores', hint: 'Ranking' },
-  { type: 'list-top-exequentes', label: 'Top exequentes', hint: 'Ranking' },
-]
-
-type DsDashboardWidgetType = 'ds-status' | 'ds-top-gestoras' | 'ds-top-entidades' | 'ds-mensal' | 'ds-recibos'
-type PenhorasDashboardWidgetType = 'penhoras-status' | 'penhoras-top-gestores' | 'penhoras-mensal'
-
-type DsDashboardWidget = {
-  id: string
-  type: DsDashboardWidgetType
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-}
-
-type PenhorasDashboardWidget = {
-  id: string
-  type: PenhorasDashboardWidgetType
-  size: DashboardWidgetSize
-  minHeight: number
-  column: DashboardWidgetColumn
-  colSpan: number
-}
-
-
-
-
-
-type ThemeId =
-  | 'light'
-  | 'dark'
-  | 'tokyo-day'
-  | 'tokyo-night'
-  | 'synthwave-84'
-  | 'one-dark-pro'
-  | 'night-owl'
-  | 'atom-one-light'
-  | 'github-light'
-  | 'github-dark'
-  | 'github-gray'
-type LayoutMode = 'narrow' | 'wide'
-type QuickToolId = 'notes' | 'calculator' | 'smart-notes'
-type CalculatorKey = {
-  label: string
-  value?: string
-  action?: 'clear' | 'backspace' | 'equals'
-  tone?: 'default' | 'muted' | 'accent'
-  wide?: boolean
-}
-type SmartNotesResultRow = {
-  lineNumber: number
-  source: string
-  expression: string
-  result: number
-  signature: string
-}
-type TotalMetricKey =
-  | 'registos'
-  | 'valorIndicado'
-  | 'valorSemIva'
-  | 'iva'
-  | 'retencao'
-  | 'meu5'
-  | 'valorEmissao'
-  | 'outrasTaxas'
-  | 'levantadoComIva'
-
-
-
-const CALCULATOR_KEYS: CalculatorKey[] = [
-  { label: 'AC', action: 'clear', tone: 'muted' },
-  { label: '⌫', action: 'backspace', tone: 'muted' },
-  { label: '%', value: '%', tone: 'muted' },
-  { label: '÷', value: '/', tone: 'muted' },
-  { label: '7', value: '7' },
-  { label: '8', value: '8' },
-  { label: '9', value: '9' },
-  { label: '×', value: '*', tone: 'muted' },
-  { label: '4', value: '4' },
-  { label: '5', value: '5' },
-  { label: '6', value: '6' },
-  { label: '-', value: '-', tone: 'muted' },
-  { label: '1', value: '1' },
-  { label: '2', value: '2' },
-  { label: '3', value: '3' },
-  { label: '+', value: '+', tone: 'muted' },
-  { label: '(', value: '(', tone: 'muted' },
-  { label: '0', value: '0' },
-  { label: ',', value: ',', tone: 'muted' },
-  { label: ')', value: ')', tone: 'muted' },
-  { label: '=', action: 'equals', tone: 'accent', wide: true },
-]
-
-const SMART_NOTES_NUMBER_FORMATTER = new Intl.NumberFormat('pt-PT', {
-  maximumFractionDigits: 6,
-})
-
-function formatSmartNotesValue(value: number): string {
-  return SMART_NOTES_NUMBER_FORMATTER.format(value)
-}
-
+import { DsRecordDrawer } from './components/ds/DsRecordDrawer'
+import { PenhorasRecordDrawer } from './components/penhoras/PenhorasRecordDrawer'
+import { RecibosRecordDrawer } from './components/recibos/RecibosRecordDrawer'
+import { LabeledInput, AutocompleteInput, LabeledSelect, Info } from './components/shared/FormInputs'
+import { QuickNotesWindow } from './components/shared/QuickNotesWindow'
+import { SmartNotesWindow } from './components/shared/SmartNotesWindow'
+import { CalculatorWindow } from './components/shared/CalculatorWindow'
+import { RecibosDashboardWidgetCard } from './components/recibos/RecibosDashboardWidgetCard'
+import { DsDashboardWidgetCard } from './components/ds/DsDashboardWidgetCard'
+import { PenhorasDashboardWidgetCard } from './components/penhoras/PenhorasDashboardWidgetCard'
+import { TABS, DEFAULT_DASHBOARD_FILTERS, MONTHS, CALCULATOR_KEYS } from './constants'
+import type { LayoutMode, QuickToolId, CalculatorKey, TotalMetricKey } from './constants'
+import type {
+  DashboardWidgetType,
+  DashboardWidgetSize,
+  DashboardWidgetColumn,
+  DashboardWidget,
+  DsDashboardWidgetType,
+  DsDashboardWidget,
+  PenhorasDashboardWidgetType,
+  PenhorasDashboardWidget,
+} from './lib/dashboardWidgets'
+import {
+  DASHBOARD_WIDGET_MIN_COL_SPAN,
+  DASHBOARD_WIDGET_MAX_COL_SPAN,
+  DASHBOARD_WIDGET_LIBRARY,
+  clampDashboardWidgetColSpan,
+} from './lib/dashboardWidgets'
+import { formatCurrency, normalizeText, toFormNumber } from './lib/formatters'
+import { resolveInitialQuickNotes } from './lib/localStorage'
+import {
+  getInitialEntryForm,
+  formToPayload,
+  recordToForm,
+  recordToPatchPayload,
+  extractGpeSeFromIndicacoes,
+  composeIndicacoes,
+} from './lib/recordHelpers'
+import { getInitialDsEntryForm, dsFormToPayload, dsRecordToForm } from './lib/dsHelpers'
+import { getInitialPenhorasEntryForm, penhorasFormToPayload, penhorasRecordToForm } from './lib/penhorasHelpers'
+import { formatSmartNotesValue } from './lib/smartNotes'
+import type { SmartNotesResultRow } from './lib/smartNotes'
 
 function resolveInitialLayoutMode(): LayoutMode {
   return 'wide'
-}
-
-
-function resolveInitialQuickNotes(): string {
-  const stored = localStorage.getItem('mesa-recibos-quick-notes')
-  return typeof stored === 'string' ? stored : ''
-}
-
-
-
-
-
-
-
-function isDarkLikeTheme(theme: ThemeId): boolean {
-  return (
-    theme === 'dark' ||
-    theme === 'tokyo-night' ||
-    theme === 'synthwave-84' ||
-    theme === 'one-dark-pro' ||
-    theme === 'night-owl' ||
-    theme === 'github-dark'
-  )
-}
-
-const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-
-
-
-function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  return String(value)
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-}
-
-function formatCurrency(value?: number): string {
-  if (typeof value !== 'number') return '-'
-  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value)
-}
-
-
-
-function getInitialEntryForm(defaultStatusId: string): EntryForm {
-  const now = new Date()
-  return {
-    tipo: 'exequente',
-    mes: now.getMonth() + 1,
-    ano: now.getFullYear(),
-    processo: '',
-    pe: '',
-    reciboNumero: '',
-    dataLevantamento: '',
-    dataRecibo: '',
-    valorIndicado: '',
-    valorSemIva: '',
-    iva: '',
-    retencao: '',
-    valorEmissao: '',
-    meu5: '',
-    outrasTaxas: '',
-    gpeSe: '',
-    gestor: '',
-    exequente: '',
-    descricaoValor: '',
-    estadoId: defaultStatusId,
-    indicacoes: '',
-  }
-}
-
-function getInitialDsEntryForm(defaultStatusId: string): DsEntryForm {
-  const now = new Date()
-  return {
-    gestora: '',
-    proponentes: '',
-    referencia: '',
-    produto: '',
-    entidadeBancaria: '',
-    liderCalculo: '',
-    recibo: '',
-    faltaReciboGestora: '',
-    valor: '',
-    dataEscritura: now.toISOString().slice(0, 10),
-    dataFechoCrm: '',
-    comissaoLoja: '',
-    ivaCgdRaw: '',
-    totalComissaoLojaCmIva: '',
-    comissaoGestor: '',
-    percentagem: '',
-    pagComissaoGestor: '',
-    estadoId: defaultStatusId,
-  }
-}
-
-function dsFormToPayload(form: DsEntryForm): Partial<DsRecord> {
-  return {
-    gestora: form.gestora.trim() || undefined,
-    proponentes: form.proponentes.trim() || undefined,
-    referencia: form.referencia.trim() || undefined,
-    produto: form.produto.trim() || undefined,
-    entidadeBancaria: form.entidadeBancaria.trim() || undefined,
-    liderCalculo: form.liderCalculo.trim() || undefined,
-    recibo: form.recibo.trim() || undefined,
-    faltaReciboGestora: form.faltaReciboGestora.trim() || undefined,
-    valorRaw: form.valor.trim() || undefined,
-    valor: parseFormNumber(form.valor),
-    dataEscritura: form.dataEscritura || undefined,
-    dataFechoCrm: form.dataFechoCrm || undefined,
-    comissaoLojaRaw: form.comissaoLoja.trim() || undefined,
-    comissaoLoja: parseFormNumber(form.comissaoLoja),
-    ivaCgdRaw: form.ivaCgdRaw.trim() || undefined,
-    totalComissaoLojaCmIvaRaw: form.totalComissaoLojaCmIva.trim() || undefined,
-    totalComissaoLojaCmIva: parseFormNumber(form.totalComissaoLojaCmIva),
-    comissaoGestorRaw: form.comissaoGestor.trim() || undefined,
-    comissaoGestor: parseFormNumber(form.comissaoGestor),
-    percentagemRaw: form.percentagem.trim() || undefined,
-    percentagem: parseFormNumber(form.percentagem),
-    pagComissaoGestor: form.pagComissaoGestor || undefined,
-    estadoId: form.estadoId,
-  }
-}
-
-function dsRecordToForm(record: DsRecord): DsEntryForm {
-  return {
-    gestora: record.gestora ?? '',
-    proponentes: record.proponentes ?? '',
-    referencia: record.referencia ?? '',
-    produto: record.produto ?? '',
-    entidadeBancaria: record.entidadeBancaria ?? '',
-    liderCalculo: record.liderCalculo ?? '',
-    recibo: record.recibo ?? '',
-    faltaReciboGestora: record.faltaReciboGestora ?? '',
-    valor: toFormNumber(record.valor),
-    dataEscritura: record.dataEscritura ?? '',
-    dataFechoCrm: record.dataFechoCrm ?? '',
-    comissaoLoja: toFormNumber(record.comissaoLoja),
-    ivaCgdRaw: record.ivaCgdRaw ?? toFormNumber(record.ivaCgdValor),
-    totalComissaoLojaCmIva: toFormNumber(record.totalComissaoLojaCmIva),
-    comissaoGestor: toFormNumber(record.comissaoGestor),
-    percentagem: toFormNumber(record.percentagem),
-    pagComissaoGestor: record.pagComissaoGestor ?? '',
-    estadoId: record.estadoId,
-  }
-}
-
-function getInitialPenhorasEntryForm(defaultStatusId: string): PenhorasEntryForm {
-  const now = new Date()
-  return {
-    pe: '',
-    acto: '',
-    dataPedido: now.toISOString().slice(0, 10),
-    identificacao: '',
-    pedido: '',
-    gestor: '',
-    estadoId: defaultStatusId,
-  }
-}
-
-function penhorasFormToPayload(form: PenhorasEntryForm): Partial<PenhorasRecord> {
-  return {
-    pe: form.pe.trim() || undefined,
-    acto: form.acto.trim() || undefined,
-    dataPedido: form.dataPedido || undefined,
-    identificacao: form.identificacao.trim() || undefined,
-    pedido: form.pedido.trim() || undefined,
-    gestor: form.gestor.trim() || undefined,
-    estadoId: form.estadoId,
-  }
-}
-
-function penhorasRecordToForm(record: PenhorasRecord): PenhorasEntryForm {
-  return {
-    pe: record.pe ?? '',
-    acto: record.acto ?? '',
-    dataPedido: record.dataPedido ?? '',
-    identificacao: record.identificacao ?? '',
-    pedido: record.pedido ?? '',
-    gestor: record.gestor ?? '',
-    estadoId: record.estadoId,
-  }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-function clampDashboardWidgetColSpan(value: number): number {
-  if (!Number.isFinite(value)) return DASHBOARD_WIDGET_MIN_COL_SPAN
-  return Math.min(DASHBOARD_WIDGET_MAX_COL_SPAN, Math.max(DASHBOARD_WIDGET_MIN_COL_SPAN, Math.round(value)))
-}
-
-
-
-
-
-
-
-function extractGpeSeFromIndicacoes(indicacoes?: string): { gpeSe: string; text: string } {
-  if (!indicacoes) return { gpeSe: '', text: '' }
-
-  const chunks = indicacoes
-    .split('|')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-  let gpeSe = ''
-  const remaining: string[] = []
-
-  for (const chunk of chunks) {
-    const match = chunk.match(/^GPESE:\s*(.+)$/i)
-    if (match) {
-      gpeSe = match[1].trim()
-      continue
-    }
-    remaining.push(chunk)
-  }
-
-  return { gpeSe, text: remaining.join(' | ') }
-}
-
-function composeIndicacoes(gpeSe: string, indicacoes: string): string | undefined {
-  const chunks: string[] = []
-  const parsedGpeSe = parseFormNumber(gpeSe)
-  const trimmedGpeSe = typeof parsedGpeSe === 'number' ? toFormNumber(parsedGpeSe) : gpeSe.trim()
-  const trimmedIndicacoes = indicacoes.trim()
-
-  if (trimmedGpeSe) {
-    chunks.push(`GPESE: ${trimmedGpeSe}`)
-  }
-  if (trimmedIndicacoes) {
-    chunks.push(trimmedIndicacoes)
-  }
-
-  return chunks.length > 0 ? chunks.join(' | ') : undefined
-}
-
-
-function formToPayload(form: EntryForm): Partial<ReceiptRecord> & { tipo: RecordType; mes: number; ano: number } {
-  return {
-    tipo: form.tipo,
-    mes: form.mes,
-    ano: form.ano,
-    processo: form.processo.trim() || undefined,
-    pe: form.pe.trim() || undefined,
-    reciboNumero: form.reciboNumero.trim() || undefined,
-    dataLevantamento: form.dataLevantamento || undefined,
-    dataRecibo: form.dataRecibo || undefined,
-    valorIndicado: parseFormNumber(form.valorIndicado),
-    valorSemIva: parseFormNumber(form.valorSemIva),
-    iva: parseFormNumber(form.iva),
-    retencao: parseFormNumber(form.retencao),
-    valorEmissao: parseFormNumber(form.valorEmissao),
-    meu5: parseFormNumber(form.meu5),
-    outrasTaxas: parseFormNumber(form.outrasTaxas),
-    gestor: form.gestor.trim() || undefined,
-    exequente: form.exequente.trim() || undefined,
-    descricaoValor: form.descricaoValor.trim() || undefined,
-    estadoId: form.estadoId,
-    indicacoes: composeIndicacoes(form.gpeSe, form.indicacoes),
-  }
-}
-
-function toFormNumber(value?: number): string {
-  if (typeof value !== 'number') return ''
-  return value.toFixed(2).replace('.', ',')
-}
-
-function recordToForm(record: ReceiptRecord): EntryForm {
-  const parsedIndicacoes = extractGpeSeFromIndicacoes(record.indicacoes)
-  const parsedGpeSe = parseFormNumber(parsedIndicacoes.gpeSe)
-  return {
-    tipo: record.tipo,
-    mes: record.mes,
-    ano: record.ano,
-    processo: record.processo ?? '',
-    pe: record.pe ?? '',
-    reciboNumero: record.reciboNumero ?? '',
-    dataLevantamento: record.dataLevantamento ?? '',
-    dataRecibo: record.dataRecibo ?? '',
-    valorIndicado: toFormNumber(record.valorIndicado),
-    valorSemIva: toFormNumber(record.valorSemIva),
-    iva: toFormNumber(record.iva),
-    retencao: toFormNumber(record.retencao),
-    valorEmissao: toFormNumber(record.valorEmissao),
-    meu5: toFormNumber(record.meu5),
-    outrasTaxas: toFormNumber(record.outrasTaxas),
-    gpeSe: typeof parsedGpeSe === 'number' ? toFormNumber(parsedGpeSe) : parsedIndicacoes.gpeSe,
-    gestor: record.gestor ?? '',
-    exequente: record.exequente ?? '',
-    descricaoValor: record.descricaoValor ?? '',
-    estadoId: record.estadoId,
-    indicacoes: parsedIndicacoes.text,
-  }
-}
-
-function recordToPatchPayload(record: ReceiptRecord): Partial<ReceiptRecord> {
-  return {
-    tipo: record.tipo,
-    mes: record.mes,
-    ano: record.ano,
-    processo: record.processo,
-    pe: record.pe,
-    reciboNumero: record.reciboNumero,
-    dataLevantamento: record.dataLevantamento,
-    dataRecibo: record.dataRecibo,
-    valorIndicado: record.valorIndicado,
-    valorSemIva: record.valorSemIva,
-    iva: record.iva,
-    retencao: record.retencao,
-    valorEmissao: record.valorEmissao,
-    meu5: record.meu5,
-    outrasTaxas: record.outrasTaxas,
-    gestor: record.gestor,
-    exequente: record.exequente,
-    descricaoValor: record.descricaoValor,
-    estadoId: record.estadoId,
-    indicacoes: record.indicacoes,
-    sourceColor: record.sourceColor,
-    sourceSheet: record.sourceSheet,
-  }
 }
 
 function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
   if (!statusId) return undefined
   return statuses.find((status) => status.id === statusId)
 }
-
 
 function App() {
   const { theme, setTheme } = useTheme()
@@ -647,7 +197,6 @@ function App() {
   const [penhorasImportServerPreview, setPenhorasImportServerPreview] = useState<ImportPreviewResponse | null>(null)
   const [penhorasImportStrategy, setPenhorasImportStrategy] = useState<'skip' | 'update' | 'duplicate'>('update')
   const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
-
 
   const {
     records,
@@ -2645,245 +2194,25 @@ function App() {
     setPenhorasStatuses((current) => current.map((status) => (status.id === statusId ? { ...status, ...patch } : status)))
   }
 
-  function renderDashboardKpi(label: string, value: number, currency = false) {
-    return (
-      <div className="dashboard-kpi">
-        <span>{label}</span>
-        <strong>{currency ? formatCurrency(value) : new Intl.NumberFormat('pt-PT').format(value)}</strong>
-      </div>
-    )
-  }
-
-  function renderDashboardBars(
-    rows: Array<{ id: string; label: string; value: number; secondary?: string }>,
-    options?: { currency?: boolean },
-  ) {
-    if (rows.length === 0) {
-      return <div className="empty-text">Sem dados para este widget.</div>
-    }
-
-    const maxValue = Math.max(...rows.map((row) => row.value), 1)
-
-    return (
-      <div className="dashboard-bars">
-        {rows.map((row) => {
-          const width = `${Math.max(4, (row.value / maxValue) * 100)}%`
-          return (
-            <div key={row.id} className="dashboard-bar-row">
-              <div className="dashboard-bar-meta">
-                <span>{row.label}</span>
-                <strong>
-                  {options?.currency ? formatCurrency(row.value) : new Intl.NumberFormat('pt-PT').format(row.value)}
-                </strong>
-              </div>
-              <div className="dashboard-bar-track">
-                <div className="dashboard-bar-fill" style={{ width }} />
-              </div>
-              {row.secondary ? <span className="muted dashboard-bar-secondary">{row.secondary}</span> : null}
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   function renderDashboardWidget(widget: DashboardWidget) {
-    const effectiveColSpan = widget.column === 'side' ? 1 : clampDashboardWidgetColSpan(widget.colSpan || 1)
-    const canShrinkWidth = widget.column !== 'side' && effectiveColSpan > DASHBOARD_WIDGET_MIN_COL_SPAN
-    const canGrowWidth = widget.column !== 'side' && effectiveColSpan < DASHBOARD_WIDGET_MAX_COL_SPAN
-
-    if (!dashboardSummary) {
-      return (
-        <article key={widget.id} className={`dashboard-widget-card span-${effectiveColSpan}`}>
-          <div className="small-note">A carregar dados…</div>
-        </article>
-      )
-    }
-
-    const headerLabel = DASHBOARD_WIDGET_LIBRARY.find((item) => item.type === widget.type)?.label ?? 'Widget'
-
-    let content: ReactNode
-    if (widget.type === 'kpi-registos') {
-      content = renderDashboardKpi('Total de registos', dashboardSummary.totals.registos)
-    } else if (widget.type === 'kpi-valor-sem-iva') {
-      content = renderDashboardKpi('Valor sem IVA', dashboardSummary.totals.valorSemIva, true)
-    } else if (widget.type === 'kpi-iva') {
-      content = renderDashboardKpi('IVA', dashboardSummary.totals.iva, true)
-    } else if (widget.type === 'kpi-retencao') {
-      content = renderDashboardKpi('Retenção', dashboardSummary.totals.retencao, true)
-    } else if (widget.type === 'kpi-levantado-com-iva') {
-      content = renderDashboardKpi('Levantado com IVA', dashboardSummary.totals.levantadoComIva, true)
-    } else if (widget.type === 'chart-status') {
-      content = renderDashboardBars(
-        dashboardSummary.byStatus.map((item) => ({
-          id: item.statusId,
-          label: item.statusLabel,
-          value: item.count,
-          secondary: formatCurrency(item.valorEmissao),
-        })),
-      )
-    } else if (widget.type === 'chart-tipo') {
-      content = renderDashboardBars(
-        dashboardSummary.byType.map((item) => ({
-          id: item.tipo,
-          label: item.tipo === 'exequente' ? 'Exequente' : 'Executado',
-          value: item.count,
-          secondary: formatCurrency(item.valorEmissao),
-        })),
-      )
-    } else if (widget.type === 'chart-mensal-emissao') {
-      const monthlyRows = dashboardSummary.byMonth
-        .slice(-12)
-        .map((item) => ({
-          id: `${item.ano}-${item.mes}`,
-          label: `${MONTHS[item.mes - 1]?.slice(0, 3) ?? item.mes}/${item.ano}`,
-          value: item.valorEmissao,
-          secondary: `${new Intl.NumberFormat('pt-PT').format(item.count)} registos`,
-        }))
-      content = renderDashboardBars(monthlyRows, { currency: true })
-    } else if (widget.type === 'list-top-gestores') {
-      content = renderDashboardBars(
-        dashboardSummary.topGestores.map((item) => ({
-          id: item.name,
-          label: item.name,
-          value: item.count,
-          secondary: formatCurrency(item.valorEmissao),
-        })),
-      )
-    } else {
-      content = renderDashboardBars(
-        dashboardSummary.topExequentes.map((item) => ({
-          id: item.name,
-          label: item.name,
-          value: item.count,
-          secondary: formatCurrency(item.valorEmissao),
-        })),
-      )
-    }
-
     return (
-      <article
+      <RecibosDashboardWidgetCard
         key={widget.id}
-        className={`dashboard-widget-card size-${widget.size} span-${effectiveColSpan} ${draggedDashboardWidgetId === widget.id ? 'dragging' : ''} ${dropDashboardWidgetId === widget.id ? 'drop-target' : ''
-          } ${resizingDashboardWidgetId === widget.id ? 'resizing' : ''}`}
-        style={{ minHeight: `${widget.minHeight}px` }}
-        draggable={!resizingDashboardWidgetId}
-        onDragStart={(event) => {
-          if (resizingDashboardWidgetId) {
-            event.preventDefault()
-            return
-          }
-          setDraggedDashboardWidgetId(widget.id)
-          setDropDashboardWidgetId(widget.id)
-          event.dataTransfer.effectAllowed = 'move'
-          event.dataTransfer.setData('text/plain', widget.id)
-        }}
-        onDragOver={(event) => {
-          event.preventDefault()
-          if (dropDashboardWidgetId !== widget.id) {
-            setDropDashboardWidgetId(widget.id)
-          }
-        }}
-        onDrop={(event) => {
-          event.preventDefault()
-          const sourceWidgetId = event.dataTransfer.getData('text/plain') || draggedDashboardWidgetId
-          if (sourceWidgetId) {
-            reorderDashboardWidgets(sourceWidgetId, widget.id)
-          }
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-        onDragEnd={() => {
-          setDraggedDashboardWidgetId(null)
-          setDropDashboardWidgetId(null)
-        }}
-      >
-        <div className="dashboard-widget-head">
-          <h4>{headerLabel}</h4>
-          <div className="dashboard-widget-actions">
-            <button className="subtle-btn icon-btn micro drag-handle-btn" type="button" title="Arrastar widget">
-              <GripVertical size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mover para coluna principal' : 'Mover para coluna lateral'}
-              onClick={() => toggleDashboardWidgetColumn(widget.id)}
-            >
-              {widget.column === 'side' ? '↤' : '↦'}
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Diminuir largura'}
-              onClick={() => adjustDashboardWidgetWidth(widget.id, -1)}
-              disabled={!canShrinkWidth}
-            >
-              <Minimize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title={widget.column === 'side' ? 'Mova para a coluna principal para ajustar largura' : 'Aumentar largura'}
-              onClick={() => adjustDashboardWidgetWidth(widget.id, 1)}
-              disabled={!canGrowWidth}
-            >
-              <Maximize2 size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Diminuir altura"
-              onClick={() => adjustDashboardWidgetHeight(widget.id, -80)}
-            >
-              <Minus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Aumentar altura"
-              onClick={() => adjustDashboardWidgetHeight(widget.id, 80)}
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para cima"
-              onClick={() => moveDashboardWidget(widget.id, -1)}
-            >
-              ↑
-            </button>
-            <button
-              className="subtle-btn icon-btn micro"
-              type="button"
-              title="Mover para baixo"
-              onClick={() => moveDashboardWidget(widget.id, 1)}
-            >
-              ↓
-            </button>
-            <button
-              className="subtle-btn icon-btn micro danger"
-              type="button"
-              title="Remover widget"
-              onClick={() => removeDashboardWidget(widget.id)}
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        </div>
-        <div className="dashboard-widget-content">{content}</div>
-        <div className="dashboard-widget-footer">
-          <button
-            className="subtle-btn icon-btn micro resize-widget-handle"
-            type="button"
-            title="Arrastar para redimensionar altura"
-            onMouseDown={(event) => startDashboardWidgetResize(event, 'recibos', widget.id, widget.minHeight)}
-          >
-            ⇳
-          </button>
-        </div>
-      </article>
+        widget={widget}
+        dashboardSummary={dashboardSummary}
+        draggedWidgetId={draggedDashboardWidgetId}
+        dropWidgetId={dropDashboardWidgetId}
+        resizingWidgetId={resizingDashboardWidgetId}
+        onSetDraggedId={setDraggedDashboardWidgetId}
+        onSetDropId={setDropDashboardWidgetId}
+        onReorder={reorderDashboardWidgets}
+        onToggleColumn={toggleDashboardWidgetColumn}
+        onAdjustWidth={adjustDashboardWidgetWidth}
+        onAdjustHeight={adjustDashboardWidgetHeight}
+        onMove={moveDashboardWidget}
+        onRemove={removeDashboardWidget}
+        onStartResize={(event, widgetId, minHeight) => startDashboardWidgetResize(event, 'recibos', widgetId, minHeight)}
+      />
     )
   }
 
@@ -3439,272 +2768,69 @@ function App() {
       )}
 
       {notesOpen && (
-        <section
-          ref={notesWindowRef}
-          className={`tool-window notes-window ${toolPositions.notes ? 'positioned' : 'centered'} ${draggingTool === 'notes' ? 'dragging' : ''
-            } ${toolPinned.notes ? 'pinned' : ''}`}
-          style={toolPositions.notes ? { left: `${toolPositions.notes.x}px`, top: `${toolPositions.notes.y}px`, zIndex: notesWindowZIndex } : { zIndex: notesWindowZIndex }}
-          onMouseDown={() => bringToolToFront('notes')}
-          aria-label="Notas rápidas"
-        >
-          <div className="tool-window-header" onMouseDown={(event) => startToolWindowDrag('notes', event)}>
-            <div className="tool-window-title">
-              <GripVertical size={14} />
-              <div>
-                <h3>Notas rápidas</h3>
-                <p className="small-note">Bloco pessoal guardado automaticamente no browser.</p>
-              </div>
-            </div>
-            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
-              <button
-                className={`subtle-btn icon-btn micro ${toolPinned.notes ? 'active' : ''}`}
-                type="button"
-                onClick={() => toggleQuickToolPinned('notes')}
-                title={toolPinned.notes ? 'Desafixar janela' : 'Fixar no topo'}
-                aria-label={toolPinned.notes ? 'Desafixar janela' : 'Fixar no topo'}
-              >
-                {toolPinned.notes ? <PinOff size={14} /> : <Pin size={14} />}
-              </button>
-              <button className="subtle-btn icon-btn micro" type="button" onClick={() => setNotesOpen(false)} title="Fechar notas" aria-label="Fechar notas">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className="quick-tool-body">
-            <textarea
-              className="quick-notes-input"
-              value={quickNotes}
-              onChange={(event) => setQuickNotes(event.target.value)}
-              placeholder="Escreva aqui notas rápidas para qualquer módulo..."
-            />
-            <div className="actions-row start">
-              <button className="subtle-btn" type="button" onClick={exportQuickNotesTxt}>
-                Exportar TXT
-              </button>
-              <button className="subtle-btn" type="button" onClick={exportQuickNotesPdf}>
-                Exportar PDF
-              </button>
-              <button className="subtle-btn" type="button" onClick={() => setQuickNotes('')}>
-                Apagar notas
-              </button>
-              <span className="muted">Guardado automaticamente</span>
-            </div>
-          </div>
-        </section>
+        <QuickNotesWindow
+          windowRef={notesWindowRef}
+          position={toolPositions.notes}
+          zIndex={notesWindowZIndex}
+          isPinned={toolPinned.notes}
+          isDragging={draggingTool === 'notes'}
+          quickNotes={quickNotes}
+          onBringToFront={() => bringToolToFront('notes')}
+          onStartDrag={(event) => startToolWindowDrag('notes', event)}
+          onTogglePinned={() => toggleQuickToolPinned('notes')}
+          onClose={() => setNotesOpen(false)}
+          onChangeNotes={setQuickNotes}
+          onClearNotes={() => setQuickNotes('')}
+          onExportTxt={exportQuickNotesTxt}
+          onExportPdf={exportQuickNotesPdf}
+        />
       )}
 
       {smartNotesOpen && (
-        <section
-          ref={smartNotesWindowRef}
-          className={`tool-window smart-notes-window ${toolPositions['smart-notes'] ? 'positioned' : 'centered'} ${draggingTool === 'smart-notes' ? 'dragging' : ''
-            } ${toolPinned['smart-notes'] ? 'pinned' : ''}`}
-          style={
-            toolPositions['smart-notes']
-              ? { left: `${toolPositions['smart-notes'].x}px`, top: `${toolPositions['smart-notes'].y}px`, zIndex: smartNotesWindowZIndex }
-              : { zIndex: smartNotesWindowZIndex }
-          }
-          onMouseDown={() => bringToolToFront('smart-notes')}
-          aria-label="Notas com cálculo"
-        >
-          <div className="tool-window-header" onMouseDown={(event) => startToolWindowDrag('smart-notes', event)}>
-            <div className="tool-window-title">
-              <GripVertical size={14} />
-              <div>
-                <h3>Notas com cálculo</h3>
-                <p className="small-note">Escreva linguagem natural e contas por linha. Ex.: "23% de 1250".</p>
-              </div>
-            </div>
-            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
-              <button
-                className={`subtle-btn icon-btn micro ${toolPinned['smart-notes'] ? 'active' : ''}`}
-                type="button"
-                onClick={() => toggleQuickToolPinned('smart-notes')}
-                title={toolPinned['smart-notes'] ? 'Desafixar janela' : 'Fixar no topo'}
-                aria-label={toolPinned['smart-notes'] ? 'Desafixar janela' : 'Fixar no topo'}
-              >
-                {toolPinned['smart-notes'] ? <PinOff size={14} /> : <Pin size={14} />}
-              </button>
-              <button
-                className="subtle-btn icon-btn micro"
-                type="button"
-                onClick={() => setSmartNotesOpen(false)}
-                title="Fechar notas com cálculo"
-                aria-label="Fechar notas com cálculo"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className="smart-notes-layout">
-            <textarea
-              className="smart-notes-input"
-              value={smartNotesText}
-              onChange={(event) => setSmartNotesText(event.target.value)}
-              placeholder={`7 × 7\n3k ganhos ÷ 5 pessoas\neu gastei 200 euros e 10 euro em bebidas\ntotal`}
-            />
-            <aside className="smart-notes-results">
-              <div className="smart-notes-results-head">
-                <strong>{smartNotesResults.length} linhas calculadas</strong>
-                <div className="smart-notes-head-meta">
-                  {smartNotesSavedEntries.length > 0 && <span className="muted">{smartNotesSavedEntries.length} guardadas</span>}
-                  {smartNotesErrors.length > 0 && <span className="muted">{smartNotesErrors.length} com erro</span>}
-                </div>
-              </div>
-              {smartNotesResults.length === 0 ? (
-                <div className="muted">Sem cálculos detetados.</div>
-              ) : (
-                <div className="smart-notes-list">
-                  {smartNotesDisplayResults.map((row) => (
-                    <div
-                      key={`${row.lineNumber}-${row.signature}`}
-                      className={`smart-notes-row ${smartNotesPinnedSet.has(row.signature) ? 'pinned' : ''}`}
-                    >
-                      <span className="smart-notes-line">L{row.lineNumber}</span>
-                      <div className="smart-notes-row-main">
-                        <div className="smart-notes-row-text">
-                          <div className="smart-notes-expression">{row.expression}</div>
-                          <strong>{formatSmartNotesValue(row.result)}</strong>
-                        </div>
-                        <div className="smart-notes-row-actions">
-                          <button
-                            className={`subtle-btn icon-btn micro ${smartNotesPinnedSet.has(row.signature) ? 'active' : ''}`}
-                            type="button"
-                            onClick={() => toggleSmartNotesPinned(row.signature)}
-                            title={smartNotesPinnedSet.has(row.signature) ? 'Desafixar' : 'Fixar no topo'}
-                            aria-label={smartNotesPinnedSet.has(row.signature) ? 'Desafixar' : 'Fixar no topo'}
-                          >
-                            <Pin size={13} />
-                          </button>
-                          <button
-                            className={`subtle-btn icon-btn micro ${smartNotesSavedSet.has(row.signature) ? 'active' : ''}`}
-                            type="button"
-                            onClick={() => toggleSmartNotesSaved(row)}
-                            title={smartNotesSavedSet.has(row.signature) ? 'Remover dos guardados' : 'Guardar cálculo'}
-                            aria-label={smartNotesSavedSet.has(row.signature) ? 'Remover dos guardados' : 'Guardar cálculo'}
-                          >
-                            <Save size={13} />
-                          </button>
-                          <button
-                            className="subtle-btn icon-btn micro danger"
-                            type="button"
-                            onClick={() => removeSmartNotesLine(row.lineNumber)}
-                            title="Eliminar linha"
-                            aria-label="Eliminar linha"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {smartNotesErrors.length > 0 && (
-                <div className="smart-notes-errors">
-                  {smartNotesErrors.slice(0, 5).map((row) => (
-                    <div key={`${row.lineNumber}-${row.error}`} className="smart-notes-error-row">
-                      <span>L{row.lineNumber}</span>
-                      <span>{row.error}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {smartNotesSavedEntries.length > 0 && (
-                <div className="smart-notes-saved">
-                  <div className="smart-notes-saved-head">
-                    <strong>Guardados</strong>
-                    <button className="subtle-btn" type="button" onClick={() => setSmartNotesSavedEntries([])}>
-                      Limpar guardados
-                    </button>
-                  </div>
-                  <div className="smart-notes-saved-list">
-                    {smartNotesSavedEntries.slice(0, 5).map((entry) => (
-                      <div key={entry.signature} className="smart-notes-saved-item">
-                        <span className="muted">{entry.expression}</span>
-                        <strong>{formatSmartNotesValue(entry.result)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </aside>
-          </div>
-          <div className="actions-row start smart-notes-actions">
-            <button className="subtle-btn" type="button" onClick={exportSmartNotesTxt}>
-              Exportar TXT
-            </button>
-            <button className="subtle-btn" type="button" onClick={exportSmartNotesPdf}>
-              Exportar PDF
-            </button>
-            <button className="subtle-btn" type="button" onClick={() => setSmartNotesText('')}>
-              Limpar
-            </button>
-            <span className="muted">Alt+S</span>
-          </div>
-        </section>
+        <SmartNotesWindow
+          windowRef={smartNotesWindowRef}
+          position={toolPositions['smart-notes']}
+          zIndex={smartNotesWindowZIndex}
+          isPinned={toolPinned['smart-notes']}
+          isDragging={draggingTool === 'smart-notes'}
+          smartNotesText={smartNotesText}
+          resultsCount={smartNotesResults.length}
+          displayResults={smartNotesDisplayResults}
+          errors={smartNotesErrors}
+          pinnedSet={smartNotesPinnedSet}
+          savedSet={smartNotesSavedSet}
+          savedEntries={smartNotesSavedEntries}
+          onBringToFront={() => bringToolToFront('smart-notes')}
+          onStartDrag={(event) => startToolWindowDrag('smart-notes', event)}
+          onTogglePinned={() => toggleQuickToolPinned('smart-notes')}
+          onClose={() => setSmartNotesOpen(false)}
+          onChangeText={setSmartNotesText}
+          onTogglePinnedRow={toggleSmartNotesPinned}
+          onToggleSavedRow={toggleSmartNotesSaved}
+          onRemoveLine={removeSmartNotesLine}
+          onClearSaved={() => setSmartNotesSavedEntries([])}
+          onClearText={() => setSmartNotesText('')}
+          onExportTxt={exportSmartNotesTxt}
+          onExportPdf={exportSmartNotesPdf}
+        />
       )}
 
       {calculatorOpen && (
-        <section
-          ref={calculatorWindowRef}
-          className={`tool-window calculator-window ${toolPositions.calculator ? 'positioned' : 'centered'} ${draggingTool === 'calculator' ? 'dragging' : ''
-            } ${toolPinned.calculator ? 'pinned' : ''}`}
-          style={
-            toolPositions.calculator
-              ? { left: `${toolPositions.calculator.x}px`, top: `${toolPositions.calculator.y}px`, zIndex: calculatorWindowZIndex }
-              : { zIndex: calculatorWindowZIndex }
-          }
-          onMouseDown={() => bringToolToFront('calculator')}
-          role="dialog"
-          aria-modal="false"
-          aria-label="Calculadora"
-        >
-          <div className="tool-window-header calculator-header" onMouseDown={(event) => startToolWindowDrag('calculator', event)}>
-            <div className="tool-window-title">
-              <GripVertical size={14} />
-              <div>
-                <h3>Calculadora</h3>
-                <p className="small-note">+, -, ×, ÷, parênteses e %</p>
-              </div>
-            </div>
-            <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>
-              <button
-                className={`subtle-btn icon-btn micro ${toolPinned.calculator ? 'active' : ''}`}
-                type="button"
-                onClick={() => toggleQuickToolPinned('calculator')}
-                title={toolPinned.calculator ? 'Desafixar janela' : 'Fixar no topo'}
-                aria-label={toolPinned.calculator ? 'Desafixar janela' : 'Fixar no topo'}
-              >
-                {toolPinned.calculator ? <PinOff size={14} /> : <Pin size={14} />}
-              </button>
-              <button className="subtle-btn icon-btn micro" type="button" onClick={() => setCalculatorOpen(false)} title="Fechar calculadora" aria-label="Fechar calculadora">
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-
-          <div className={`calculator-display ${calculatorError ? 'error' : ''}`}>
-            <div className="calculator-expression">
-              {(calculatorExpression || '0').replace(/\*/g, '×').replace(/\//g, '÷').replace(/\./g, ',')}
-            </div>
-            <div className="calculator-result">{calculatorError || calculatorResult || '0'}</div>
-          </div>
-
-          <div className="calculator-keypad">
-            {CALCULATOR_KEYS.map((key) => (
-              <button
-                key={key.label}
-                className={`calculator-key tone-${key.tone ?? 'default'} ${key.wide ? 'wide' : ''}`}
-                type="button"
-                onClick={() => handleCalculatorKeyPress(key)}
-              >
-                {key.label}
-              </button>
-            ))}
-          </div>
-        </section>
+        <CalculatorWindow
+          windowRef={calculatorWindowRef}
+          position={toolPositions.calculator}
+          zIndex={calculatorWindowZIndex}
+          isPinned={toolPinned.calculator}
+          isDragging={draggingTool === 'calculator'}
+          expression={calculatorExpression}
+          result={calculatorResult}
+          error={calculatorError}
+          onBringToFront={() => bringToolToFront('calculator')}
+          onStartDrag={(event) => startToolWindowDrag('calculator', event)}
+          onTogglePinned={() => toggleQuickToolPinned('calculator')}
+          onClose={() => setCalculatorOpen(false)}
+          onKeyPress={handleCalculatorKeyPress}
+        />
       )}
 
       <main className="main-grid">
@@ -4018,10 +3144,6 @@ function App() {
           )
         }
 
-
-
-
-
         {
           activeModule === 'recibos' && activeTab === 'dashboards' && (
             <RecibosDashboards
@@ -4104,608 +3226,63 @@ function App() {
           )
         }
 
-        {
-          activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
-            <div className="record-modal-overlay" onClick={() => setSelectedDsRecordId(null)}>
-              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-                <div className="drawer-header">
-                  <div className="modal-title-block">
-                    <h3>{selectedDsRecord.referencia || selectedDsRecord.proponentes || 'Detalhe do registo DS'}</h3>
-                    <div className="small-note modal-meta">
-                      {[selectedDsRecord.gestora, selectedDsRecord.entidadeBancaria, selectedDsRecord.dataEscritura].filter(Boolean).join(' · ') || '-'}
-                    </div>
-                  </div>
-                  <div className="actions-row modal-header-actions">
-                    <button className="subtle-btn" type="button" onClick={() => setIsDsRecordEditing((current) => !current)}>
-                      {isDsRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                      {isDsRecordEditing ? 'Cancelar edição' : 'Editar'}
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => setSelectedDsRecordId(null)}>Fechar</button>
-                  </div>
-                </div>
+        {activeModule === 'ds' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedDsRecord && (
+          <DsRecordDrawer
+            record={selectedDsRecord}
+            recordEdit={selectedDsRecordEdit}
+            isEditing={isDsRecordEditing}
+            orderedStatuses={dsOrderedStatuses}
+            gestoraOptions={dsGestoraFilterOptions}
+            proponentesSuggestions={dsProponentesSuggestions}
+            referenciaSuggestions={dsReferenciaSuggestions}
+            produtoOptions={dsProdutoFilterOptions}
+            entidadeOptions={dsEntidadeFilterOptions}
+            reciboSuggestions={dsReciboSuggestions}
+            onClose={() => setSelectedDsRecordId(null)}
+            onToggleEdit={() => setIsDsRecordEditing((current) => !current)}
+            onEditInput={handleDsRecordEditInput}
+            onSave={() => void saveSelectedDsRecordEdits()}
+            onStatusChange={(recordId, statusId) => void updateDsRecordStatus(recordId, statusId)}
+          />
+        )}
 
-                {isDsRecordEditing && selectedDsRecordEdit ? (
-                  <div className="record-edit-content">
-                    <div className="field-grid three">
-                      <LabeledInput
-                        label="Gestora"
-                        value={selectedDsRecordEdit.gestora}
-                        onChange={(value) => handleDsRecordEditInput('gestora', value)}
-                        suggestions={dsGestoraFilterOptions}
-                      />
-                      <LabeledInput
-                        label="Proponentes"
-                        value={selectedDsRecordEdit.proponentes}
-                        onChange={(value) => handleDsRecordEditInput('proponentes', value)}
-                        suggestions={dsProponentesSuggestions}
-                      />
-                      <LabeledInput
-                        label="Referência"
-                        value={selectedDsRecordEdit.referencia}
-                        onChange={(value) => handleDsRecordEditInput('referencia', value)}
-                        suggestions={dsReferenciaSuggestions}
-                      />
-                    </div>
-                    <div className="field-grid three">
-                      <LabeledInput
-                        label="Produto"
-                        value={selectedDsRecordEdit.produto}
-                        onChange={(value) => handleDsRecordEditInput('produto', value)}
-                        suggestions={dsProdutoFilterOptions}
-                      />
-                      <LabeledInput
-                        label="Entidade bancária"
-                        value={selectedDsRecordEdit.entidadeBancaria}
-                        onChange={(value) => handleDsRecordEditInput('entidadeBancaria', value)}
-                        suggestions={dsEntidadeFilterOptions}
-                      />
-                      <LabeledInput
-                        label="Líder cálculo"
-                        value={selectedDsRecordEdit.liderCalculo}
-                        onChange={(value) => handleDsRecordEditInput('liderCalculo', value)}
-                      />
-                    </div>
-                    <div className="field-grid three">
-                      <LabeledInput
-                        label="Recibo"
-                        value={selectedDsRecordEdit.recibo}
-                        onChange={(value) => handleDsRecordEditInput('recibo', value)}
-                        suggestions={dsReciboSuggestions}
-                      />
-                      <LabeledInput
-                        label="Falta recibo gestora"
-                        value={selectedDsRecordEdit.faltaReciboGestora}
-                        onChange={(value) => handleDsRecordEditInput('faltaReciboGestora', value)}
-                      />
-                      <LabeledSelect
-                        label="Estado"
-                        value={selectedDsRecordEdit.estadoId}
-                        onChange={(value) => handleDsRecordEditInput('estadoId', value)}
-                        options={dsOrderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                      />
-                    </div>
-                    <div className="field-grid five">
-                      <LabeledInput label="Valor" value={selectedDsRecordEdit.valor} onChange={(value) => handleDsRecordEditInput('valor', value)} />
-                      <LabeledInput
-                        label="Comissão loja"
-                        value={selectedDsRecordEdit.comissaoLoja}
-                        onChange={(value) => handleDsRecordEditInput('comissaoLoja', value)}
-                      />
-                      <LabeledInput
-                        label="IVA CGD (raw)"
-                        value={selectedDsRecordEdit.ivaCgdRaw}
-                        onChange={(value) => handleDsRecordEditInput('ivaCgdRaw', value)}
-                      />
-                      <LabeledInput
-                        label="Total comissão c/ IVA"
-                        value={selectedDsRecordEdit.totalComissaoLojaCmIva}
-                        onChange={(value) => handleDsRecordEditInput('totalComissaoLojaCmIva', value)}
-                      />
-                      <LabeledInput
-                        label="Comissão gestor"
-                        value={selectedDsRecordEdit.comissaoGestor}
-                        onChange={(value) => handleDsRecordEditInput('comissaoGestor', value)}
-                      />
-                    </div>
-                    <div className="field-grid four">
-                      <LabeledInput
-                        label="Percentagem"
-                        value={selectedDsRecordEdit.percentagem}
-                        onChange={(value) => handleDsRecordEditInput('percentagem', value)}
-                      />
-                      <LabeledInput
-                        type="date"
-                        label="Data escritura"
-                        value={selectedDsRecordEdit.dataEscritura}
-                        onChange={(value) => handleDsRecordEditInput('dataEscritura', value)}
-                      />
-                      <LabeledInput
-                        type="date"
-                        label="Data fecho CRM"
-                        value={selectedDsRecordEdit.dataFechoCrm}
-                        onChange={(value) => handleDsRecordEditInput('dataFechoCrm', value)}
-                      />
-                      <LabeledInput
-                        label="Pagamento comissão gestor"
-                        value={selectedDsRecordEdit.pagComissaoGestor}
-                        onChange={(value) => handleDsRecordEditInput('pagComissaoGestor', value)}
-                      />
-                    </div>
-                    <div className="actions-row modal-edit-actions">
-                      <button className="primary-btn" type="button" onClick={() => void saveSelectedDsRecordEdits()}>
-                        <Save size={15} />
-                        Guardar alterações
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="detail-grid modal-detail-grid">
-                    <Info label="Gestora" value={selectedDsRecord.gestora || '-'} />
-                    <Info label="Proponentes" value={selectedDsRecord.proponentes || '-'} />
-                    <Info label="Referência" value={selectedDsRecord.referencia || '-'} />
-                    <Info label="Produto" value={selectedDsRecord.produto || '-'} />
-                    <Info label="Entidade bancária" value={selectedDsRecord.entidadeBancaria || '-'} />
-                    <Info label="Líder cálculo" value={selectedDsRecord.liderCalculo || '-'} />
-                    <Info label="Recibo" value={selectedDsRecord.recibo || '-'} />
-                    <Info label="Falta recibo gestora" value={selectedDsRecord.faltaReciboGestora || '-'} />
-                    <Info label="Valor" value={formatCurrency(selectedDsRecord.valor)} />
-                    <Info label="Comissão loja" value={formatCurrency(selectedDsRecord.comissaoLoja)} />
-                    <Info label="Total comissão c/ IVA" value={formatCurrency(selectedDsRecord.totalComissaoLojaCmIva)} />
-                    <Info label="Comissão gestor" value={formatCurrency(selectedDsRecord.comissaoGestor)} />
-                    <Info label="IVA CGD" value={selectedDsRecord.ivaCgdRaw || formatCurrency(selectedDsRecord.ivaCgdValor)} />
-                    <Info label="Percentagem" value={selectedDsRecord.percentagemRaw || toFormNumber(selectedDsRecord.percentagem) || '-'} />
-                    <Info label="Data escritura" value={selectedDsRecord.dataEscritura || '-'} />
-                    <Info label="Data fecho CRM" value={selectedDsRecord.dataFechoCrm || '-'} />
-                    <Info label="Pag. comissão gestor" value={selectedDsRecord.pagComissaoGestor || '-'} />
-                    <div className="field modal-status-field">
-                      <span>Estado</span>
-                      <select value={selectedDsRecord.estadoId} onChange={(event) => void updateDsRecordStatus(selectedDsRecord.id, event.target.value)}>
-                        {dsOrderedStatuses.map((statusOption) => (
-                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
+        {activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedPenhorasRecord && (
+          <PenhorasRecordDrawer
+            record={selectedPenhorasRecord}
+            recordEdit={selectedPenhorasRecordEdit}
+            isEditing={isPenhorasRecordEditing}
+            activeStatuses={penhorasActiveStatuses}
+            peSuggestions={penhorasPeSuggestions}
+            actoOptions={penhorasActoFilterOptions}
+            gestorOptions={penhorasGestorFilterOptions}
+            onClose={() => setSelectedPenhorasRecordId(null)}
+            onToggleEdit={() => setIsPenhorasRecordEditing((current) => !current)}
+            onEditInput={handlePenhorasRecordEditInput}
+            onSave={() => void saveSelectedPenhorasRecordEdits()}
+            onStatusChange={(recordId, statusId) => void updatePenhorasRecordStatus(recordId, statusId)}
+          />
+        )}
 
-                <h4 className="modal-section-title">Metadados</h4>
-                <div className="history-list modal-history-list">
-                  <div className="history-item">
-                    <div>Criado</div>
-                    <div className="muted">{new Date(selectedDsRecord.createdAt).toLocaleString('pt-PT')}</div>
-                  </div>
-                  <div className="history-item">
-                    <div>Última atualização</div>
-                    <div className="muted">{new Date(selectedDsRecord.updatedAt).toLocaleString('pt-PT')}</div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          )
-        }
-
-        {
-          activeModule === 'penhoras' && (activeTab === 'consulta' || activeTab === 'tabela') && selectedPenhorasRecord && (
-            <div className="record-modal-overlay" onClick={() => setSelectedPenhorasRecordId(null)}>
-              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-                <div className="drawer-header">
-                  <div className="modal-title-block">
-                    <h3>{selectedPenhorasRecord.pe || selectedPenhorasRecord.identificacao || 'Detalhe do registo Penhoras'}</h3>
-                    <div className="small-note modal-meta">
-                      {[selectedPenhorasRecord.gestor, selectedPenhorasRecord.acto, selectedPenhorasRecord.dataPedido].filter(Boolean).join(' · ') || '-'}
-                    </div>
-                  </div>
-                  <div className="actions-row modal-header-actions">
-                    <button className="subtle-btn" type="button" onClick={() => setIsPenhorasRecordEditing((current) => !current)}>
-                      {isPenhorasRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                      {isPenhorasRecordEditing ? 'Cancelar edição' : 'Editar'}
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => setSelectedPenhorasRecordId(null)}>Fechar</button>
-                  </div>
-                </div>
-
-                {isPenhorasRecordEditing && selectedPenhorasRecordEdit ? (
-                  <div className="record-edit-content">
-                    <div className="field-grid three">
-                      <LabeledInput
-                        label="PE"
-                        value={selectedPenhorasRecordEdit.pe}
-                        onChange={(value) => handlePenhorasRecordEditInput('pe', value)}
-                        suggestions={penhorasPeSuggestions}
-                      />
-                      <LabeledInput
-                        label="Acto"
-                        value={selectedPenhorasRecordEdit.acto}
-                        onChange={(value) => handlePenhorasRecordEditInput('acto', value)}
-                        suggestions={penhorasActoFilterOptions}
-                      />
-                      <LabeledInput
-                        type="date"
-                        label="Data pedido"
-                        value={selectedPenhorasRecordEdit.dataPedido}
-                        onChange={(value) => handlePenhorasRecordEditInput('dataPedido', value)}
-                      />
-                    </div>
-                    <div className="field-grid three">
-                      <LabeledInput
-                        label="Identificação"
-                        value={selectedPenhorasRecordEdit.identificacao}
-                        onChange={(value) => handlePenhorasRecordEditInput('identificacao', value)}
-                      />
-                      <LabeledInput
-                        label="Pedido"
-                        value={selectedPenhorasRecordEdit.pedido}
-                        onChange={(value) => handlePenhorasRecordEditInput('pedido', value)}
-                      />
-                      <LabeledInput
-                        label="Gestor"
-                        value={selectedPenhorasRecordEdit.gestor}
-                        onChange={(value) => handlePenhorasRecordEditInput('gestor', value)}
-                        suggestions={penhorasGestorFilterOptions}
-                      />
-                    </div>
-                    <div className="field-grid three">
-                      <LabeledSelect
-                        label="Estado"
-                        value={selectedPenhorasRecordEdit.estadoId}
-                        onChange={(value) => handlePenhorasRecordEditInput('estadoId', value)}
-                        options={penhorasActiveStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                      />
-                    </div>
-                    <div className="actions-row modal-edit-actions">
-                      <button className="primary-btn" type="button" onClick={() => void saveSelectedPenhorasRecordEdits()}>
-                        <Save size={15} />
-                        Guardar alterações
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="detail-grid modal-detail-grid">
-                    <Info label="PE" value={selectedPenhorasRecord.pe || '-'} />
-                    <Info label="Acto" value={selectedPenhorasRecord.acto || '-'} />
-                    <Info label="Data pedido" value={selectedPenhorasRecord.dataPedido || '-'} />
-                    <Info label="Identificação" value={selectedPenhorasRecord.identificacao || '-'} />
-                    <Info label="Pedido" value={selectedPenhorasRecord.pedido || '-'} />
-                    <Info label="Gestor" value={selectedPenhorasRecord.gestor || '-'} />
-                    <div className="field modal-status-field">
-                      <span>Estado</span>
-                      <select value={selectedPenhorasRecord.estadoId} onChange={(event) => void updatePenhorasRecordStatus(selectedPenhorasRecord.id, event.target.value)}>
-                        {!penhorasActiveStatuses.some((statusOption) => statusOption.id === selectedPenhorasRecord.estadoId) && (
-                          <option value="">Selecionar estado...</option>
-                        )}
-                        {penhorasActiveStatuses.map((statusOption) => (
-                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <h4 className="modal-section-title">Metadados</h4>
-                <div className="history-list modal-history-list">
-                  <div className="history-item">
-                    <div>Criado</div>
-                    <div className="muted">{new Date(selectedPenhorasRecord.createdAt).toLocaleString('pt-PT')}</div>
-                  </div>
-                  <div className="history-item">
-                    <div>Última atualização</div>
-                    <div className="muted">{new Date(selectedPenhorasRecord.updatedAt).toLocaleString('pt-PT')}</div>
-                  </div>
-                </div>
-              </aside>
-            </div>
-          )
-        }
-
-        {
-          activeModule === 'recibos' && selectedRecord && (
-            <div className="record-modal-overlay" onClick={() => setSelectedRecordId(null)}>
-              <aside className="panel record-modal" onClick={(event) => event.stopPropagation()}>
-                <div className="drawer-header">
-                  <div className="modal-title-block">
-                    <h3>{selectedRecord.processo || selectedRecord.pe || selectedRecord.reciboNumero || 'Detalhe do registo'}</h3>
-                    <div className="small-note modal-meta">
-                      {selectedRecord.pe || '-'} · {MONTHS[selectedRecord.mes - 1]} {selectedRecord.ano}
-                    </div>
-                  </div>
-                  <div className="actions-row modal-header-actions">
-                    <button
-                      className="subtle-btn"
-                      type="button"
-                      onClick={() => setIsRecordEditing((current) => !current)}
-                    >
-                      {isRecordEditing ? <X size={15} /> : <Pencil size={15} />}
-                      {isRecordEditing ? 'Cancelar edição' : 'Editar'}
-                    </button>
-                    <button className="subtle-btn" type="button" onClick={() => setSelectedRecordId(null)}>Fechar</button>
-                  </div>
-                </div>
-
-                {isRecordEditing && selectedRecordEdit ? (
-                  <div className="record-edit-content">
-                    <div className="field-grid three">
-                      <LabeledSelect
-                        label="Tipo"
-                        value={selectedRecordEdit.tipo}
-                        onChange={(value) => handleRecordEditInput('tipo', value as RecordType)}
-                        options={[
-                          { value: 'exequente', label: 'Exequente' },
-                          { value: 'executado', label: 'Executado' },
-                        ]}
-                      />
-                      <LabeledSelect
-                        label="Mês"
-                        value={String(selectedRecordEdit.mes)}
-                        onChange={(value) => handleRecordEditInput('mes', Number(value))}
-                        options={MONTHS.map((label, index) => ({ value: String(index + 1), label }))}
-                      />
-                      <LabeledInput
-                        label="Ano"
-                        value={String(selectedRecordEdit.ano)}
-                        onChange={(value) => handleRecordEditInput('ano', Number(value) || selectedRecordEdit.ano)}
-                      />
-                    </div>
-
-                    <div className="field-grid three">
-                      <LabeledInput label="Processo" value={selectedRecordEdit.processo} onChange={(value) => handleRecordEditInput('processo', value)} suggestions={recordSuggestions.processo} />
-                      <LabeledInput label="PE" value={selectedRecordEdit.pe} onChange={(value) => handleRecordEditInput('pe', value)} suggestions={recordSuggestions.pe} />
-                      <LabeledInput label="Recibo" value={selectedRecordEdit.reciboNumero} onChange={(value) => handleRecordEditInput('reciboNumero', value)} suggestions={recordSuggestions.reciboNumero} />
-                    </div>
-
-                    <div className="field-grid five">
-                      <LabeledInput label="Valor indicado" value={selectedRecordEdit.valorIndicado} onChange={(value) => handleRecordEditInput('valorIndicado', value)} />
-                      <LabeledInput label="Valor sem IVA" value={selectedRecordEdit.valorSemIva} onChange={(value) => handleRecordEditInput('valorSemIva', value)} />
-                      <LabeledInput label="IVA" value={selectedRecordEdit.iva} onChange={(value) => handleRecordEditInput('iva', value)} />
-                      <LabeledInput label="Retenção" value={selectedRecordEdit.retencao} onChange={(value) => handleRecordEditInput('retencao', value)} />
-                      <LabeledInput label="Meu 5%" value={selectedRecordEdit.meu5} onChange={(value) => handleRecordEditInput('meu5', value)} />
-                    </div>
-
-                    <div className="field-grid five">
-                      <LabeledInput label="GPESE" value={selectedRecordEdit.gpeSe} onChange={(value) => handleRecordEditInput('gpeSe', value)} />
-                      <LabeledInput
-                        label="Gestor"
-                        value={selectedRecordEdit.gestor}
-                        onChange={(value) => handleRecordEditInput('gestor', value)}
-                        suggestions={gestorSuggestions}
-                      />
-                      <LabeledInput
-                        label="Exequente"
-                        value={selectedRecordEdit.exequente}
-                        onChange={(value) => handleRecordEditInput('exequente', value)}
-                        suggestions={exequenteSuggestions}
-                      />
-                      <LabeledInput label="Descrição valor" value={selectedRecordEdit.descricaoValor} onChange={(value) => handleRecordEditInput('descricaoValor', value)} />
-                      <LabeledSelect
-                        label="Estado"
-                        value={selectedRecordEdit.estadoId}
-                        onChange={(value) => handleRecordEditInput('estadoId', value)}
-                        options={orderedStatuses.map((status) => ({ value: status.id, label: status.label }))}
-                      />
-                    </div>
-
-                    <div className="field-grid one">
-                      <LabeledInput label="Indicações" value={selectedRecordEdit.indicacoes} onChange={(value) => handleRecordEditInput('indicacoes', value)} />
-                    </div>
-
-                    <div className="actions-row modal-edit-actions">
-                      <button
-                        className="subtle-btn"
-                        type="button"
-                        onClick={() => setSelectedRecordEdit(applyFormAutoCalculations(selectedRecordEdit, calculationSettings, true))}
-                      >
-                        Recalcular
-                      </button>
-                      <button className="primary-btn" type="button" onClick={() => void saveSelectedRecordEdits()}>
-                        <Save size={15} />
-                        Guardar alterações
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="detail-grid modal-detail-grid">
-                    <Info label="Tipo" value={selectedRecord.tipo === 'exequente' ? 'Exequente' : 'Executado'} />
-                    <Info label="PE" value={selectedRecord.pe || '-'} />
-                    <Info label="Processo" value={selectedRecord.processo || '-'} />
-                    <Info label="Recibo" value={selectedRecord.reciboNumero || '-'} />
-                    <Info label="Gestor" value={selectedRecord.gestor || '-'} />
-                    <Info label="Exequente" value={selectedRecord.exequente || '-'} />
-                    <Info label="Valor sem IVA" value={formatCurrency(selectedRecord.valorSemIva)} />
-                    <Info label="IVA" value={formatCurrency(selectedRecord.iva)} />
-                    <Info label="Retenção" value={formatCurrency(selectedRecord.retencao)} />
-                    <Info label="Meu 5%" value={formatCurrency(selectedRecord.meu5)} />
-                    <Info label="GPESE" value={selectedRecordIndicacoes.gpeSe || '-'} />
-                    <Info label="Indicações" value={selectedRecordIndicacoes.text || '-'} />
-                    <div className="field modal-status-field">
-                      <span>Estado</span>
-                      <select value={selectedRecord.estadoId} onChange={(event) => void updateRecordStatus(selectedRecord.id, event.target.value)}>
-                        {orderedStatuses.map((statusOption) => (
-                          <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <h4 className="modal-section-title">Histórico</h4>
-                <div className="history-list modal-history-list">
-                  {selectedRecord.history.length === 0 ? (
-                    <div className="empty-text">Sem histórico.</div>
-                  ) : (
-                    selectedRecord.history.map((item) => (
-                      <div key={item.id} className="history-item">
-                        <div>{item.message}</div>
-                        <div className="muted">{new Date(item.at).toLocaleString('pt-PT')}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </aside>
-            </div>
-          )
-        }
+        {activeModule === 'recibos' && selectedRecord && (
+          <RecibosRecordDrawer
+            record={selectedRecord}
+            recordEdit={selectedRecordEdit}
+            isEditing={isRecordEditing}
+            orderedStatuses={orderedStatuses}
+            recordSuggestions={recordSuggestions}
+            gestorSuggestions={gestorSuggestions}
+            exequenteSuggestions={exequenteSuggestions}
+            recordIndicacoes={selectedRecordIndicacoes}
+            onClose={() => setSelectedRecordId(null)}
+            onToggleEdit={() => setIsRecordEditing((current) => !current)}
+            onEditInput={handleRecordEditInput}
+            onRecalculate={() => selectedRecordEdit && setSelectedRecordEdit(applyFormAutoCalculations(selectedRecordEdit, calculationSettings, true))}
+            onSave={() => void saveSelectedRecordEdits()}
+            onStatusChange={(recordId, statusId) => void updateRecordStatus(recordId, statusId)}
+          />
+        )}
       </main >
     </div >
-  )
-}
-
-type LabeledInputProps = {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  type?: 'text' | 'date' | 'number'
-  suggestions?: string[]
-  placeholder?: string
-}
-
-function LabeledInput({ label, value, onChange, type = 'text', suggestions, placeholder }: LabeledInputProps) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      {type === 'text' && Array.isArray(suggestions) && suggestions.length > 0 ? (
-        <AutocompleteInput value={value} onChange={onChange} suggestions={suggestions} placeholder={placeholder} />
-      ) : (
-        <input
-          type={type}
-          value={value}
-          placeholder={placeholder}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </label>
-  )
-}
-
-type AutocompleteInputProps = {
-  value: string
-  onChange: (value: string) => void
-  suggestions: string[]
-  placeholder?: string
-}
-
-function AutocompleteInput({ value, onChange, suggestions, placeholder }: AutocompleteInputProps) {
-  const [open, setOpen] = useState(false)
-  const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  const filtered = useMemo(() => {
-    const unique = [...new Set(suggestions.map((item) => item.trim()).filter(Boolean))]
-    const query = normalizeText(value)
-
-    if (!query) return unique.slice(0, 160)
-
-    const startsWith = unique.filter((item) => normalizeText(item).startsWith(query))
-    const contains = unique.filter((item) => !normalizeText(item).startsWith(query) && normalizeText(item).includes(query))
-    return [...startsWith, ...contains].slice(0, 160)
-  }, [suggestions, value])
-
-  function commitSelection(nextValue: string) {
-    onChange(nextValue)
-    setOpen(false)
-    setHighlightedIndex(-1)
-  }
-
-  return (
-    <div className="autocomplete-input">
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        placeholder={placeholder}
-        autoComplete="off"
-        onFocus={() => setOpen(true)}
-        onBlur={() => {
-          window.setTimeout(() => {
-            setOpen(false)
-            setHighlightedIndex(-1)
-          }, 110)
-        }}
-        onChange={(event) => {
-          onChange(event.target.value)
-          setOpen(true)
-          setHighlightedIndex(-1)
-        }}
-        onKeyDown={(event) => {
-          if (!open || filtered.length === 0) return
-
-          if (event.key === 'ArrowDown') {
-            event.preventDefault()
-            setHighlightedIndex((current) => (current + 1 >= filtered.length ? 0 : current + 1))
-            return
-          }
-
-          if (event.key === 'ArrowUp') {
-            event.preventDefault()
-            setHighlightedIndex((current) => (current <= 0 ? filtered.length - 1 : current - 1))
-            return
-          }
-
-          if (event.key === 'Enter') {
-            if (highlightedIndex >= 0) {
-              event.preventDefault()
-              commitSelection(filtered[highlightedIndex])
-            }
-            return
-          }
-
-          if (event.key === 'Escape') {
-            setOpen(false)
-            setHighlightedIndex(-1)
-          }
-        }}
-      />
-      {open && filtered.length > 0 && (
-        <div className="autocomplete-menu" role="listbox">
-          {filtered.map((option, index) => (
-            <button
-              key={`${option}-${index}`}
-              type="button"
-              className={`autocomplete-option ${highlightedIndex === index ? 'active' : ''}`}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                commitSelection(option)
-              }}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-type LabeledSelectProps = {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: { value: string; label: string }[]
-}
-
-function LabeledSelect({ label, value, onChange, options }: LabeledSelectProps) {
-  return (
-    <label className="field">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-
-type InfoProps = {
-  label: string
-  value: string
-}
-
-function Info({ label, value }: InfoProps) {
-  return (
-    <div className="info-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   )
 }
 
