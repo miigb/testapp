@@ -18,7 +18,6 @@ import {
   X,
 } from 'lucide-react'
 
-import { api } from './api'
 import { applyFormAutoCalculations } from './lib/calculations'
 import type {
   AnalyticsSummary,
@@ -34,7 +33,6 @@ import type {
   ReceiptRecord,
   RecordFilters,
   RecordType,
-  StatusDefinition,
   TabId,
   TaxRule,
 } from './types'
@@ -84,31 +82,21 @@ import { CalculatorWindow } from './components/shared/CalculatorWindow'
 import { RecibosDashboardWidgetCard } from './components/recibos/RecibosDashboardWidgetCard'
 import { DsDashboardWidgetCard } from './components/ds/DsDashboardWidgetCard'
 import { PenhorasDashboardWidgetCard } from './components/penhoras/PenhorasDashboardWidgetCard'
-import { TABS, DEFAULT_DASHBOARD_FILTERS, MONTHS, CALCULATOR_KEYS } from './constants'
-import type { LayoutMode, QuickToolId, CalculatorKey, TotalMetricKey } from './constants'
+import { TABS, DEFAULT_DASHBOARD_FILTERS } from './constants'
+import type { LayoutMode, QuickToolId, TotalMetricKey } from './constants'
 import type {
   DashboardWidget,
   DsDashboardWidget,
   PenhorasDashboardWidget,
 } from './lib/dashboardWidgets'
-import { formatCurrency, normalizeText, toFormNumber } from './lib/formatters'
+import { formatCurrency, toFormNumber } from './lib/formatters'
 import { resolveInitialQuickNotes } from './lib/localStorage'
-import {
-  getInitialEntryForm,
-  recordToForm,
-  extractGpeSeFromIndicacoes,
-  composeIndicacoes,
-} from './lib/recordHelpers'
-import { getInitialDsEntryForm, dsRecordToForm } from './lib/dsHelpers'
-import { getInitialPenhorasEntryForm, penhorasRecordToForm } from './lib/penhorasHelpers'
+import { getInitialEntryForm, extractGpeSeFromIndicacoes } from './lib/recordHelpers'
+import { getInitialDsEntryForm } from './lib/dsHelpers'
+import { getInitialPenhorasEntryForm } from './lib/penhorasHelpers'
 
 function resolveInitialLayoutMode(): LayoutMode {
   return 'wide'
-}
-
-function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
-  if (!statusId) return undefined
-  return statuses.find((status) => status.id === statusId)
 }
 
 function App() {
@@ -146,9 +134,17 @@ function App() {
 
   const [layoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
   const [quickNotes, setQuickNotes] = useState(resolveInitialQuickNotes)
-  const [calculatorExpression, setCalculatorExpression] = useState('')
-  const [calculatorResult, setCalculatorResult] = useState<string | null>(null)
-  const [calculatorError, setCalculatorError] = useState('')
+  const {
+    calculatorExpression,
+    setCalculatorExpression,
+    calculatorResult,
+    calculatorError,
+    evaluateCalculator,
+    clearCalculator,
+    appendCalculatorValue,
+    backspaceCalculator,
+    handleCalculatorKeyPress,
+  } = useCalculator()
   const [totalsHoverOpen, setTotalsHoverOpen] = useState(false)
   const [selectedTotalMetrics, setSelectedTotalMetrics] = useState<TotalMetricKey[]>([
     'registos',
@@ -304,47 +300,6 @@ function App() {
     setDashboardName,
   })
 
-  // We declare evaluateCalculator here first to pass to useQuickTools, but we need it to see setCalculatorResult etc
-  const evaluateCalculator = useCallback(() => {
-    const normalized = calculatorExpression
-      .replace(/,/g, '.')
-      .replace(/[×x]/g, '*')
-      .replace(/[÷]/g, '/')
-      .trim()
-
-    if (!normalized) {
-      setCalculatorResult(null)
-      setCalculatorError('')
-      return
-    }
-
-    if (!/^[0-9+\-*/().\s%]+$/.test(normalized)) {
-      setCalculatorError('Expressão inválida.')
-      setCalculatorResult(null)
-      return
-    }
-
-    const expressionWithPercent = normalized.replace(/(\d+(\.\d+)?)%/g, '($1/100)')
-
-    try {
-      const computed = Function(`"use strict"; return (${expressionWithPercent})`)()
-      if (typeof computed !== 'number' || !Number.isFinite(computed)) {
-        setCalculatorError('Resultado inválido.')
-        setCalculatorResult(null)
-        return
-      }
-      setCalculatorError('')
-      setCalculatorResult(
-        new Intl.NumberFormat('pt-PT', {
-          maximumFractionDigits: 6,
-        }).format(computed),
-      )
-    } catch {
-      setCalculatorError('Não foi possível calcular.')
-      setCalculatorResult(null)
-    }
-  }, [calculatorExpression])
-
   const {
     toolsExpanded,
     setToolsExpanded,
@@ -449,20 +404,24 @@ function App() {
     defaultStatus,
   })
 
-  const years = useMemo(() => {
-    const values = new Set(records.map((record) => record.ano))
-    return [...values].sort((a, b) => b - a)
-  }, [records])
-
-  const exequenteFilterOptions = useMemo(
-    () => [...new Set(records.map((record) => record.exequente).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
-    [records],
-  )
-
-  const gestorFilterOptions = useMemo(
-    () => [...new Set(records.map((record) => record.gestor).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
-    [records],
-  )
+  const {
+    years,
+    exequenteFilterOptions,
+    gestorFilterOptions,
+    dsYears,
+    dsGestoraFilterOptions,
+    dsEntidadeFilterOptions,
+    dsProdutoFilterOptions,
+    dsProponentesSuggestions,
+    dsReferenciaSuggestions,
+    dsReciboSuggestions,
+    penhorasYears,
+    penhorasGestorFilterOptions,
+    penhorasActoFilterOptions,
+    penhorasPeSuggestions,
+    gestorSuggestions,
+    exequenteSuggestions,
+  } = useFilterOptions({ records, dsRecords, penhorasRecords, recordSuggestions })
 
   const dsOrderedStatuses = useMemo(
     () => [...dsStatuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
@@ -470,60 +429,6 @@ function App() {
   )
   const dsActiveStatuses = useMemo(() => dsOrderedStatuses.filter((status) => status.active), [dsOrderedStatuses])
   const dsDefaultStatus = useMemo(() => dsActiveStatuses[0] ?? dsOrderedStatuses[0], [dsActiveStatuses, dsOrderedStatuses])
-
-  const dsYears = useMemo(() => {
-    const values = new Set(
-      dsRecords
-        .map((record) => (record.dataEscritura ? new Date(record.dataEscritura).getUTCFullYear() : undefined))
-        .filter((value): value is number => Number.isFinite(value)),
-    )
-    return [...values].sort((a, b) => b - a)
-  }, [dsRecords])
-
-  const dsGestoraFilterOptions = useMemo(
-    () =>
-      [...new Set(dsRecords.map((record) => record.gestora).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [dsRecords],
-  )
-
-  const dsEntidadeFilterOptions = useMemo(
-    () =>
-      [...new Set(dsRecords.map((record) => record.entidadeBancaria).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [dsRecords],
-  )
-
-  const dsProdutoFilterOptions = useMemo(
-    () =>
-      [...new Set(dsRecords.map((record) => record.produto).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [dsRecords],
-  )
-
-  const dsProponentesSuggestions = useMemo(
-    () =>
-      [...new Set(dsRecords.map((record) => record.proponentes).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [dsRecords],
-  )
-
-  const dsReferenciaSuggestions = useMemo(
-    () =>
-      [...new Set(dsRecords.map((record) => record.referencia).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [dsRecords],
-  )
-
-  const dsReciboSuggestions = useMemo(
-    () => [...new Set(dsRecords.map((record) => record.recibo).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
-    [dsRecords],
-  )
 
   const penhorasOrderedStatuses = useMemo(
     () => [...penhorasStatuses].sort((a, b) => a.order - b.order || a.label.localeCompare(b.label)),
@@ -602,46 +507,6 @@ function App() {
     setActiveTab,
     setSelectedRecordId,
   })
-
-  const penhorasYears = useMemo(() => {
-    const values = new Set(
-      penhorasRecords
-        .map((record) => (record.dataPedido ? new Date(record.dataPedido).getUTCFullYear() : undefined))
-        .filter((value): value is number => Number.isFinite(value)),
-    )
-    return [...values].sort((a, b) => b - a)
-  }, [penhorasRecords])
-
-  const penhorasGestorFilterOptions = useMemo(
-    () =>
-      [...new Set(penhorasRecords.map((record) => record.gestor).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [penhorasRecords],
-  )
-
-  const penhorasActoFilterOptions = useMemo(
-    () =>
-      [...new Set(penhorasRecords.map((record) => record.acto).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [penhorasRecords],
-  )
-
-  const penhorasPeSuggestions = useMemo(
-    () => [...new Set(penhorasRecords.map((record) => record.pe).filter((value): value is string => Boolean(value?.trim())))].sort((a, b) => a.localeCompare(b)),
-    [penhorasRecords],
-  )
-
-  const gestorSuggestions = useMemo(
-    () => (recordSuggestions.gestor.length > 0 ? recordSuggestions.gestor : gestorFilterOptions),
-    [recordSuggestions.gestor, gestorFilterOptions],
-  )
-
-  const exequenteSuggestions = useMemo(
-    () => (recordSuggestions.exequente.length > 0 ? recordSuggestions.exequente : exequenteFilterOptions),
-    [recordSuggestions.exequente, exequenteFilterOptions],
-  )
 
   const tableViews = useMemo(() => savedViews.filter((view) => view.scope === 'tabela'), [savedViews])
   const dashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'dashboard'), [savedViews])
@@ -722,218 +587,17 @@ function App() {
     }
   }, [records])
 
-  const dsDashboardTotals = useMemo(() => {
-    let valor = 0
-    let comissaoLoja = 0
-    let totalComissaoLojaCmIva = 0
-    let comissaoGestor = 0
-    let comRecibo = 0
-
-    for (const record of dsRecords) {
-      if (typeof record.valor === 'number') valor += record.valor
-      if (typeof record.comissaoLoja === 'number') comissaoLoja += record.comissaoLoja
-      if (typeof record.totalComissaoLojaCmIva === 'number') totalComissaoLojaCmIva += record.totalComissaoLojaCmIva
-      if (typeof record.comissaoGestor === 'number') comissaoGestor += record.comissaoGestor
-      if (record.recibo?.trim()) comRecibo += 1
-    }
-
-    return {
-      registos: dsRecords.length,
-      valor,
-      comissaoLoja,
-      totalComissaoLojaCmIva,
-      comissaoGestor,
-      comRecibo,
-      semRecibo: Math.max(0, dsRecords.length - comRecibo),
-    }
-  }, [dsRecords])
-
-  const dsDashboardByStatus = useMemo(() => {
-    const buckets = new Map<string, { count: number; total: number }>()
-    for (const record of dsRecords) {
-      const key = record.estadoId || 'sem-estado'
-      const current = buckets.get(key) ?? { count: 0, total: 0 }
-      current.count += 1
-      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
-      if (typeof value === 'number') current.total += value
-      buckets.set(key, current)
-    }
-
-    return [...buckets.entries()]
-      .map(([statusId, bucket]) => {
-        const status = getStatus(dsStatuses, statusId)
-        return {
-          id: statusId,
-          label: status?.label ?? 'Sem estado',
-          value: bucket.count,
-          secondary: formatCurrency(bucket.total),
-        }
-      })
-      .sort((a, b) => b.value - a.value)
-  }, [dsRecords, dsStatuses])
-
-  const dsDashboardTopGestoras = useMemo(() => {
-    const buckets = new Map<string, { count: number; total: number }>()
-    for (const record of dsRecords) {
-      const key = record.gestora?.trim()
-      if (!key) continue
-      const current = buckets.get(key) ?? { count: 0, total: 0 }
-      current.count += 1
-      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
-      if (typeof value === 'number') current.total += value
-      buckets.set(key, current)
-    }
-
-    return [...buckets.entries()]
-      .map(([name, bucket]) => ({
-        id: name,
-        label: name,
-        value: bucket.count,
-        secondary: formatCurrency(bucket.total),
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [dsRecords])
-
-  const dsDashboardTopEntidades = useMemo(() => {
-    const buckets = new Map<string, { count: number; total: number }>()
-    for (const record of dsRecords) {
-      const key = record.entidadeBancaria?.trim()
-      if (!key) continue
-      const current = buckets.get(key) ?? { count: 0, total: 0 }
-      current.count += 1
-      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
-      if (typeof value === 'number') current.total += value
-      buckets.set(key, current)
-    }
-
-    return [...buckets.entries()]
-      .map(([name, bucket]) => ({
-        id: name,
-        label: name,
-        value: bucket.count,
-        secondary: formatCurrency(bucket.total),
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [dsRecords])
-
-  const dsDashboardByMonth = useMemo(() => {
-    const buckets = new Map<string, { ano: number; mes: number; count: number; total: number }>()
-    for (const record of dsRecords) {
-      if (!record.dataEscritura) continue
-      const date = new Date(record.dataEscritura)
-      if (Number.isNaN(date.getTime())) continue
-      const ano = date.getUTCFullYear()
-      const mes = date.getUTCMonth() + 1
-      const key = `${ano}-${mes}`
-      const current = buckets.get(key) ?? { ano, mes, count: 0, total: 0 }
-      current.count += 1
-      const value = record.totalComissaoLojaCmIva ?? record.comissaoLoja ?? record.valor ?? 0
-      if (typeof value === 'number') current.total += value
-      buckets.set(key, current)
-    }
-
-    return [...buckets.values()]
-      .sort((a, b) => (a.ano === b.ano ? a.mes - b.mes : a.ano - b.ano))
-      .slice(-12)
-      .map((item) => ({
-        id: `${item.ano}-${item.mes}`,
-        label: `${MONTHS[item.mes - 1]?.slice(0, 3) ?? item.mes}/${item.ano}`,
-        value: item.total,
-        secondary: `${new Intl.NumberFormat('pt-PT').format(item.count)} registos`,
-      }))
-  }, [dsRecords])
-
-  const penhorasDashboardTotals = useMemo(() => {
-    let comDataPedido = 0
-    let recusados = 0
-    let pendentes = 0
-
-    for (const record of penhorasRecords) {
-      if (record.dataPedido) comDataPedido += 1
-      const status = getStatus(penhorasStatuses, record.estadoId)
-      const normalizedStatus = normalizeText(status?.key || status?.label || '')
-
-      if (normalizedStatus.includes('RECUS') || normalizedStatus.includes('DESIST') || normalizedStatus.includes('CANCELAMENTO')) {
-        recusados += 1
-      } else if (
-        (normalizedStatus.includes('AGUARDA') && normalizedStatus.includes('REGIST')) ||
-        normalizedStatus.includes('SEM ESTADO') ||
-        normalizedStatus.includes('SEM-ESTADO')
-      ) {
-        pendentes += 1
-      }
-    }
-
-    return {
-      registos: penhorasRecords.length,
-      comDataPedido,
-      recusados,
-      pendentes,
-    }
-  }, [penhorasRecords, penhorasStatuses])
-
-  const penhorasDashboardByStatus = useMemo(() => {
-    const buckets = new Map<string, number>()
-    for (const record of penhorasRecords) {
-      const key = record.estadoId || 'sem-estado'
-      buckets.set(key, (buckets.get(key) ?? 0) + 1)
-    }
-
-    return [...buckets.entries()]
-      .map(([statusId, count]) => {
-        const status = getStatus(penhorasStatuses, statusId)
-        return {
-          id: statusId,
-          label: status?.label ?? 'Sem estado',
-          value: count,
-        }
-      })
-      .sort((a, b) => b.value - a.value)
-  }, [penhorasRecords, penhorasStatuses])
-
-  const penhorasDashboardTopGestores = useMemo(() => {
-    const buckets = new Map<string, number>()
-    for (const record of penhorasRecords) {
-      const key = record.gestor?.trim()
-      if (!key) continue
-      buckets.set(key, (buckets.get(key) ?? 0) + 1)
-    }
-
-    return [...buckets.entries()]
-      .map(([gestor, count]) => ({
-        id: gestor,
-        label: gestor,
-        value: count,
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [penhorasRecords])
-
-  const penhorasDashboardByMonth = useMemo(() => {
-    const buckets = new Map<string, { ano: number; mes: number; count: number }>()
-    for (const record of penhorasRecords) {
-      if (!record.dataPedido) continue
-      const date = new Date(record.dataPedido)
-      if (Number.isNaN(date.getTime())) continue
-      const ano = date.getUTCFullYear()
-      const mes = date.getUTCMonth() + 1
-      const key = `${ano}-${mes}`
-      const current = buckets.get(key) ?? { ano, mes, count: 0 }
-      current.count += 1
-      buckets.set(key, current)
-    }
-
-    return [...buckets.values()]
-      .sort((a, b) => (a.ano === b.ano ? a.mes - b.mes : a.ano - b.ano))
-      .slice(-12)
-      .map((item) => ({
-        id: `${item.ano}-${item.mes}`,
-        label: `${MONTHS[item.mes - 1]?.slice(0, 3) ?? item.mes}/${item.ano}`,
-        value: item.count,
-      }))
-  }, [penhorasRecords])
+  const {
+    dsDashboardTotals,
+    dsDashboardByStatus,
+    dsDashboardTopGestoras,
+    dsDashboardTopEntidades,
+    dsDashboardByMonth,
+    penhorasDashboardTotals,
+    penhorasDashboardByStatus,
+    penhorasDashboardTopGestores,
+    penhorasDashboardByMonth,
+  } = useDashboardAnalytics({ dsRecords, dsStatuses, penhorasRecords, penhorasStatuses })
 
   const recentRecords = useMemo(() => [...records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12), [records])
   const dsRecentRecords = useMemo(() => [...dsRecords].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 12), [dsRecords])
@@ -1075,113 +739,27 @@ function App() {
     void refreshPenhorasRecords()
   }, [bootstrapLoading, activeModule, penhorasFilters, globalSearch, refreshPenhorasRecords])
 
-  useEffect(() => {
-    if (activeModule !== 'recibos') {
-      setSelectedRecord(null)
-      setSelectedRecordEdit(null)
-      return
-    }
-    if (!selectedRecordId) {
-      setSelectedRecord(null)
-      setSelectedRecordEdit(null)
-      setIsRecordEditing(false)
-      return
-    }
-
-    void (async () => {
-      try {
-        const record = await api.getRecord(selectedRecordId)
-        setSelectedRecord(record)
-        setSelectedRecordEdit(recordToForm(record))
-      } catch {
-        const fallback = records.find((item) => item.id === selectedRecordId) ?? null
-        setSelectedRecord(fallback)
-        setSelectedRecordEdit(fallback ? recordToForm(fallback) : null)
-      }
-    })()
-  }, [selectedRecordId, records, activeModule])
-
-  useEffect(() => {
-    if (!selectedRecord) {
-      setSelectedRecordEdit(null)
-      setIsRecordEditing(false)
-      return
-    }
-
-    setSelectedRecordEdit(recordToForm(selectedRecord))
-  }, [selectedRecord])
-
-  useEffect(() => {
-    if (activeModule !== 'ds') {
-      setSelectedDsRecord(null)
-      setSelectedDsRecordEdit(null)
-      return
-    }
-    if (!selectedDsRecordId) {
-      setSelectedDsRecord(null)
-      setSelectedDsRecordEdit(null)
-      setIsDsRecordEditing(false)
-      return
-    }
-
-    void (async () => {
-      try {
-        const record = await api.getDsRecord(selectedDsRecordId)
-        setSelectedDsRecord(record)
-        setSelectedDsRecordEdit(dsRecordToForm(record))
-      } catch {
-        const fallback = dsRecords.find((item) => item.id === selectedDsRecordId) ?? null
-        setSelectedDsRecord(fallback)
-        setSelectedDsRecordEdit(fallback ? dsRecordToForm(fallback) : null)
-      }
-    })()
-  }, [selectedDsRecordId, dsRecords, activeModule])
-
-  useEffect(() => {
-    if (!selectedDsRecord) {
-      setSelectedDsRecordEdit(null)
-      setIsDsRecordEditing(false)
-      return
-    }
-
-    setSelectedDsRecordEdit(dsRecordToForm(selectedDsRecord))
-  }, [selectedDsRecord])
-
-  useEffect(() => {
-    if (activeModule !== 'penhoras') {
-      setSelectedPenhorasRecord(null)
-      setSelectedPenhorasRecordEdit(null)
-      return
-    }
-    if (!selectedPenhorasRecordId) {
-      setSelectedPenhorasRecord(null)
-      setSelectedPenhorasRecordEdit(null)
-      setIsPenhorasRecordEditing(false)
-      return
-    }
-
-    void (async () => {
-      try {
-        const record = await api.getPenhorasRecord(selectedPenhorasRecordId)
-        setSelectedPenhorasRecord(record)
-        setSelectedPenhorasRecordEdit(penhorasRecordToForm(record))
-      } catch {
-        const fallback = penhorasRecords.find((item) => item.id === selectedPenhorasRecordId) ?? null
-        setSelectedPenhorasRecord(fallback)
-        setSelectedPenhorasRecordEdit(fallback ? penhorasRecordToForm(fallback) : null)
-      }
-    })()
-  }, [selectedPenhorasRecordId, penhorasRecords, activeModule])
-
-  useEffect(() => {
-    if (!selectedPenhorasRecord) {
-      setSelectedPenhorasRecordEdit(null)
-      setIsPenhorasRecordEditing(false)
-      return
-    }
-
-    setSelectedPenhorasRecordEdit(penhorasRecordToForm(selectedPenhorasRecord))
-  }, [selectedPenhorasRecord])
+  useSelectedRecord({
+    activeModule,
+    selectedRecordId,
+    records,
+    selectedRecord,
+    setSelectedRecord,
+    setSelectedRecordEdit,
+    setIsRecordEditing,
+    selectedDsRecordId,
+    dsRecords,
+    selectedDsRecord,
+    setSelectedDsRecord,
+    setSelectedDsRecordEdit,
+    setIsDsRecordEditing,
+    selectedPenhorasRecordId,
+    penhorasRecords,
+    selectedPenhorasRecord,
+    setSelectedPenhorasRecord,
+    setSelectedPenhorasRecordEdit,
+    setIsPenhorasRecordEditing,
+  })
 
   useEffect(() => {
     if (!activeDashboardId) return
@@ -1424,40 +1002,6 @@ function App() {
         onStartResize={(event, widgetId, minHeight) => startDashboardWidgetResize(event, 'penhoras', widgetId, minHeight)}
       />
     )
-  }
-
-  function clearCalculator() {
-    setCalculatorExpression('')
-    setCalculatorResult(null)
-    setCalculatorError('')
-  }
-
-  function appendCalculatorValue(value: string) {
-    setCalculatorExpression((current) => `${current}${value}`)
-    setCalculatorError('')
-  }
-
-  function backspaceCalculator() {
-    setCalculatorExpression((current) => current.slice(0, -1))
-    setCalculatorError('')
-  }
-
-  function handleCalculatorKeyPress(key: CalculatorKey) {
-    if (key.action === 'clear') {
-      clearCalculator()
-      return
-    }
-    if (key.action === 'backspace') {
-      backspaceCalculator()
-      return
-    }
-    if (key.action === 'equals') {
-      evaluateCalculator()
-      return
-    }
-    if (key.value) {
-      appendCalculatorValue(key.value)
-    }
   }
 
   useEffect(() => {
