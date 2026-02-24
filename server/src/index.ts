@@ -38,15 +38,8 @@ app.use(createCorsMiddleware())
 app.use(express.json({ limit: '30mb' }))
 app.use(cookieParser())
 
+// Unprotected routes
 app.use('/api/auth', createAuthRouter(prisma))
-app.use('/api/ai', requireAuth, aiRouter)
-app.use('/api', requireAuth, createRecordsRouter(prisma))
-app.use('/api/ds', requireAuth, createDsRouter(prisma))
-app.use('/api/penhoras', requireAuth, createPenhorasRouter(prisma))
-app.use('/api', requireAuth, createStatusesRouter(prisma))
-app.use('/api', requireAuth, createSettingsRouter(prisma))
-app.use('/api', requireAuth, createDataRouter(prisma))
-
 app.get('/api/health', async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`
@@ -55,6 +48,15 @@ app.get('/api/health', async (_req, res) => {
     res.status(503).json({ ok: false, db: 'down', now: new Date().toISOString() })
   }
 })
+
+// Protected routes (require authentication)
+app.use('/api/ai', requireAuth, aiRouter)
+app.use('/api', requireAuth, createRecordsRouter(prisma))
+app.use('/api/ds', requireAuth, createDsRouter(prisma))
+app.use('/api/penhoras', requireAuth, createPenhorasRouter(prisma))
+app.use('/api', requireAuth, createStatusesRouter(prisma))
+app.use('/api', requireAuth, createSettingsRouter(prisma))
+app.use('/api', requireAuth, createDataRouter(prisma))
 
 // In production, serve the built frontend from dist/ under the same origin.
 // This avoids CORS complexity and keeps deployment simple (single Railway service).
