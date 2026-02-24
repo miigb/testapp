@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 
 import { api } from '../api'
@@ -16,6 +15,12 @@ import type {
 } from '../types'
 
 interface UseEntryFormParams {
+  entryForm: EntryForm
+  setEntryForm: Dispatch<SetStateAction<EntryForm>>
+  dsEntryForm: DsEntryForm
+  setDsEntryForm: Dispatch<SetStateAction<DsEntryForm>>
+  penhorasEntryForm: PenhorasEntryForm
+  setPenhorasEntryForm: Dispatch<SetStateAction<PenhorasEntryForm>>
   calculationSettings: CalculationSettings
   defaultStatus: StatusDefinition | undefined
   dsDefaultStatus: StatusDefinition | undefined
@@ -32,6 +37,12 @@ interface UseEntryFormParams {
 }
 
 export function useEntryForm({
+  entryForm,
+  setEntryForm,
+  dsEntryForm,
+  setDsEntryForm,
+  penhorasEntryForm,
+  setPenhorasEntryForm,
   calculationSettings,
   defaultStatus,
   dsDefaultStatus,
@@ -46,10 +57,6 @@ export function useEntryForm({
   setActiveTab,
   setSelectedRecordId,
 }: UseEntryFormParams) {
-  const [entryForm, setEntryForm] = useState<EntryForm>(getInitialEntryForm(''))
-  const [dsEntryForm, setDsEntryForm] = useState<DsEntryForm>(getInitialDsEntryForm(''))
-  const [penhorasEntryForm, setPenhorasEntryForm] = useState<PenhorasEntryForm>(getInitialPenhorasEntryForm(''))
-
   function handleEntryInput<K extends keyof EntryForm>(key: K, value: EntryForm[K]) {
     setEntryForm((current) => {
       const next = { ...current, [key]: value }
@@ -191,12 +198,6 @@ export function useEntryForm({
   }
 
   return {
-    entryForm,
-    setEntryForm,
-    dsEntryForm,
-    setDsEntryForm,
-    penhorasEntryForm,
-    setPenhorasEntryForm,
     handleEntryInput,
     handleRecordEditInput,
     handleDsEntryInput,

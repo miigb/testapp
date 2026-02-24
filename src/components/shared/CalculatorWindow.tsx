@@ -49,7 +49,6 @@ export function CalculatorWindow({
           <GripVertical size={14} />
           <div>
             <h3>Calculadora</h3>
-            <p className="small-note">+, -, ×, ÷, parênteses e %</p>
           </div>
         </div>
         <div className="tool-window-controls" onMouseDown={(event) => event.stopPropagation()}>

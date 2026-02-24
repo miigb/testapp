@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 
-import { jsPDF } from 'jspdf'
 import {
   Calculator,
   Minimize2,
@@ -20,7 +19,7 @@ import {
 } from 'lucide-react'
 
 import { api } from './api'
-import { applyFormAutoCalculations, parseFormNumber } from './lib/calculations'
+import { applyFormAutoCalculations } from './lib/calculations'
 import type {
   AnalyticsSummary,
   CalculationSettings,
@@ -54,6 +53,12 @@ import { useImport } from './hooks/useImport'
 import { useSettings } from './hooks/useSettings'
 import { useEntryForm } from './hooks/useEntryForm'
 import { useRecordActions } from './hooks/useRecordActions'
+import { useNotesExport } from './hooks/useNotesExport'
+import { useDashboardHandlers } from './hooks/useDashboardHandlers'
+import { useCalculator } from './hooks/useCalculator'
+import { useDashboardAnalytics } from './hooks/useDashboardAnalytics'
+import { useFilterOptions } from './hooks/useFilterOptions'
+import { useSelectedRecord } from './hooks/useSelectedRecord'
 import { DsConfiguracao } from './components/ds/DsConfiguracao'
 import { PenhorasConfiguracao } from './components/penhoras/PenhorasConfiguracao'
 import { RecibosConfiguracao } from './components/recibos/RecibosConfiguracao'
@@ -90,16 +95,12 @@ import { formatCurrency, normalizeText, toFormNumber } from './lib/formatters'
 import { resolveInitialQuickNotes } from './lib/localStorage'
 import {
   getInitialEntryForm,
-  formToPayload,
   recordToForm,
-  recordToPatchPayload,
   extractGpeSeFromIndicacoes,
   composeIndicacoes,
 } from './lib/recordHelpers'
-import { getInitialDsEntryForm, dsFormToPayload, dsRecordToForm } from './lib/dsHelpers'
-import { getInitialPenhorasEntryForm, penhorasFormToPayload, penhorasRecordToForm } from './lib/penhorasHelpers'
-import { formatSmartNotesValue } from './lib/smartNotes'
-import type { SmartNotesResultRow } from './lib/smartNotes'
+import { getInitialDsEntryForm, dsRecordToForm } from './lib/dsHelpers'
+import { getInitialPenhorasEntryForm, penhorasRecordToForm } from './lib/penhorasHelpers'
 
 function resolveInitialLayoutMode(): LayoutMode {
   return 'wide'
@@ -565,6 +566,41 @@ function App() {
     refreshPenhorasRecords,
     setFeedback,
     setEntryForm,
+  })
+
+  const {
+    handleEntryInput,
+    handleRecordEditInput,
+    handleDsEntryInput,
+    handleDsRecordEditInput,
+    handlePenhorasEntryInput,
+    handlePenhorasRecordEditInput,
+    submitEntry,
+    saveNewEntry,
+    submitDsEntry,
+    saveNewDsEntry,
+    submitPenhorasEntry,
+    saveNewPenhorasEntry,
+  } = useEntryForm({
+    entryForm,
+    setEntryForm,
+    dsEntryForm,
+    setDsEntryForm,
+    penhorasEntryForm,
+    setPenhorasEntryForm,
+    calculationSettings,
+    defaultStatus,
+    dsDefaultStatus,
+    penhorasDefaultStatus,
+    setSelectedRecordEdit,
+    setSelectedDsRecordEdit,
+    setSelectedPenhorasRecordEdit,
+    refreshRecords,
+    refreshDsRecords,
+    refreshPenhorasRecords,
+    setFeedback,
+    setActiveTab,
+    setSelectedRecordId,
   })
 
   const penhorasYears = useMemo(() => {
@@ -1206,605 +1242,105 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeModule, activeTab, dashboardFilters, globalSearch])
 
-  async function refreshDashboardSummary() {
-    setDashboardLoading(true)
-    try {
-      const summary = await api.getAnalyticsSummary({
-        ...dashboardFilters,
-        q: globalSearch,
-      })
-      setDashboardSummary(summary)
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao carregar métricas do dashboard.')
-    } finally {
-      setDashboardLoading(false)
-    }
-  }
-
   function dismissFeedback() {
     if (!feedback) return
     setFeedbackClosing(true)
   }
 
-  function patchDsFilters<K extends keyof DsRecordFilters>(key: K, value: DsRecordFilters[K]) {
-    setActiveDsSavedViewId(null)
-    setDsFilters((current) => ({ ...current, [key]: value, page: 1 }))
-  }
-
-  function patchPenhorasFilters<K extends keyof PenhorasRecordFilters>(key: K, value: PenhorasRecordFilters[K]) {
-    setActivePenhorasSavedViewId(null)
-    setPenhorasFilters((current) => ({ ...current, [key]: value, page: 1 }))
-  }
-
-  async function saveDashboard(options?: { asNew?: boolean }) {
-    const trimmedName = dashboardName.trim() || 'Dashboard'
-
-    try {
-      if (options?.asNew || !activeDashboardId) {
-        const created = await api.createSavedView({
-          name: trimmedName,
-          scope: 'dashboard',
-          filters: dashboardSavePayload as Record<string, unknown>,
-        })
-        setSavedViews((current) => [created, ...current])
-        setActiveDashboardId(created.id)
-        setDashboardName(created.name)
-        setFeedback('Dashboard guardado.')
-        return
-      }
-
-      const updated = await api.updateSavedView(activeDashboardId, {
-        name: trimmedName,
-        filters: dashboardSavePayload as Record<string, unknown>,
-      })
-      setSavedViews((current) => current.map((view) => (view.id === updated.id ? updated : view)))
-      setFeedback('Dashboard atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar dashboard.')
-    }
-  }
-
-  async function deleteDashboard() {
-    if (!activeDashboardId) return
-    const confirmed = window.confirm('Eliminar este dashboard?')
-    if (!confirmed) return
-
-    try {
-      await api.deleteSavedView(activeDashboardId)
-      setSavedViews((current) => current.filter((view) => view.id !== activeDashboardId))
-      resetDashboardDraft()
-      setFeedback('Dashboard eliminado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao eliminar dashboard.')
-    }
-  }
-
-  function patchFilters<K extends keyof RecordFilters>(key: K, value: RecordFilters[K]) {
-    setActiveSavedViewId(null)
-    setFilters((current) => ({ ...current, [key]: value, page: 1 }))
-  }
-
-  function patchDashboardFilters<K extends keyof RecordFilters>(key: K, value: RecordFilters[K]) {
-    setDashboardFilters((current) => ({ ...current, [key]: value, page: 1 }))
-  }
-
-  function resetDashboardDraft() {
-    setActiveDashboardId(null)
-    setDashboardName('Dashboard')
-    setDashboardFilters(DEFAULT_DASHBOARD_FILTERS)
-    setDashboardWidgets([])
-    setDashboardConfigOpen(true)
-  }
-
-  function handleEntryInput<K extends keyof EntryForm>(key: K, value: EntryForm[K]) {
-    setEntryForm((current) => {
-      const next = { ...current, [key]: value }
-      if (['valorIndicado', 'valorSemIva', 'valorEmissao'].includes(String(key))) {
-        return applyFormAutoCalculations(next, calculationSettings, key === 'valorIndicado')
-      }
-      return next
-    })
-  }
-
-  function handleRecordEditInput<K extends keyof EntryForm>(key: K, value: EntryForm[K]) {
-    setSelectedRecordEdit((current) => {
-      if (!current) return current
-      const next = { ...current, [key]: value }
-      if (['valorIndicado', 'valorSemIva', 'valorEmissao'].includes(String(key))) {
-        return applyFormAutoCalculations(next, calculationSettings, key === 'valorIndicado')
-      }
-      return next
-    })
-  }
-
-  function handleDsEntryInput<K extends keyof DsEntryForm>(key: K, value: DsEntryForm[K]) {
-    setDsEntryForm((current) => ({ ...current, [key]: value }))
-  }
-
-  function handleDsRecordEditInput<K extends keyof DsEntryForm>(key: K, value: DsEntryForm[K]) {
-    setSelectedDsRecordEdit((current) => {
-      if (!current) return current
-      return { ...current, [key]: value }
-    })
-  }
-
-  function handlePenhorasEntryInput<K extends keyof PenhorasEntryForm>(key: K, value: PenhorasEntryForm[K]) {
-    setPenhorasEntryForm((current) => ({ ...current, [key]: value }))
-  }
-
-  function handlePenhorasRecordEditInput<K extends keyof PenhorasEntryForm>(key: K, value: PenhorasEntryForm[K]) {
-    setSelectedPenhorasRecordEdit((current) => {
-      if (!current) return current
-      return { ...current, [key]: value }
-    })
-  }
-
-  async function submitEntry(event: FormEvent<HTMLFormElement>, saveMode: 'save' | 'saveNew') {
-    event.preventDefault()
-
-    if (!entryForm.pe.trim() && !entryForm.processo.trim() && !entryForm.reciboNumero.trim()) {
-      setFeedback('Preencha pelo menos Processo, PE ou N.º de recibo.')
-      return
-    }
-
-    try {
-      const created = await api.createRecord(formToPayload(entryForm))
-      setFeedback('Registo guardado com sucesso.')
-      if (saveMode === 'saveNew' && defaultStatus) {
-        setEntryForm(getInitialEntryForm(defaultStatus.id))
-      }
-      await refreshRecords()
-      setSelectedRecordId(created.id)
-      setActiveTab('consulta')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar registo.')
-    }
-  }
-
-  async function saveNewEntry() {
-    const fakeEvent = { preventDefault: () => undefined } as FormEvent<HTMLFormElement>
-    await submitEntry(fakeEvent, 'saveNew')
-  }
-
-  async function submitDsEntry(event: FormEvent<HTMLFormElement>, saveMode: 'save' | 'saveNew') {
-    event.preventDefault()
-
-    const payload = dsFormToPayload(dsEntryForm)
-    const hasMinimumData = Boolean(
-      payload.gestora ||
-      payload.proponentes ||
-      payload.referencia ||
-      payload.produto ||
-      payload.entidadeBancaria ||
-      payload.recibo ||
-      payload.valorRaw ||
-      payload.comissaoLojaRaw ||
-      payload.totalComissaoLojaCmIvaRaw,
-    )
-
-    if (!hasMinimumData) {
-      setFeedback('Preencha pelo menos Gestora, Proponentes, Referência, Produto, Entidade, Recibo ou valores.')
-      return
-    }
-
-    try {
-      await api.createDsRecord(payload)
-      setFeedback('Registo DS guardado com sucesso.')
-      if (saveMode === 'saveNew' && dsDefaultStatus) {
-        setDsEntryForm(getInitialDsEntryForm(dsDefaultStatus.id))
-      } else {
-        setActiveTab('consulta')
-      }
-      await refreshDsRecords()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar registo DS.')
-    }
-  }
-
-  async function saveNewDsEntry() {
-    const fakeEvent = { preventDefault: () => undefined } as FormEvent<HTMLFormElement>
-    await submitDsEntry(fakeEvent, 'saveNew')
-  }
-
-  async function submitPenhorasEntry(event: FormEvent<HTMLFormElement>, saveMode: 'save' | 'saveNew') {
-    event.preventDefault()
-
-    const payload = penhorasFormToPayload(penhorasEntryForm)
-    const hasMinimumData = Boolean(payload.pe || payload.acto || payload.identificacao || payload.pedido || payload.gestor || payload.dataPedido)
-
-    if (!hasMinimumData) {
-      setFeedback('Preencha pelo menos PE, Acto, Identificação, Pedido, Gestor ou Data pedido.')
-      return
-    }
-
-    try {
-      await api.createPenhorasRecord(payload)
-      setFeedback('Registo Penhoras guardado com sucesso.')
-      if (saveMode === 'saveNew' && penhorasDefaultStatus) {
-        setPenhorasEntryForm(getInitialPenhorasEntryForm(penhorasDefaultStatus.id))
-      } else {
-        setActiveTab('consulta')
-      }
-      await refreshPenhorasRecords()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao guardar registo Penhoras.')
-    }
-  }
-
-  async function saveNewPenhorasEntry() {
-    const fakeEvent = { preventDefault: () => undefined } as FormEvent<HTMLFormElement>
-    await submitPenhorasEntry(fakeEvent, 'saveNew')
-  }
-
-  async function updateRecordStatus(
-    recordId: string,
-    statusId: string,
-    options?: {
-      registerUndo?: boolean
-    },
-  ) {
-    const registerUndo = options?.registerUndo ?? true
-    const previous = records.find((record) => record.id === recordId)
-    if (previous && previous.estadoId === statusId) return
-
-    try {
-      await api.updateRecordStatus(recordId, statusId)
-      if (registerUndo && previous) {
-        pushUndo({
-          label: `estado de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, run: async () => {
-            await updateRecordStatus(recordId, previous.estadoId, { registerUndo: false })
-          }
-        })
-      }
-      await refreshRecords()
-      if (selectedRecordId === recordId) {
-        setSelectedRecordId(recordId)
-      }
-      setFeedback('Estado atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado.')
-    }
-  }
-
-  async function updateDsRecordStatus(recordId: string, statusId: string) {
-    const previous = dsRecords.find((record) => record.id === recordId)
-    if (previous && previous.estadoId === statusId) return
-
-    try {
-      await api.updateDsRecordStatus(recordId, statusId)
-      await refreshDsRecords()
-      setFeedback('Estado DS atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado DS.')
-    }
-  }
-
-  async function updatePenhorasRecordStatus(recordId: string, statusId: string) {
-    const previous = penhorasRecords.find((record) => record.id === recordId)
-    if (previous && previous.estadoId === statusId) return
-
-    try {
-      await api.updatePenhorasRecordStatus(recordId, statusId)
-      await refreshPenhorasRecords()
-      setFeedback('Estado Penhoras atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar estado Penhoras.')
-    }
-  }
-
-  async function runBulkStatusUpdate() {
-    if (!bulkStatusId || selectedIds.length === 0) {
-      return
-    }
-
-    try {
-      const before = records
-        .filter((record) => selectedIds.includes(record.id))
-        .map((record) => ({ id: record.id, estadoId: record.estadoId }))
-      const result = await api.bulkStatus(selectedIds, bulkStatusId)
-      if (before.length > 0) {
-        pushUndo({
-          label: 'alteração de estado em lote', run: async () => {
-            await Promise.all(before.map((item) => api.updateRecordStatus(item.id, item.estadoId)))
-          }
-        })
-      }
-      setFeedback(`Atualização em lote concluída: ${result.updated} registos.`)
-      setSelectedIds([])
-      await refreshRecords()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha na atualização em lote.')
-    }
-  }
-
-  async function runBulkFieldUpdate() {
-    if (selectedIds.length === 0) return
-
-    const patch: Partial<ReceiptRecord> = {}
-    if (bulkGestor.trim()) patch.gestor = bulkGestor.trim()
-    if (bulkExequente.trim()) patch.exequente = bulkExequente.trim()
-    if (bulkIndicacoes.trim()) patch.indicacoes = bulkIndicacoes.trim()
-
-    if (Object.keys(patch).length === 0 && !bulkForceRecalculate) {
-      setFeedback('Defina pelo menos um campo para atualizar em lote ou ative recálculo fiscal.')
-      return
-    }
-
-    const before = records.filter((record) => selectedIds.includes(record.id))
-
-    try {
-      const result = await api.bulkUpdate(selectedIds, patch, { forceRecalculate: bulkForceRecalculate })
-      if (before.length > 0) {
-        pushUndo({
-          label: 'edição em lote', run: async () => {
-            await Promise.all(before.map((record) => api.patchRecord(record.id, recordToPatchPayload(record))))
-          }
-        })
-      }
-      setFeedback(`Edição em lote concluída: ${result.updated} registos.`)
-      setSelectedIds([])
-      await refreshRecords()
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha na edição em lote.')
-    }
-  }
-
-  async function saveSelectedRecordEdits() {
-    if (!selectedRecord || !selectedRecordEdit) return
-
-    const previous = selectedRecord
-
-    try {
-      await api.patchRecord(selectedRecord.id, formToPayload(selectedRecordEdit))
-      pushUndo({
-        label: `edição de ${previous.pe || previous.processo || previous.reciboNumero || 'registo'}`, run: async () => {
-          await api.patchRecord(previous.id, recordToPatchPayload(previous))
-        }
-      })
-      setIsRecordEditing(false)
-      await refreshRecords()
-      setSelectedRecordId(previous.id)
-      setFeedback('Registo atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar registo.')
-    }
-  }
-
-  async function saveSelectedDsRecordEdits() {
-    if (!selectedDsRecord || !selectedDsRecordEdit) return
-
-    try {
-      await api.patchDsRecord(selectedDsRecord.id, dsFormToPayload(selectedDsRecordEdit))
-      setIsDsRecordEditing(false)
-      await refreshDsRecords()
-      setSelectedDsRecordId(selectedDsRecord.id)
-      setFeedback('Registo DS atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar registo DS.')
-    }
-  }
-
-  async function saveSelectedPenhorasRecordEdits() {
-    if (!selectedPenhorasRecord || !selectedPenhorasRecordEdit) return
-
-    try {
-      await api.patchPenhorasRecord(selectedPenhorasRecord.id, penhorasFormToPayload(selectedPenhorasRecordEdit))
-      setIsPenhorasRecordEditing(false)
-      await refreshPenhorasRecords()
-      setSelectedPenhorasRecordId(selectedPenhorasRecord.id)
-      setFeedback('Registo Penhoras atualizado.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao atualizar registo Penhoras.')
-    }
-  }
-
-  function toggleSelectRecord(recordId: string) {
-    setSelectedIds((current) => (current.includes(recordId) ? current.filter((id) => id !== recordId) : [...current, recordId]))
-  }
-
-  function toggleSelectAllRecords() {
-    if (allSelectedInTable) {
-      setSelectedIds([])
-      return
-    }
-    setSelectedIds(records.map((record) => record.id))
-  }
-
-  async function exportCurrentSnapshot() {
-    try {
-      const snapshot = await api.exportRecordsSnapshot()
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json;charset=utf-8' })
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(blob)
-      link.download = `mesa-recibos-snapshot-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
-      link.click()
-      URL.revokeObjectURL(link.href)
-      setFeedback('Snapshot atual exportado com sucesso.')
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Falha ao exportar snapshot.')
-    }
-  }
-
-  function buildQuickNotesFileName(extension: 'txt' | 'pdf'): string {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-    return `mesa-recibos-notas-${stamp}.${extension}`
-  }
-
-  function buildSmartNotesFileName(extension: 'txt' | 'pdf'): string {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
-    return `mesa-recibos-notas-calculo-${stamp}.${extension}`
-  }
-
-  function buildSmartNotesExportText(): string {
-    const content = smartNotesText.trim()
-    if (!content) return ''
-
-    const sections = [
-      'Notas com cálculo',
-      `Exportado: ${new Date().toLocaleString('pt-PT')}`,
-      '',
-      content,
-    ]
-
-    if (smartNotesResults.length > 0) {
-      sections.push('', 'Resultados', ...smartNotesResults.map((row) => `L${row.lineNumber}: ${row.expression} = ${formatSmartNotesValue(row.result)}`))
-    }
-
-    if (smartNotesErrors.length > 0) {
-      sections.push('', 'Linhas com erro', ...smartNotesErrors.map((row) => `L${row.lineNumber}: ${row.error}`))
-    }
-
-    return sections.join('\n')
-  }
-
-  function removeSmartNotesLine(lineNumber: number) {
-    setSmartNotesText((current) => {
-      const lines = current.split('\n')
-      if (lineNumber < 1 || lineNumber > lines.length) return current
-      lines.splice(lineNumber - 1, 1)
-      return lines.join('\n')
-    })
-  }
-
-  function toggleSmartNotesPinned(signature: string) {
-    setSmartNotesPinnedSignatures((current) => {
-      if (current.includes(signature)) {
-        return current.filter((value) => value !== signature)
-      }
-      return [signature, ...current].slice(0, 200)
-    })
-  }
-
-  function toggleSmartNotesSaved(row: SmartNotesResultRow) {
-    setSmartNotesSavedEntries((current) => {
-      const alreadySaved = current.some((entry) => entry.signature === row.signature)
-      if (alreadySaved) {
-        return current.filter((entry) => entry.signature !== row.signature)
-      }
-      return [
-        {
-          signature: row.signature,
-          expression: row.expression,
-          result: row.result,
-          source: row.source,
-          savedAt: new Date().toISOString(),
-        },
-        ...current,
-      ].slice(0, 200)
-    })
-  }
-
-  function exportQuickNotesTxt() {
-    const content = quickNotes.trim()
-    if (!content) {
-      setFeedback('Sem notas para exportar.')
-      return
-    }
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = buildQuickNotesFileName('txt')
-    link.click()
-    URL.revokeObjectURL(link.href)
-    setFeedback('Notas exportadas em TXT.')
-  }
-
-  function exportQuickNotesPdf() {
-    const content = quickNotes.trim()
-    if (!content) {
-      setFeedback('Sem notas para exportar.')
-      return
-    }
-
-    try {
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-      const margin = 44
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const pageHeight = doc.internal.pageSize.getHeight()
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.text('Notas rápidas', margin, 42)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.text(new Date().toLocaleString('pt-PT'), margin, 58)
-
-      doc.setFontSize(12)
-      const lines = doc.splitTextToSize(content, pageWidth - margin * 2)
-      let y = 86
-
-      for (const line of lines) {
-        if (y > pageHeight - margin) {
-          doc.addPage()
-          y = margin
-        }
-        doc.text(line, margin, y)
-        y += 16
-      }
-
-      doc.save(buildQuickNotesFileName('pdf'))
-      setFeedback('Notas exportadas em PDF.')
-    } catch {
-      setFeedback('Falha ao exportar notas em PDF.')
-    }
-  }
-
-  function exportSmartNotesTxt() {
-    const content = buildSmartNotesExportText()
-    if (!content) {
-      setFeedback('Sem notas com cálculo para exportar.')
-      return
-    }
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = buildSmartNotesFileName('txt')
-    link.click()
-    URL.revokeObjectURL(link.href)
-    setFeedback('Notas com cálculo exportadas em TXT.')
-  }
-
-  function exportSmartNotesPdf() {
-    const content = buildSmartNotesExportText()
-    if (!content) {
-      setFeedback('Sem notas com cálculo para exportar.')
-      return
-    }
-
-    try {
-      const doc = new jsPDF({ unit: 'pt', format: 'a4' })
-      const margin = 44
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const pageHeight = doc.internal.pageSize.getHeight()
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.text('Notas com cálculo', margin, 42)
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.text(new Date().toLocaleString('pt-PT'), margin, 58)
-
-      doc.setFontSize(12)
-      const lines = doc.splitTextToSize(content, pageWidth - margin * 2)
-      let y = 86
-
-      for (const line of lines) {
-        if (y > pageHeight - margin) {
-          doc.addPage()
-          y = margin
-        }
-        doc.text(line, margin, y)
-        y += 16
-      }
-
-      doc.save(buildSmartNotesFileName('pdf'))
-      setFeedback('Notas com cálculo exportadas em PDF.')
-    } catch {
-      setFeedback('Falha ao exportar notas com cálculo em PDF.')
-    }
-  }
+  const {
+    updateRecordStatus,
+    updateDsRecordStatus,
+    updatePenhorasRecordStatus,
+    runBulkStatusUpdate,
+    runBulkFieldUpdate,
+    saveSelectedRecordEdits,
+    saveSelectedDsRecordEdits,
+    saveSelectedPenhorasRecordEdits,
+    toggleSelectRecord,
+    toggleSelectAllRecords,
+  } = useRecordActions({
+    records,
+    dsRecords,
+    penhorasRecords,
+    selectedIds,
+    setSelectedIds,
+    allSelectedInTable,
+    pushUndo,
+    selectedRecordId,
+    setSelectedRecordId,
+    selectedRecord,
+    selectedDsRecord,
+    selectedPenhorasRecord,
+    selectedRecordEdit,
+    selectedDsRecordEdit,
+    selectedPenhorasRecordEdit,
+    setIsRecordEditing,
+    setIsDsRecordEditing,
+    setIsPenhorasRecordEditing,
+    setSelectedDsRecordId,
+    setSelectedPenhorasRecordId,
+    bulkStatusId,
+    bulkGestor,
+    bulkExequente,
+    bulkIndicacoes,
+    bulkForceRecalculate,
+    refreshRecords,
+    refreshDsRecords,
+    refreshPenhorasRecords,
+    setFeedback,
+  })
+
+  const {
+    exportCurrentSnapshot,
+    removeSmartNotesLine,
+    toggleSmartNotesPinned,
+    toggleSmartNotesSaved,
+    exportQuickNotesTxt,
+    exportQuickNotesPdf,
+    exportSmartNotesTxt,
+    exportSmartNotesPdf,
+  } = useNotesExport({
+    quickNotes,
+    smartNotesText,
+    setSmartNotesText,
+    smartNotesResults,
+    smartNotesErrors,
+    setSmartNotesPinnedSignatures,
+    setSmartNotesSavedEntries,
+    setFeedback,
+  })
+
+  const {
+    refreshDashboardSummary,
+    resetDashboardDraft,
+    saveDashboard,
+    deleteDashboard,
+    patchFilters,
+    patchDsFilters,
+    patchPenhorasFilters,
+    patchDashboardFilters,
+  } = useDashboardHandlers({
+    dashboardFilters,
+    globalSearch,
+    setDashboardLoading,
+    setDashboardSummary,
+    dashboardName,
+    activeDashboardId,
+    dashboardSavePayload: dashboardSavePayload as Record<string, unknown>,
+    setSavedViews,
+    setActiveDashboardId,
+    setDashboardName,
+    setDashboardFilters,
+    setDashboardWidgets,
+    setDashboardConfigOpen,
+    setActiveSavedViewId,
+    setFilters,
+    setActiveDsSavedViewId,
+    setDsFilters,
+    setActivePenhorasSavedViewId,
+    setPenhorasFilters,
+    setFeedback,
+  })
 
   function toggleTotalMetric(metric: TotalMetricKey) {
     setSelectedTotalMetrics((current) => {
