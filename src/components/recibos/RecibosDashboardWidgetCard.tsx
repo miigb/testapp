@@ -60,7 +60,7 @@ export interface RecibosDashboardWidgetCardProps {
   onToggleColumn: (id: string) => void
   onAdjustWidth: (id: string, delta: number) => void
   onAdjustHeight: (id: string, delta: number) => void
-  onMove: (id: string, direction: number) => void
+  onMove: (id: string, direction: 1 | -1) => void
   onRemove: (id: string) => void
   onStartResize: (event: ReactMouseEvent<HTMLButtonElement>, widgetId: string, minHeight: number) => void
 }

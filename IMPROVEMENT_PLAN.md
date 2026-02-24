@@ -188,10 +188,10 @@ Files created (✅ = done):
 **Note:** All new files compile cleanly (`npx tsc --noEmit` = 0 errors). App.tsx has NOT yet been updated to import from these — that's the next step (wiring phase).
 
 **Strategy:**
-1. ✅ Create new files with functions verbatim (done).
-2. ⏳ Update `App.tsx` to import from new files (wiring — next step).
-3. Verify app still works (dev server, no TS errors, no runtime errors).
-4. Commit.
+1. ✅ Create new files with functions verbatim.
+2. ✅ Update `App.tsx` to import from new files.
+3. ✅ Verified: `tsc --noEmit` clean, dev server runs.
+4. ✅ Committed.
 
 Risk: **Very low.** Pure functions — logic unchanged, only location changes.
 
@@ -204,14 +204,14 @@ These components are defined **outside** the `App()` function (lines 7876–8129
 - ✅ `LabeledInput`, `AutocompleteInput`, `LabeledSelect` → `src/components/shared/FormInputs.tsx`
 - ✅ `StatusPill`, `StatusIcon`, `ExequenteLogo`, `GestorAvatar`, `EntityIdentity` → `src/components/shared/StatusComponents.tsx`
 - ✅ `Info` → `src/components/shared/FormInputs.tsx`
-- ⏳ `FeedbackToast` (visual feedback bar) — still inside App()
-- ⏳ `UndoBar` (undo notification) — still inside App()
+- ✅ `FeedbackToast` (visual feedback bar)
+- ✅ `UndoBar` (undo notification)
 
 **Strategy:**
 1. ✅ Create `src/components/shared/` directory and component files.
-2. ⏳ Import back into `App.tsx` (wiring — next step, same as Phase 1 wiring).
-3. Verify.
-4. Commit.
+2. ✅ Import back into `App.tsx`.
+3. ✅ Verified.
+4. ✅ Committed.
 
 Risk: **Low.** These components have no internal state or hooks.
 
@@ -220,23 +220,29 @@ Risk: **Low.** These components have no internal state or hooks.
 ### Phase 3 — Extract Custom Hooks (Completed)
 **Goal:** Pull data-fetching and state logic out of `App()` into named hooks.
 
-Key hooks extracted:
-- ✅ `useTheme()` 
-- ✅ `useUndoStack()` 
-- ✅ `useQuickTools()` 
-- ✅ `useBootstrap()` 
-- ✅ `useRecords(filters)` 
-- ✅ `useDsRecords(filters)` 
-- ✅ `usePenhorasRecords(filters)` 
-- ✅ `useDashboard(filters)` 
-- ✅ `useSavedViews(scope)` 
-- ✅ `useSmartNotes()` 
+All 20 hooks extracted:
+- ✅ `useTheme()` — theme management with localStorage sync
+- ✅ `useUndoStack()` — undo/redo stack
+- ✅ `useQuickTools()` — notes, calculator, smart-notes panel state
+- ✅ `useBootstrap()` — bootstrap API call, statuses, calcSettings
+- ✅ `useRecords(filters)` — records CRUD, filters, pagination
+- ✅ `useDsRecords(filters)` — DS module records CRUD
+- ✅ `usePenhorasRecords(filters)` — Penhoras module records CRUD
+- ✅ `useDashboard(filters)` — widget layout state
+- ✅ `useSavedViews(scope)` — saved views CRUD
+- ✅ `useSmartNotes()` — smart notes evaluation, pinning, saving
+- ✅ `useSettings()` — status/calcSettings management
+- ✅ `useEntryForm()` — entry form state + submission for all 3 modules
+- ✅ `useImport()` — import flow for all 3 modules
+- ✅ `useRecordActions()` — CRUD actions, bulk ops, undo
+- ✅ `useDashboardHandlers()` — dashboard widget CRUD + resize
+- ✅ `useDashboardAnalytics()` — 9 dashboard aggregation computations
+- ✅ `useFilterOptions()` — 16 filter/suggestion derivations
+- ✅ `useSelectedRecord()` — selected record loading for all 3 modules
+- ✅ `useCalculator()` — calculator state + evaluation
+- ✅ `useNotesExport()` — notes export functionality
 
-**Outcome:** All state and data-fetching logic has successfully been decentralized from `App.tsx` into isolated files under `src/hooks/`.
-3. Move state + effects + callbacks into hook.
-4. Call hook in `App()`, spread returned values.
-5. Verify identical behaviour.
-6. Commit each hook individually.
+**Outcome:** App.tsx reduced from 8,129 → 1,733 lines. All state and data-fetching logic decentralized into `src/hooks/`.
 
 Risk: **Medium.** Need to be careful with callback dependencies (useCallback, useEffect deps). Do one hook at a time.
 
@@ -333,12 +339,12 @@ Risk: **Medium.** Routes are isolated by path prefix — use those as natural ex
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 0 - Preparation | ✅ Done | Dev server verified, structure mapped |
-| 1 - Extract utils | � Files created, wiring pending | `tsc --noEmit` = 0 errors |
-| 2 - Extract UI components | � Files created, wiring pending | Components in `src/components/shared/` |
-| 3 - Extract hooks | 🔲 Not started | Next after wiring |
-| 4 - Extract module components | ✅ Done | Separated Recibos, DS and Penhoras into Tabs, Dashboards, and Entries |
-| 5 - Context/state slicing | 🔲 Not started | Optional |
-| 6 - Server refactor | 🔲 Not started | Independent |
+| 1 - Extract utils | ✅ Done | 13 files in `src/lib/`, all wired into App.tsx |
+| 2 - Extract UI components | ✅ Done | 6 files in `src/components/shared/` |
+| 3 - Extract hooks | ✅ Done | 20 hooks in `src/hooks/` — App.tsx: 8129 → 1733 lines |
+| 4 - Extract module components | ✅ Done | 21 components across recibos/, ds/, penhoras/ |
+| 5 - Context/state slicing | 🔲 Not started | Optional — defer until prop drilling is painful |
+| 6 - Server refactor | 🔲 Not started | `server/src/index.ts` still 3249 lines |
 | 7 - Tests & polish | 🔲 Not started | Ongoing |
 
 ---

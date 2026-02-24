@@ -2,7 +2,7 @@ import type { MouseEvent as ReactMouseEvent } from 'react'
 import { GripVertical, Pin, PinOff, X } from 'lucide-react'
 
 export interface QuickNotesWindowProps {
-  windowRef: React.RefObject<HTMLDivElement>
+  windowRef: React.RefObject<HTMLDivElement | null>
   position: { x: number; y: number } | null
   zIndex: number
   isPinned: boolean

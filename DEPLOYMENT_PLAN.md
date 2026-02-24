@@ -153,9 +153,10 @@ Deliverable:
 - Rollback runbook is tested and documented.
 
 ## 10. Proposed implementation order (next actions)
-1. Implement production routing model (same-origin API + frontend).
-2. Add production scripts and env validation.
+1. ✅ Implement production routing model (same-origin API + frontend).
+2. ✅ Add production scripts and env validation.
 3. Create Railway project + Postgres and deploy staging.
 4. Run smoke tests and fix gaps.
 5. Enable CI/CD pipeline.
-6. Launch production.
+6. Add authentication (Supabase Auth — JWT only, keep Express).
+7. Launch production.

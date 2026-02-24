@@ -1,18 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   Calculator,
   Minimize2,
-  Pin,
-  PinOff,
   Plus,
-  Minus,
-  Pencil,
-  Save,
   SquareFunction,
   StickyNote,
-  Trash2,
   Undo2,
   Wrench,
   X,
@@ -24,17 +17,13 @@ import type {
   CalculationSettings,
   DsEntryForm,
   DsRecord,
-  DsRecordFilters,
   EntryForm,
   ModuleId,
   PenhorasEntryForm,
   PenhorasRecord,
-  PenhorasRecordFilters,
   ReceiptRecord,
   RecordFilters,
-  RecordType,
   TabId,
-  TaxRule,
 } from './types'
 
 import { isDarkLikeTheme, useTheme } from './hooks/useTheme'
@@ -75,7 +64,6 @@ import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabel
 import { DsRecordDrawer } from './components/ds/DsRecordDrawer'
 import { PenhorasRecordDrawer } from './components/penhoras/PenhorasRecordDrawer'
 import { RecibosRecordDrawer } from './components/recibos/RecibosRecordDrawer'
-import { LabeledInput, AutocompleteInput, LabeledSelect, Info } from './components/shared/FormInputs'
 import { QuickNotesWindow } from './components/shared/QuickNotesWindow'
 import { SmartNotesWindow } from './components/shared/SmartNotesWindow'
 import { CalculatorWindow } from './components/shared/CalculatorWindow'
@@ -89,7 +77,7 @@ import type {
   DsDashboardWidget,
   PenhorasDashboardWidget,
 } from './lib/dashboardWidgets'
-import { formatCurrency, toFormNumber } from './lib/formatters'
+import { formatCurrency } from './lib/formatters'
 import { resolveInitialQuickNotes } from './lib/localStorage'
 import { getInitialEntryForm, extractGpeSeFromIndicacoes } from './lib/recordHelpers'
 import { getInitialDsEntryForm } from './lib/dsHelpers'
@@ -136,13 +124,9 @@ function App() {
   const [quickNotes, setQuickNotes] = useState(resolveInitialQuickNotes)
   const {
     calculatorExpression,
-    setCalculatorExpression,
     calculatorResult,
     calculatorError,
     evaluateCalculator,
-    clearCalculator,
-    appendCalculatorValue,
-    backspaceCalculator,
     handleCalculatorKeyPress,
   } = useCalculator()
   const [totalsHoverOpen, setTotalsHoverOpen] = useState(false)

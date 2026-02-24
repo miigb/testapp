@@ -4,7 +4,7 @@ import type { SavedSmartNotesEntry, SmartNotesErrorRow, SmartNotesResultRow } fr
 import { formatSmartNotesValue } from '../../lib/smartNotes'
 
 export interface SmartNotesWindowProps {
-  windowRef: React.RefObject<HTMLDivElement>
+  windowRef: React.RefObject<HTMLDivElement | null>
   position: { x: number; y: number } | null
   zIndex: number
   isPinned: boolean

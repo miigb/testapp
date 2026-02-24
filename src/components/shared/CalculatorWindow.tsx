@@ -4,7 +4,7 @@ import { CALCULATOR_KEYS } from '../../constants'
 import type { CalculatorKey } from '../../constants'
 
 export interface CalculatorWindowProps {
-  windowRef: React.RefObject<HTMLDivElement>
+  windowRef: React.RefObject<HTMLDivElement | null>
   position: { x: number; y: number } | null
   zIndex: number
   isPinned: boolean
