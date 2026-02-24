@@ -1,12 +1,13 @@
 import 'dotenv/config'
 
-import cors from 'cors'
 import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus, type Status, type TaxRule } from '@prisma/client'
 import { z } from 'zod'
 
+import { createCorsMiddleware } from './middleware/cors'
+import { createErrorHandler } from './middleware/errorHandler'
 import { aiRouter } from './routes/ai'
 
 import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES, DEFAULT_STATUSES, DEFAULT_TAX_RULES } from './defaults'
@@ -33,21 +34,10 @@ if (process.env.NODE_ENV === 'production') {
 
 const PORT = Number(process.env.PORT ?? process.env.API_PORT ?? 4000)
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : []
-
 const app = express()
 const prisma = new PrismaClient()
 
-app.use(
-  cors({
-    origin: process.env.NODE_ENV === 'production' && allowedOrigins.length > 0
-      ? allowedOrigins
-      : true,
-    credentials: true,
-  }),
-)
+app.use(createCorsMiddleware())
 app.use(express.json({ limit: '30mb' }))
 
 function databaseSetupHint() {
@@ -3231,13 +3221,7 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-app.use((err: unknown, _req: express.Request, res: express.Response) => {
-  console.error(err)
-  if (err instanceof Prisma.PrismaClientInitializationError || err instanceof Prisma.PrismaClientKnownRequestError) {
-    return res.status(503).json({ error: databaseSetupHint() })
-  }
-  return res.status(500).json({ error: 'Erro interno do servidor.' })
-})
+app.use(createErrorHandler(databaseSetupHint))
 
 app.listen(PORT, () => {
   console.log(`[api] running on http://localhost:${PORT}`)
