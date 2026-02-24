@@ -16,6 +16,8 @@ import { createPenhorasRouter } from './routes/penhoras'
 import { createStatusesRouter } from './routes/statuses'
 import { createSettingsRouter } from './routes/settings'
 import { createDataRouter } from './routes/data'
+import { createTodosRouter } from './routes/todos'
+import { createNotificationsRouter } from './routes/notifications'
 
 import { databaseSetupHint } from './services/shared'
 
@@ -57,6 +59,8 @@ app.use('/api/penhoras', requireAuth, createPenhorasRouter(prisma))
 app.use('/api', requireAuth, createStatusesRouter(prisma))
 app.use('/api', requireAuth, createSettingsRouter(prisma))
 app.use('/api', requireAuth, createDataRouter(prisma))
+app.use('/api/todos', requireAuth, createTodosRouter(prisma))
+app.use('/api/notifications', requireAuth, createNotificationsRouter(prisma))
 
 // In production, serve the built frontend from dist/ under the same origin.
 // This avoids CORS complexity and keeps deployment simple (single Railway service).
