@@ -318,17 +318,27 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/trash', async (_req, res) => {
-    const items = await prisma.record.findMany({
-      where: { deletedAt: { not: null } },
-      orderBy: { deletedAt: 'desc' },
-      include: {
-        status: true,
-        deletedBy: {
-          select: { id: true, username: true, displayName: true },
+  router.get('/records/trash', async (req, res) => {
+    const page = Number(req.query.page ?? 1)
+    const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
+    const skip = Math.max(page - 1, 0) * pageSize
+    const where: Prisma.RecordWhereInput = { deletedAt: { not: null } }
+
+    const [items, total] = await Promise.all([
+      prisma.record.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { deletedAt: 'desc' },
+        include: {
+          status: true,
+          deletedBy: {
+            select: { id: true, username: true, displayName: true },
+          },
         },
-      },
-    })
+      }),
+      prisma.record.count({ where }),
+    ])
 
     return res.json({
       items: items.map((record) => ({
@@ -336,6 +346,9 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
         deletedAt: record.deletedAt?.toISOString() ?? null,
         deletedBy: record.deletedBy ?? null,
       })),
+      total,
+      page,
+      pageSize,
     })
   })
 
@@ -412,7 +425,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
     }
 
-    const current = await prisma.record.findUnique({ where: { id: req.params.id } })
+    const current = await prisma.record.findFirst({ where: { id: req.params.id, deletedAt: null } })
     if (!current) {
       return res.status(404).json({ error: 'Registo não encontrado.' })
     }
@@ -446,7 +459,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Status inválido.' })
     }
 
-    const old = await prisma.record.findUnique({ where: { id: req.params.id }, include: { status: true } })
+    const old = await prisma.record.findFirst({ where: { id: req.params.id, deletedAt: null }, include: { status: true } })
     if (!old) {
       return res.status(404).json({ error: 'Registo não encontrado.' })
     }
@@ -773,11 +786,15 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
       return res.status(404).json({ error: 'Registo não encontrado.' })
     }
 
+    if (!req.user) {
+      return res.status(401).json({ error: 'Autenticação necessária.' })
+    }
+
     await prisma.record.update({
       where: { id: req.params.id },
       data: {
         deletedAt: new Date(),
-        deletedById: req.user!.userId,
+        deletedById: req.user.userId,
       },
     })
 
@@ -806,12 +823,16 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
   })
 
   router.delete('/records/:id/permanent', async (req, res) => {
-    const record = await prisma.record.findUnique({
-      where: { id: req.params.id },
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
+    }
+
+    const record = await prisma.record.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
     })
 
     if (!record) {
-      return res.status(404).json({ error: 'Registo não encontrado.' })
+      return res.status(404).json({ error: 'Registo não encontrado ou não está eliminado.' })
     }
 
     await prisma.record.delete({
