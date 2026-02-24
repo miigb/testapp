@@ -321,6 +321,32 @@ export type RecordSuggestions = {
   exequente: string[]
 }
 
+// Auth types
+export type UserRole = 'ADMIN' | 'USER'
+
+export type User = {
+  id: number
+  username: string
+  displayName: string
+  email: string | null
+  role: UserRole
+  avatarColor: string | null
+  active: boolean
+  createdAt: string
+}
+
+export type LoginCredentials = {
+  username: string
+  password: string
+}
+
+export type RegisterData = {
+  username: string
+  displayName: string
+  email?: string
+  password: string
+}
+
 export type AnalyticsTotals = {
   registos: number
   valorIndicado: number

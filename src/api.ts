@@ -8,6 +8,7 @@ import type {
   DsRecordFilters,
   DsRecordsResponse,
   ImportPreviewResponse,
+  LoginCredentials,
   PenhorasRecord,
   PenhorasRecordFilters,
   PenhorasRecordsResponse,
@@ -16,8 +17,11 @@ import type {
   RecordSuggestions,
   RecordsResponse,
   ReceiptRecord,
+  RegisterData,
   SavedView,
   StatusDefinition,
+  User,
+  UserRole,
 } from './types'
 
 type RecordWithStatusAliases = ReceiptRecord & {
@@ -34,6 +38,7 @@ type PenhorasRecordWithStatusAliases = PenhorasRecord & {
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...(init?.headers ?? {}),
@@ -470,6 +475,48 @@ export const api = {
     return request<{ ok: true; summary: Record<string, unknown> }>('/api/penhoras/import/commit', {
       method: 'POST',
       body: JSON.stringify(payload),
+    })
+  },
+
+  // Auth
+  login(credentials: LoginCredentials) {
+    return request<{ user: User }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    })
+  },
+
+  logout() {
+    return request<{ ok: true }>('/api/auth/logout', {
+      method: 'POST',
+    })
+  },
+
+  getMe() {
+    return request<User>('/api/auth/me')
+  },
+
+  register(data: RegisterData) {
+    return request<{ user: User }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  getUsers() {
+    return request<User[]>('/api/auth/users')
+  },
+
+  updateUser(id: number, data: Partial<{ displayName: string; email: string | null; role: UserRole; active: boolean; avatarColor: string }>) {
+    return request<User>(`/api/auth/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  deactivateUser(id: number) {
+    return request<{ ok: true }>(`/api/auth/users/${id}`, {
+      method: 'DELETE',
     })
   },
 }

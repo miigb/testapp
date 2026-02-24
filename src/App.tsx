@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   Calculator,
+  LogOut,
   Minimize2,
   Plus,
   SquareFunction,
@@ -26,6 +27,7 @@ import type {
   TabId,
 } from './types'
 
+import { useAuth } from './hooks/useAuth'
 import { isDarkLikeTheme, useTheme } from './hooks/useTheme'
 import { useUndoStack } from './hooks/useUndoStack'
 import { useQuickTools } from './hooks/useQuickTools'
@@ -46,6 +48,7 @@ import { useCalculator } from './hooks/useCalculator'
 import { useDashboardAnalytics } from './hooks/useDashboardAnalytics'
 import { useFilterOptions } from './hooks/useFilterOptions'
 import { useSelectedRecord } from './hooks/useSelectedRecord'
+import { LoginPage } from './components/auth/LoginPage'
 import { DsConfiguracao } from './components/ds/DsConfiguracao'
 import { PenhorasConfiguracao } from './components/penhoras/PenhorasConfiguracao'
 import { RecibosConfiguracao } from './components/recibos/RecibosConfiguracao'
@@ -88,6 +91,10 @@ function resolveInitialLayoutMode(): LayoutMode {
 }
 
 function App() {
+  const { user, authLoading, authError, setAuthError, login, register, logout } = useAuth()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
   const { theme, setTheme } = useTheme()
   const { undoStack, pushUndo, handleUndo } = useUndoStack({
     onUndoSuccess: async (label) => {
@@ -1115,6 +1122,26 @@ function App() {
 
   const isDashboardFocusMode = activeTab === 'dashboards' && dashboardFocusMode
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    if (!userMenuOpen) return
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [userMenuOpen])
+
+  if (authLoading) {
+    return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">A carregar autenticacao...</div></div>
+  }
+
+  if (!user) {
+    return <LoginPage onLogin={login} onRegister={register} authError={authError} setAuthError={setAuthError} />
+  }
+
   if (bootstrapLoading) {
     return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">A carregar aplicação...</div></div>
   }
@@ -1176,6 +1203,34 @@ function App() {
                 placeholder="Pesquisar por processo, PE, recibo, exequente, gestor ou nota..."
               />
               {topActionButtons}
+              <div className="user-menu-wrapper" ref={userMenuRef}>
+                <button
+                  className="user-avatar-btn"
+                  type="button"
+                  onClick={() => setUserMenuOpen((c) => !c)}
+                  title={user.displayName}
+                  aria-label={`Menu do utilizador: ${user.displayName}`}
+                  style={{ background: user.avatarColor || 'var(--brand)' }}
+                >
+                  {user.displayName.charAt(0).toUpperCase()}
+                </button>
+                {userMenuOpen && (
+                  <div className="user-menu-dropdown">
+                    <div className="user-menu-info">
+                      <span className="user-menu-name">{user.displayName}</span>
+                      <span className="user-menu-role">{user.role === 'ADMIN' ? 'Administrador' : 'Utilizador'}</span>
+                    </div>
+                    <button
+                      className="user-menu-logout"
+                      type="button"
+                      onClick={() => { setUserMenuOpen(false); void logout() }}
+                    >
+                      <LogOut size={15} />
+                      Sair
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
