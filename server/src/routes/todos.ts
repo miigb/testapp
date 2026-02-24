@@ -19,23 +19,37 @@ export function createTodosRouter(prisma: PrismaClient): Router {
   // ---------------------------------------------------------------------------
   router.get('/', async (req, res) => {
     try {
-      const page = Math.max(Number(req.query.page ?? 1), 1)
-      const pageSize = Math.min(Math.max(Number(req.query.pageSize ?? 20), 1), 100)
+      const rawPage = Number(req.query.page ?? 1)
+      const page = Math.max(Number.isFinite(rawPage) ? rawPage : 1, 1)
+      const rawPageSize = Number(req.query.pageSize ?? 20)
+      const pageSize = Math.min(Math.max(Number.isFinite(rawPageSize) ? rawPageSize : 20, 1), 100)
       const skip = (page - 1) * pageSize
 
+      const VALID_STATUSES = ['PENDING', 'IN_PROGRESS', 'DONE']
+      const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
       const where: Prisma.TodoWhereInput = { deletedAt: null }
 
       if (req.query.status && typeof req.query.status === 'string') {
+        if (!VALID_STATUSES.includes(req.query.status)) {
+          return res.status(400).json({ error: 'Valor de status inválido.' })
+        }
         where.status = req.query.status as Prisma.TodoWhereInput['status']
       }
       if (req.query.priority && typeof req.query.priority === 'string') {
+        if (!VALID_PRIORITIES.includes(req.query.priority)) {
+          return res.status(400).json({ error: 'Valor de prioridade inválido.' })
+        }
         where.priority = req.query.priority as Prisma.TodoWhereInput['priority']
       }
       if (req.query.assigneeId) {
-        where.assigneeId = Number(req.query.assigneeId)
+        const id = Number(req.query.assigneeId)
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'assigneeId inválido.' })
+        where.assigneeId = id
       }
       if (req.query.createdById) {
-        where.createdById = Number(req.query.createdById)
+        const id = Number(req.query.createdById)
+        if (Number.isNaN(id)) return res.status(400).json({ error: 'createdById inválido.' })
+        where.createdById = id
       }
       if (req.query.linkedModule && typeof req.query.linkedModule === 'string') {
         where.linkedModule = req.query.linkedModule

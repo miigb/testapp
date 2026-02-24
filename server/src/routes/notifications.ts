@@ -19,7 +19,7 @@ export function createNotificationsRouter(prisma: PrismaClient): Router {
     addSseClient(req.user!.userId, res)
 
     const heartbeat = setInterval(() => {
-      res.write(':heartbeat\n\n')
+      res.write(': heartbeat\n\n')
     }, 30_000)
 
     res.on('close', () => {
@@ -113,11 +113,15 @@ export function createNotificationsRouter(prisma: PrismaClient): Router {
   // ---------------------------------------------------------------------------
   router.get('/', async (req, res) => {
     try {
-      const page = Math.max(Number(req.query.page ?? 1), 1)
-      const pageSize = Math.min(Math.max(Number(req.query.pageSize ?? 20), 1), 100)
+      const rawPage = Number(req.query.page ?? 1)
+      const page = Math.max(Number.isFinite(rawPage) ? rawPage : 1, 1)
+      const rawPageSize = Number(req.query.pageSize ?? 20)
+      const pageSize = Math.min(Math.max(Number.isFinite(rawPageSize) ? rawPageSize : 20, 1), 100)
       const skip = (page - 1) * pageSize
 
-      const where = { userId: req.user!.userId }
+      const where: { userId: number; read?: boolean } = { userId: req.user!.userId }
+      if (req.query.read === 'true') where.read = true
+      else if (req.query.read === 'false') where.read = false
 
       const [items, total] = await Promise.all([
         prisma.notification.findMany({

@@ -16,6 +16,11 @@ export function pushToUser(userId: number, event: string, data: unknown) {
   if (!userClients) return
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
   for (const res of userClients) {
-    res.write(payload)
+    try {
+      res.write(payload)
+    } catch {
+      userClients.delete(res)
+    }
   }
+  if (userClients.size === 0) clients.delete(userId)
 }
