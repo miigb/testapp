@@ -1407,6 +1407,8 @@ function App() {
             setIsDsRecordEditing={setIsDsRecordEditing}
             updateDsRecordStatus={updateDsRecordStatus}
             formatCurrency={formatCurrency}
+            setFeedback={setFeedback}
+            onRefresh={refreshDsRecords}
           />
         )}
 
@@ -1517,6 +1519,8 @@ function App() {
             setSelectedPenhorasRecordId={setSelectedPenhorasRecordId}
             setIsPenhorasRecordEditing={setIsPenhorasRecordEditing}
             updatePenhorasRecordStatus={updatePenhorasRecordStatus}
+            setFeedback={setFeedback}
+            onRefresh={refreshPenhorasRecords}
           />
         )}
 
@@ -1624,6 +1628,8 @@ function App() {
               setIsRecordEditing={setIsRecordEditing}
               updateRecordStatus={updateRecordStatus}
               formatCurrency={formatCurrency}
+              setFeedback={setFeedback}
+              onRefresh={refreshRecords}
             />
           )
         }

@@ -67,6 +67,8 @@ export type ReceiptRecord = {
   indicacoes?: string
   sourceColor?: string
   sourceSheet?: string
+  deletedAt?: string | null
+  deletedBy?: { id: number; username: string; displayName: string } | null
   createdAt: string
   updatedAt: string
   history: HistoryEvent[]
@@ -209,6 +211,8 @@ export type DsRecord = {
   rawPayload?: Record<string, unknown>
   estadoId: string
   status?: StatusDefinition
+  deletedAt?: string | null
+  deletedBy?: { id: number; username: string; displayName: string } | null
   createdAt: string
   updatedAt: string
 }
@@ -275,6 +279,8 @@ export type PenhorasRecord = {
   rawPayload?: Record<string, unknown>
   estadoId: string
   status?: StatusDefinition
+  deletedAt?: string | null
+  deletedBy?: { id: number; username: string; displayName: string } | null
   createdAt: string
   updatedAt: string
 }
@@ -402,4 +408,11 @@ export type AnalyticsSummary = {
   byMonth: AnalyticsMonthBucket[]
   topGestores: AnalyticsEntityBucket[]
   topExequentes: AnalyticsEntityBucket[]
+}
+
+export type TrashResponse<T> = {
+  items: (T & { deletedAt: string | null; deletedBy: { id: number; username: string; displayName: string } | null })[]
+  total: number
+  page: number
+  pageSize: number
 }

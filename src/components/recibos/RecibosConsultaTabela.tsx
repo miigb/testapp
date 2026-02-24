@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { ReceiptRecord, RecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
+import { api } from '../../api'
+import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import type { TotalMetricKey } from '../../constants'
 import { TOTAL_METRIC_OPTIONS } from '../../constants'
 
@@ -77,6 +79,9 @@ export interface RecibosConsultaTabelaProps {
     updateRecordStatus: (id: string, statusId: string) => Promise<void>
     // Formatting
     formatCurrency: (value?: number) => string
+    // Feedback & refresh
+    setFeedback: (msg: string) => void
+    onRefresh: () => void
 }
 
 export function RecibosConsultaTabela({
@@ -131,8 +136,11 @@ export function RecibosConsultaTabela({
     setIsRecordEditing,
     updateRecordStatus,
     formatCurrency,
+    setFeedback,
+    onRefresh,
 }: RecibosConsultaTabelaProps) {
     const [isExportOpen, setIsExportOpen] = useState(false)
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
     const exportColumns: ExportColumn[] = [
         { header: 'Tipo', key: 'tipo', width: 15 },
@@ -446,6 +454,18 @@ export function RecibosConsultaTabela({
                                     >
                                         Editar
                                     </button>
+                                    <button
+                                        className="subtle-btn compact danger"
+                                        type="button"
+                                        title="Mover para lixeira"
+                                        aria-label="Mover para lixeira"
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            setDeleteTarget(record.id)
+                                        }}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                                 <div className="result-status">
                                     {status ? <StatusPill status={status} /> : <span className="muted">Sem estado</span>}
@@ -524,6 +544,18 @@ export function RecibosConsultaTabela({
                                                 >
                                                     Editar
                                                 </button>
+                                                <button
+                                                    className="subtle-btn compact danger"
+                                                    type="button"
+                                                    title="Mover para lixeira"
+                                                    aria-label="Mover para lixeira"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        setDeleteTarget(record.id)
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -540,6 +572,23 @@ export function RecibosConsultaTabela({
                 moduleName="Recibos"
                 columns={exportColumns}
                 data={exportData}
+            />
+
+            <ConfirmDeleteModal
+                open={deleteTarget !== null}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={async () => {
+                    if (!deleteTarget) return
+                    try {
+                        await api.deleteRecord(deleteTarget)
+                        setFeedback('Registo movido para a lixeira.')
+                        onRefresh()
+                    } catch (err) {
+                        setFeedback(err instanceof Error ? err.message : 'Erro ao eliminar registo.')
+                    } finally {
+                        setDeleteTarget(null)
+                    }
+                }}
             />
         </section>
     )

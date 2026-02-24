@@ -20,6 +20,7 @@ import type {
   RegisterData,
   SavedView,
   StatusDefinition,
+  TrashResponse,
   User,
   UserRole,
 } from './types'
@@ -518,5 +519,47 @@ export const api = {
     return request<{ ok: true }>(`/api/auth/users/${id}`, {
       method: 'DELETE',
     })
+  },
+
+  // Trash — Recibos
+  deleteRecord(id: string) {
+    return request<{ success: true }>(`/api/records/${id}`, { method: 'DELETE' })
+  },
+  restoreRecord(id: string) {
+    return request<ReceiptRecord>(`/api/records/${id}/restore`, { method: 'POST' })
+  },
+  permanentDeleteRecord(id: string) {
+    return request<{ success: true }>(`/api/records/${id}/permanent`, { method: 'DELETE' })
+  },
+  getRecordsTrash(page = 1, pageSize = 100) {
+    return request<TrashResponse<ReceiptRecord>>(`/api/records/trash?page=${page}&pageSize=${pageSize}`)
+  },
+
+  // Trash — DS
+  deleteDsRecord(id: string) {
+    return request<{ success: true }>(`/api/ds/records/${id}`, { method: 'DELETE' })
+  },
+  restoreDsRecord(id: string) {
+    return request<DsRecord>(`/api/ds/records/${id}/restore`, { method: 'POST' })
+  },
+  permanentDeleteDsRecord(id: string) {
+    return request<{ success: true }>(`/api/ds/records/${id}/permanent`, { method: 'DELETE' })
+  },
+  getDsRecordsTrash(page = 1, pageSize = 100) {
+    return request<TrashResponse<DsRecord>>(`/api/ds/records/trash?page=${page}&pageSize=${pageSize}`)
+  },
+
+  // Trash — Penhoras
+  deletePenhorasRecord(id: string) {
+    return request<{ success: true }>(`/api/penhoras/records/${id}`, { method: 'DELETE' })
+  },
+  restorePenhorasRecord(id: string) {
+    return request<PenhorasRecord>(`/api/penhoras/records/${id}/restore`, { method: 'POST' })
+  },
+  permanentDeletePenhorasRecord(id: string) {
+    return request<{ success: true }>(`/api/penhoras/records/${id}/permanent`, { method: 'DELETE' })
+  },
+  getPenhorasRecordsTrash(page = 1, pageSize = 100) {
+    return request<TrashResponse<PenhorasRecord>>(`/api/penhoras/records/trash?page=${page}&pageSize=${pageSize}`)
   },
 }

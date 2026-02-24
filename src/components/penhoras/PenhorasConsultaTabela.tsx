@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
+import { api } from '../../api'
+import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { ExportComposer } from '../shared/ExportComposer'
 import type { ExportColumn } from '../../lib/exportGenerators'
 import { colorWithAlpha } from '../../lib/formatters'
@@ -45,6 +47,9 @@ export interface PenhorasConsultaTabelaProps {
     setSelectedPenhorasRecordId: (id: string) => void
     setIsPenhorasRecordEditing: (v: boolean) => void
     updatePenhorasRecordStatus: (id: string, statusId: string) => Promise<void>
+    // Feedback & refresh
+    setFeedback: (msg: string) => void
+    onRefresh: () => void
 }
 
 export function PenhorasConsultaTabela({
@@ -72,8 +77,11 @@ export function PenhorasConsultaTabela({
     setSelectedPenhorasRecordId,
     setIsPenhorasRecordEditing,
     updatePenhorasRecordStatus,
+    setFeedback,
+    onRefresh,
 }: PenhorasConsultaTabelaProps) {
     const [isExportOpen, setIsExportOpen] = useState(false)
+    const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
     const exportColumns: ExportColumn[] = [
         { header: 'PE', key: 'pe', width: 15 },
@@ -220,6 +228,18 @@ export function PenhorasConsultaTabela({
                                     >
                                         Editar
                                     </button>
+                                    <button
+                                        className="subtle-btn compact danger"
+                                        type="button"
+                                        title="Mover para lixeira"
+                                        aria-label="Mover para lixeira"
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            setDeleteTarget(record.id)
+                                        }}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                                 <div className="result-status ds-result-status">
                                     {status ? <StatusPill status={status} /> : <span className="muted ds-status-pill-empty">Sem estado</span>}
@@ -279,17 +299,31 @@ export function PenhorasConsultaTabela({
                                             </select>
                                         </td>
                                         <td>
-                                            <button
-                                                className="subtle-btn compact"
-                                                type="button"
-                                                onClick={(event) => {
-                                                    event.stopPropagation()
-                                                    setSelectedPenhorasRecordId(record.id)
-                                                    setIsPenhorasRecordEditing(true)
-                                                }}
-                                            >
-                                                Editar
-                                            </button>
+                                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                                <button
+                                                    className="subtle-btn compact"
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        setSelectedPenhorasRecordId(record.id)
+                                                        setIsPenhorasRecordEditing(true)
+                                                    }}
+                                                >
+                                                    Editar
+                                                </button>
+                                                <button
+                                                    className="subtle-btn compact danger"
+                                                    type="button"
+                                                    title="Mover para lixeira"
+                                                    aria-label="Mover para lixeira"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        setDeleteTarget(record.id)
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 )
@@ -305,6 +339,23 @@ export function PenhorasConsultaTabela({
                 moduleName="Penhoras"
                 columns={exportColumns}
                 data={exportData}
+            />
+
+            <ConfirmDeleteModal
+                open={deleteTarget !== null}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={async () => {
+                    if (!deleteTarget) return
+                    try {
+                        await api.deletePenhorasRecord(deleteTarget)
+                        setFeedback('Registo Penhoras movido para a lixeira.')
+                        onRefresh()
+                    } catch (err) {
+                        setFeedback(err instanceof Error ? err.message : 'Erro ao eliminar registo Penhoras.')
+                    } finally {
+                        setDeleteTarget(null)
+                    }
+                }}
             />
         </section>
     )
