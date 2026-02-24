@@ -12,6 +12,29 @@ import { aiRouter } from './routes/ai'
 
 import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES, DEFAULT_STATUSES, DEFAULT_TAX_RULES } from './defaults'
 import {
+  recordInputSchema,
+  recordPatchSchema,
+  importCommitSchema,
+  importPreviewSchema,
+  saveViewSchema,
+  taxRuleSchema,
+  calculationSettingsSchema,
+  statusSchema,
+  bulkUpdateSchema,
+} from './schemas/records'
+import {
+  dsRecordInputSchema,
+  dsRecordPatchSchema,
+  dsImportPreviewSchema,
+  dsImportCommitSchema,
+} from './schemas/ds'
+import {
+  penhorasRecordInputSchema,
+  penhorasRecordPatchSchema,
+  penhorasImportPreviewSchema,
+  penhorasImportCommitSchema,
+} from './schemas/penhoras'
+import {
   applyCalculations,
   buildUniqueRecordKey,
   normalizeText,
@@ -43,158 +66,6 @@ app.use(express.json({ limit: '30mb' }))
 function databaseSetupHint() {
   return 'Base de dados indisponível. Configure DATABASE_URL e execute: npm run prisma:push'
 }
-
-const recordInputSchema = z.object({
-  tipo: z.enum(['exequente', 'executado']),
-  mes: z.number().int().min(1).max(12),
-  ano: z.number().int().min(2000).max(2100),
-  processo: z.string().trim().optional(),
-  pe: z.string().trim().optional(),
-  reciboNumero: z.string().trim().optional(),
-  dataLevantamento: z.string().optional(),
-  dataRecibo: z.string().optional(),
-  valorIndicado: z.number().optional(),
-  valorSemIva: z.number().optional(),
-  iva: z.number().optional(),
-  retencao: z.number().optional(),
-  valorEmissao: z.number().optional(),
-  meu5: z.number().optional(),
-  outrasTaxas: z.number().optional(),
-  gestor: z.string().trim().optional(),
-  exequente: z.string().trim().optional(),
-  descricaoValor: z.string().trim().optional(),
-  indicacoes: z.string().trim().optional(),
-  sourceColor: z.string().optional(),
-  sourceSheet: z.string().optional(),
-  statusId: z.string().optional(),
-  estadoId: z.string().optional(),
-})
-
-const recordPatchSchema = recordInputSchema.partial()
-
-const importCommitSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-  colorMapping: z.record(z.string(), z.string()).optional(),
-  strategy: z.enum(['skip', 'update', 'duplicate']).default('skip'),
-  forceRecalculate: z.boolean().optional(),
-})
-
-const importPreviewSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-  colorMapping: z.record(z.string(), z.string()).optional(),
-})
-
-const saveViewSchema = z.object({
-  name: z.string().min(1),
-  scope: z.string().min(1),
-  filters: z.record(z.string(), z.unknown()),
-})
-
-const taxRuleSchema = z.object({
-  id: z.string().optional(),
-  code: z.string().min(1),
-  label: z.string().min(1),
-  rate: z.number().min(0),
-  enabled: z.boolean(),
-  targetField: z.enum(['iva', 'retencao', 'meu5', 'outrasTaxas']),
-  baseField: z.enum(['valorIndicado', 'valorSemIva', 'valorEmissao']),
-  order: z.number().int(),
-})
-
-const calculationSettingsSchema = z.object({
-  autoApplyRules: z.boolean().optional(),
-  autoComputeValorSemIva: z.boolean().optional(),
-  autoComputeValorEmissao: z.boolean().optional(),
-  roundTo: z.number().int().min(0).max(6).optional(),
-  taxRules: z.array(taxRuleSchema).optional(),
-})
-
-const statusSchema = z.object({
-  key: z.string().min(1),
-  label: z.string().min(1),
-  icon: z.string().min(1),
-  color: z.string().min(1),
-  active: z.boolean(),
-  order: z.number().int(),
-})
-
-const bulkUpdateSchema = z.object({
-  recordIds: z.array(z.string().min(1)).min(1),
-  patch: recordPatchSchema,
-  forceRecalculate: z.boolean().optional(),
-})
-
-const dsRecordInputSchema = z.object({
-  gestora: z.string().trim().optional(),
-  proponentes: z.string().trim().optional(),
-  referencia: z.string().trim().optional(),
-  produto: z.string().trim().optional(),
-  entidadeBancaria: z.string().trim().optional(),
-  liderCalculo: z.string().trim().optional(),
-  recibo: z.string().trim().optional(),
-  faltaReciboGestora: z.string().trim().optional(),
-  valorRaw: z.string().trim().optional(),
-  valor: z.number().optional(),
-  dataEscritura: z.string().optional(),
-  dataFechoCrm: z.string().optional(),
-  comissaoLojaRaw: z.string().trim().optional(),
-  comissaoLoja: z.number().optional(),
-  ivaCgdRaw: z.string().trim().optional(),
-  ivaCgdValor: z.number().optional(),
-  ivaCgdKind: z.enum(['sem_iva', 'total_levantado', 'valor', 'outro']).optional(),
-  totalComissaoLojaCmIvaRaw: z.string().trim().optional(),
-  totalComissaoLojaCmIva: z.number().optional(),
-  comissaoGestorRaw: z.string().trim().optional(),
-  comissaoGestor: z.number().optional(),
-  percentagemRaw: z.string().trim().optional(),
-  percentagem: z.number().optional(),
-  pagComissaoGestor: z.string().optional(),
-  sourceFile: z.string().trim().optional(),
-  sourceSheet: z.string().trim().optional(),
-  sourceRowNumber: z.number().int().optional(),
-  importBatchId: z.string().trim().optional(),
-  rawPayload: z.record(z.string(), z.unknown()).optional(),
-  statusId: z.string().optional(),
-  estadoId: z.string().optional(),
-})
-
-const dsRecordPatchSchema = dsRecordInputSchema.partial()
-
-const dsImportPreviewSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-})
-
-const dsImportCommitSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-  strategy: z.enum(['skip', 'update', 'duplicate']).default('skip'),
-})
-
-const penhorasRecordInputSchema = z.object({
-  pe: z.string().trim().optional(),
-  acto: z.string().trim().optional(),
-  dataPedido: z.string().optional(),
-  identificacao: z.string().trim().optional(),
-  pedido: z.string().trim().optional(),
-  gestor: z.string().trim().optional(),
-  sourceFile: z.string().trim().optional(),
-  sourceSheet: z.string().trim().optional(),
-  sourceRowNumber: z.number().int().optional(),
-  importBatchId: z.string().trim().optional(),
-  rawPayload: z.record(z.string(), z.unknown()).optional(),
-  statusId: z.string().optional(),
-  estadoId: z.string().optional(),
-})
-
-const penhorasRecordPatchSchema = penhorasRecordInputSchema.partial()
-
-const penhorasImportPreviewSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-})
-
-const penhorasImportCommitSchema = z.object({
-  rows: z.array(z.record(z.string(), z.unknown())),
-  strategy: z.enum(['skip', 'update', 'duplicate']).default('skip'),
-})
 
 const PENHORAS_LEGEND_ACTO_VALUES = [
   'LEGENDA',
