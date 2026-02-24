@@ -337,6 +337,7 @@ function App() {
     penhorasStatuses,
     setPenhorasStatuses,
   } = useBootstrap({
+    userId: user?.id,
     setSavedViews,
     setEntryForm,
     setBulkStatusId,

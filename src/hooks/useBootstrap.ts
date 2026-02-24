@@ -6,6 +6,7 @@ import { getInitialDsEntryForm } from '../lib/dsHelpers'
 import { getInitialPenhorasEntryForm } from '../lib/penhorasHelpers'
 
 export interface BootstrapControls {
+    userId: number | undefined
     setSavedViews: React.Dispatch<React.SetStateAction<SavedView[]>>
     setEntryForm: React.Dispatch<React.SetStateAction<EntryForm>>
     setBulkStatusId: React.Dispatch<React.SetStateAction<string>>
@@ -16,6 +17,7 @@ export interface BootstrapControls {
 }
 
 export function useBootstrap({
+    userId,
     setSavedViews,
     setEntryForm,
     setBulkStatusId,
@@ -61,6 +63,10 @@ export function useBootstrap({
     }
 
     useEffect(() => {
+        if (!userId) {
+            setBootstrapLoading(false)
+            return
+        }
         void (async () => {
             setBootstrapLoading(true)
             setPageError('')
@@ -119,7 +125,7 @@ export function useBootstrap({
             }
         })()
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [userId])
 
     return {
         bootstrapLoading,
