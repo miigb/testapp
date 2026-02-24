@@ -349,11 +349,11 @@ export function PenhorasConsultaTabela({
                     try {
                         await api.deletePenhorasRecord(deleteTarget)
                         setFeedback('Registo Penhoras movido para a lixeira.')
-                        onRefresh()
                     } catch (err) {
                         setFeedback(err instanceof Error ? err.message : 'Erro ao eliminar registo Penhoras.')
                     } finally {
                         setDeleteTarget(null)
+                        onRefresh()
                     }
                 }}
             />

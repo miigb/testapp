@@ -365,11 +365,11 @@ export function DsConsultaTabela({
                     try {
                         await api.deleteDsRecord(deleteTarget)
                         setFeedback('Registo DS movido para a lixeira.')
-                        onRefresh()
                     } catch (err) {
                         setFeedback(err instanceof Error ? err.message : 'Erro ao eliminar registo DS.')
                     } finally {
                         setDeleteTarget(null)
+                        onRefresh()
                     }
                 }}
             />

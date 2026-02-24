@@ -582,11 +582,11 @@ export function RecibosConsultaTabela({
                     try {
                         await api.deleteRecord(deleteTarget)
                         setFeedback('Registo movido para a lixeira.')
-                        onRefresh()
                     } catch (err) {
                         setFeedback(err instanceof Error ? err.message : 'Erro ao eliminar registo.')
                     } finally {
                         setDeleteTarget(null)
+                        onRefresh()
                     }
                 }}
             />

@@ -33,7 +33,7 @@ export function ConfirmDeleteModal({
       position: 'fixed', inset: 0, zIndex: 9999,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.4)',
-    }} onClick={onCancel}>
+    }} onClick={loading ? undefined : onCancel}>
       <div style={{
         background: '#fff', borderRadius: 12, padding: '24px 28px',
         maxWidth: 420, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
