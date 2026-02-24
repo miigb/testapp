@@ -1,21 +1,14 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { TrashItem } from './TrashItem'
-
-interface TrashEntry {
-  id: string
-  module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
-  label: string
-  deletedAt: string
-  deletedBy?: string
-}
+import type { TrashEntry } from '../../hooks/useTrash'
 
 interface TrashPanelProps {
   items: TrashEntry[]
   loading: boolean
   onRestore: (module: string, id: string) => Promise<void>
   onPermanentDelete?: (module: string, id: string) => Promise<void>
-  onEmptyTrash?: () => Promise<void>
+  onEmptyTrash?: (module?: 'recibos' | 'ds' | 'penhoras' | 'tarefas') => Promise<void>
   isAdmin?: boolean
 }
 
@@ -37,7 +30,7 @@ export function TrashPanel({ items, loading, onRestore, onPermanentDelete, onEmp
 
   async function handleEmptyTrash() {
     if (!onEmptyTrash) return
-    await onEmptyTrash()
+    await onEmptyTrash(filter === 'todos' ? undefined : filter)
     setConfirmEmpty(false)
   }
 
@@ -60,7 +53,9 @@ export function TrashPanel({ items, loading, onRestore, onPermanentDelete, onEmp
         <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)' }}>
           {confirmEmpty ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
-              <span style={{ color: '#ef4444', fontWeight: 600 }}>Eliminar tudo permanentemente?</span>
+              <span style={{ color: '#ef4444', fontWeight: 600 }}>
+                {filter === 'todos' ? 'Eliminar tudo permanentemente?' : `Eliminar todos os itens de ${TRASH_TABS.find((t) => t.id === filter)?.label ?? filter} permanentemente?`}
+              </span>
               <button
                 type="button"
                 className="primary-btn"

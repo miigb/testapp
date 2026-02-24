@@ -58,8 +58,7 @@ export function TodoExpandedView({
   // Load comments on mount
   useEffect(() => {
     onFetchComments().then(setComments).catch(() => { /* ignore */ })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todo.id])
+  }, [todo.id, onFetchComments])
 
   async function handleSave() {
     setSaving(true)

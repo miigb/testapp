@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { api } from '../api'
 import type { TodoItem, TodoComment, TodoFilters, UserSummary } from '../types'
 
@@ -14,9 +14,11 @@ export function useTodos(currentUserId: number | undefined) {
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<TodoFilters>(DEFAULT_FILTERS)
   const [users, setUsers] = useState<UserSummary[]>([])
+  const requestIdRef = useRef(0)
 
   const refreshTodos = useCallback(async () => {
     if (!currentUserId) return
+    const requestId = ++requestIdRef.current
     setLoading(true)
     try {
       const params: { status?: string; priority?: string; assigneeId?: number } = {}
@@ -28,11 +30,16 @@ export function useTodos(currentUserId: number | undefined) {
         params.assigneeId = filters.assigneeId as number
       }
       const result = await api.getTodos(params)
-      setTodos(result.items)
+      // Only apply result if this is still the latest request
+      if (requestId === requestIdRef.current) {
+        setTodos(result.items)
+      }
     } catch {
       // silently fail
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
   }, [filters, currentUserId])
 

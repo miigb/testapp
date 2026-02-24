@@ -47,9 +47,12 @@ export function useNotifications(userId: number | undefined) {
   useEffect(() => {
     if (!userId) return
 
+    let destroyed = false
     let reconnectTimeout: ReturnType<typeof setTimeout>
 
     function connect() {
+      if (destroyed) return
+
       const es = new EventSource('/api/notifications/stream')
       eventSourceRef.current = es
 
@@ -74,15 +77,20 @@ export function useNotifications(userId: number | undefined) {
 
       es.onerror = () => {
         es.close()
-        eventSourceRef.current = null
-        // Auto-reconnect after 5s
-        reconnectTimeout = setTimeout(connect, 5000)
+        if (eventSourceRef.current === es) {
+          eventSourceRef.current = null
+        }
+        // Auto-reconnect after 5s only if not destroyed
+        if (!destroyed) {
+          reconnectTimeout = setTimeout(connect, 5000)
+        }
       }
     }
 
     connect()
 
     return () => {
+      destroyed = true
       clearTimeout(reconnectTimeout)
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
@@ -94,9 +102,12 @@ export function useNotifications(userId: number | undefined) {
   const markRead = useCallback(async (id: number) => {
     await api.markNotificationRead(id)
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      prev.map((n) => {
+        if (n.id !== id) return n
+        if (!n.read) setUnreadCount((c) => Math.max(0, c - 1))
+        return { ...n, read: true }
+      }),
     )
-    setUnreadCount((prev) => Math.max(0, prev - 1))
   }, [])
 
   const markAllRead = useCallback(async () => {

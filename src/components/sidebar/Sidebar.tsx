@@ -1,19 +1,12 @@
 import { Bell, CheckSquare, PanelRightClose, Trash2 } from 'lucide-react'
 import type { TodoItem, TodoFilters, TodoComment, NotificationItem, NotificationPreferences, UserSummary } from '../../types'
+import type { TrashEntry } from '../../hooks/useTrash'
 import { TodosPanel } from './TodosPanel'
 import { NotificationsPanel } from './NotificationsPanel'
 import { TrashPanel } from './TrashPanel'
 import './Sidebar.css'
 
 export type SidebarTab = 'todos' | 'notifications' | 'trash'
-
-interface TrashEntry {
-  id: string
-  module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
-  label: string
-  deletedAt: string
-  deletedBy?: string
-}
 
 export interface SidebarProps {
   open: boolean
@@ -59,7 +52,7 @@ export interface SidebarProps {
   trashCount: number
   onRestore: (module: string, id: string) => Promise<void>
   onPermanentDelete?: (module: string, id: string) => Promise<void>
-  onEmptyTrash?: () => Promise<void>
+  onEmptyTrash?: (module?: 'recibos' | 'ds' | 'penhoras' | 'tarefas') => Promise<void>
   isAdmin?: boolean
 }
 

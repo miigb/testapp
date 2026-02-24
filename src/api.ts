@@ -673,7 +673,7 @@ export const api = {
 
   getNotifications(params?: { page?: number; pageSize?: number; read?: boolean }) {
     const search = new URLSearchParams()
-    if (params?.page) search.set('page', String(params.page))
+    if (params?.page !== undefined) search.set('page', String(params.page))
     if (params?.pageSize) search.set('pageSize', String(params.pageSize))
     if (params?.read !== undefined) search.set('read', String(params.read))
     const qs = search.toString()
@@ -706,6 +706,6 @@ export const api = {
   // ── Users (summary) ──────────────────────────────────────────────────
 
   getUsersSummary() {
-    return request<UserSummary[]>('/api/auth/users')
+    return request<UserSummary[]>('/api/auth/users/summary')
   },
 }

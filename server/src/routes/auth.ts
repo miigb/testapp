@@ -132,6 +132,21 @@ export function createAuthRouter(prisma: PrismaClient) {
     return res.json(user)
   })
 
+  // GET /users/summary (lightweight — used for assignment dropdowns)
+  r.get('/users/summary', requireAuth, async (_req, res) => {
+    const users = await prisma.user.findMany({
+      where: { active: true },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarColor: true,
+      },
+      orderBy: { displayName: 'asc' },
+    })
+    return res.json(users)
+  })
+
   // GET /users (no email — used for assignment dropdowns)
   r.get('/users', requireAuth, async (_req, res) => {
     const users = await prisma.user.findMany({

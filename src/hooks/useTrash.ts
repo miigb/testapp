@@ -6,7 +6,7 @@ export interface TrashEntry {
   module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
   label: string
   deletedAt: string
-  deletedBy?: string
+  deletedBy?: { displayName: string }
 }
 
 export function useTrash(userId: number | undefined) {
@@ -28,48 +28,52 @@ export function useTrash(userId: number | undefined) {
 
       if (recibosResult.status === 'fulfilled') {
         for (const item of recibosResult.value.items) {
+          const deletedByObj = item.deletedBy as { displayName: string } | null | undefined
           entries.push({
             id: item.id,
             module: 'recibos',
             label: item.processo || item.pe || item.reciboNumero || `Recibo #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
-            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
+            deletedBy: deletedByObj ?? undefined,
           })
         }
       }
 
       if (dsResult.status === 'fulfilled') {
         for (const item of dsResult.value.items) {
+          const deletedByObj = item.deletedBy as { displayName: string } | null | undefined
           entries.push({
             id: item.id,
             module: 'ds',
             label: item.referencia || item.proponentes || `DS #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
-            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
+            deletedBy: deletedByObj ?? undefined,
           })
         }
       }
 
       if (penhorasResult.status === 'fulfilled') {
         for (const item of penhorasResult.value.items) {
+          const deletedByObj = item.deletedBy as { displayName: string } | null | undefined
           entries.push({
             id: item.id,
             module: 'penhoras',
             label: item.pe || item.identificacao || `Penhora #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
-            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
+            deletedBy: deletedByObj ?? undefined,
           })
         }
       }
 
       if (todosResult.status === 'fulfilled') {
         for (const item of todosResult.value.items) {
+          const deletedByObj = (item as Record<string, unknown>).deletedBy as { displayName: string } | null | undefined
           entries.push({
             id: String(item.id),
             module: 'tarefas',
             label: item.title,
             deletedAt: item.deletedAt || item.updatedAt,
-            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
+            deletedBy: deletedByObj ?? undefined,
           })
         }
       }
@@ -124,14 +128,32 @@ export function useTrash(userId: number | undefined) {
     setItems((prev) => prev.filter((item) => !(item.id === id && item.module === module)))
   }, [])
 
-  const emptyTrash = useCallback(async () => {
-    await Promise.allSettled([
-      api.emptyRecibosTrash(),
-      api.emptyDsTrash(),
-      api.emptyPenhorasTrash(),
-      api.emptyTodosTrash(),
-    ])
-    setItems([])
+  const emptyTrash = useCallback(async (module?: 'recibos' | 'ds' | 'penhoras' | 'tarefas') => {
+    if (module) {
+      switch (module) {
+        case 'recibos':
+          await api.emptyRecibosTrash()
+          break
+        case 'ds':
+          await api.emptyDsTrash()
+          break
+        case 'penhoras':
+          await api.emptyPenhorasTrash()
+          break
+        case 'tarefas':
+          await api.emptyTodosTrash()
+          break
+      }
+      setItems((prev) => prev.filter((item) => item.module !== module))
+    } else {
+      await Promise.allSettled([
+        api.emptyRecibosTrash(),
+        api.emptyDsTrash(),
+        api.emptyPenhorasTrash(),
+        api.emptyTodosTrash(),
+      ])
+      setItems([])
+    }
   }, [])
 
   return {

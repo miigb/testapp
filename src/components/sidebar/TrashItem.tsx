@@ -1,12 +1,5 @@
 import { RotateCcw, Trash2 } from 'lucide-react'
-
-interface TrashEntry {
-  id: string
-  module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
-  label: string
-  deletedAt: string
-  deletedBy?: string
-}
+import type { TrashEntry } from '../../hooks/useTrash'
 
 interface TrashItemProps {
   item: TrashEntry
@@ -52,7 +45,7 @@ export function TrashItem({ item, onRestore, onPermanentDelete }: TrashItemProps
         <div className="trash-item-name">{item.label}</div>
         <div className="trash-item-date">
           {daysSinceLabel(item.deletedAt)}
-          {item.deletedBy && ` por ${item.deletedBy}`}
+          {item.deletedBy && ` por ${item.deletedBy.displayName}`}
         </div>
         <div className="trash-item-date" style={{ color: remaining <= 5 ? '#ef4444' : undefined }}>
           {remaining === 0
