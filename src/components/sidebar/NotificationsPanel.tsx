@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BellOff, Settings } from 'lucide-react'
 import type { NotificationItem, NotificationPreferences } from '../../types'
 import { NotificationCard } from './NotificationCard'
+import { NotificationPreferences as NotificationPreferencesPanel } from '../shared/NotificationPreferences'
 
 interface NotificationsPanelProps {
   notifications: NotificationItem[]
@@ -35,15 +36,6 @@ function groupNotifications(notifications: NotificationItem[]): { label: string;
   return groups.filter((g) => g.items.length > 0)
 }
 
-const PREF_LABELS: { key: keyof NotificationPreferences; label: string }[] = [
-  { key: 'taskAssigned', label: 'Tarefa atribuída' },
-  { key: 'taskCompleted', label: 'Tarefa concluída' },
-  { key: 'taskCommented', label: 'Comentário em tarefa' },
-  { key: 'taskDueSoon', label: 'Tarefa a expirar' },
-  { key: 'recordStatusChange', label: 'Mudança de estado de registo' },
-  { key: 'mention', label: 'Menção' },
-]
-
 export function NotificationsPanel({
   notifications,
   loading,
@@ -58,29 +50,11 @@ export function NotificationsPanel({
 
   if (showPrefs && preferences) {
     return (
-      <div className="notif-prefs">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span className="notif-prefs-title">Preferências de notificações</span>
-          <button
-            type="button"
-            className="subtle-btn icon-btn micro"
-            onClick={() => setShowPrefs(false)}
-            title="Voltar"
-          >
-            Voltar
-          </button>
-        </div>
-        {PREF_LABELS.map(({ key, label }) => (
-          <div key={key} className="notif-pref-row">
-            <label>{label}</label>
-            <input
-              type="checkbox"
-              checked={preferences[key]}
-              onChange={(e) => void onUpdatePreferences({ [key]: e.target.checked })}
-            />
-          </div>
-        ))}
-      </div>
+      <NotificationPreferencesPanel
+        preferences={preferences}
+        onSave={onUpdatePreferences}
+        onClose={() => setShowPrefs(false)}
+      />
     )
   }
 
@@ -100,7 +74,7 @@ export function NotificationsPanel({
           type="button"
           className="subtle-btn icon-btn micro"
           onClick={() => setShowPrefs(true)}
-          title="Preferências"
+          title="Preferencias"
         >
           <Settings size={14} />
         </button>
@@ -108,12 +82,12 @@ export function NotificationsPanel({
 
       {loading ? (
         <div className="sidebar-empty">
-          <div className="sidebar-empty-text">A carregar notificações...</div>
+          <div className="sidebar-empty-text">A carregar notificacoes...</div>
         </div>
       ) : notifications.length === 0 ? (
         <div className="sidebar-empty">
           <BellOff size={32} className="sidebar-empty-icon" />
-          <div className="sidebar-empty-text">Sem notificações.</div>
+          <div className="sidebar-empty-text">Sem notificacoes.</div>
         </div>
       ) : (
         groups.map((group) => (
