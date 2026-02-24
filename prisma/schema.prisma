@@ -32,6 +32,138 @@ enum DsIvaKind {
   outro
 }
 
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  username    String    @unique
+  displayName String
+  email       String?   @unique
+  password    String
+  role        UserRole  @default(USER)
+  avatarColor String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  todosCreated           Todo[]                  @relation("TodoCreator")
+  todosAssigned          Todo[]                  @relation("TodoAssignee")
+  todoComments           TodoComment[]
+  notifications          Notification[]
+  notificationPrefs      NotificationPreference?
+  deletedRecords         Record[]                @relation("RecordDeleter")
+  deletedDsRecords       DsRecord[]              @relation("DsRecordDeleter")
+  deletedPenhorasRecords PenhorasRecord[]        @relation("PenhorasRecordDeleter")
+}
+
+enum TodoPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TodoStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+model Todo {
+  id             Int          @id @default(autoincrement())
+  title          String
+  description    String?
+  priority       TodoPriority @default(MEDIUM)
+  status         TodoStatus   @default(PENDING)
+  dueDate        DateTime?
+
+  createdById    Int
+  createdBy      User         @relation("TodoCreator", fields: [createdById], references: [id])
+  assigneeId     Int?
+  assignee       User?        @relation("TodoAssignee", fields: [assigneeId], references: [id])
+
+  linkedModule   String?
+  linkedRecordId String?
+
+  deletedAt      DateTime?
+  deletedById    Int?
+
+  subtasks       TodoSubtask[]
+  comments       TodoComment[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([createdById])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model TodoSubtask {
+  id        Int     @id @default(autoincrement())
+  todoId    Int
+  todo      Todo    @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  title     String
+  completed Boolean @default(false)
+  order     Int     @default(0)
+
+  @@index([todoId])
+}
+
+model TodoComment {
+  id        Int      @id @default(autoincrement())
+  todoId    Int
+  todo      Todo     @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([todoId])
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_COMMENTED
+  TASK_DUE_SOON
+  RECORD_STATUS_CHANGE
+  MENTION
+}
+
+model Notification {
+  id             Int              @id @default(autoincrement())
+  userId         Int
+  user           User             @relation(fields: [userId], references: [id])
+  type           NotificationType
+  title          String
+  message        String
+  read           Boolean          @default(false)
+  linkedModule   String?
+  linkedRecordId String?
+  linkedTodoId   Int?
+  createdAt      DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id                  Int     @id @default(autoincrement())
+  userId              Int     @unique
+  user                User    @relation(fields: [userId], references: [id])
+  taskAssigned        Boolean @default(true)
+  taskCompleted       Boolean @default(true)
+  taskCommented       Boolean @default(true)
+  taskDueSoon         Boolean @default(true)
+  recordStatusChange  Boolean @default(true)
+  mention             Boolean @default(true)
+}
+
 model Status {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -77,11 +209,16 @@ model Record {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
+  deletedAt   DateTime?
+  deletedById Int?
+  deletedBy   User?    @relation("RecordDeleter", fields: [deletedById], references: [id])
+
   @@index([ano, mes])
   @@index([tipo])
   @@index([statusId])
   @@index([gestor])
   @@index([exequente])
+  @@index([deletedAt])
   @@unique([tipo, ano, mes, processo, pe, reciboNumero], map: "record_unique_key")
 }
 
@@ -184,11 +321,16 @@ model DsRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  deletedAt   DateTime?
+  deletedById Int?
+  deletedBy   User?    @relation("DsRecordDeleter", fields: [deletedById], references: [id])
+
   @@index([statusId])
   @@index([gestora])
   @@index([referencia])
   @@index([entidadeBancaria])
   @@index([dataEscritura])
+  @@index([deletedAt])
 }
 
 model PenhorasStatus {
@@ -225,9 +367,14 @@ model PenhorasRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  deletedAt   DateTime?
+  deletedById Int?
+  deletedBy   User?    @relation("PenhorasRecordDeleter", fields: [deletedById], references: [id])
+
   @@index([statusId])
   @@index([pe])
   @@index([gestor])
   @@index([acto])
   @@index([dataPedido])
+  @@index([deletedAt])
 }
