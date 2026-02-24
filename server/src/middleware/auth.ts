@@ -23,7 +23,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.user?.role !== 'ADMIN') {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Autenticacao necessaria.' })
+  }
+  if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Apenas administradores.' })
   }
   next()

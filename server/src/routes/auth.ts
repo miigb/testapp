@@ -24,41 +24,49 @@ export function createAuthRouter(prisma: PrismaClient) {
 
     const { username, displayName, email, password } = parsed.data
 
-    const existing = await prisma.user.findUnique({ where: { username } })
-    if (existing) {
-      return res.status(409).json({ error: 'Nome de utilizador ja existe.' })
-    }
-
-    const userCount = await prisma.user.count()
-    const role = userCount === 0 ? 'ADMIN' : 'USER'
-
     const hashedPassword = await hashPassword(password)
     const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
 
-    const user = await prisma.user.create({
-      data: {
-        username,
-        displayName,
-        email: email ?? null,
-        password: hashedPassword,
-        role,
-        avatarColor,
-      },
-      select: {
-        id: true,
-        username: true,
-        displayName: true,
-        email: true,
-        role: true,
-        active: true,
-        avatarColor: true,
-        createdAt: true,
-      },
-    })
+    try {
+      const user = await prisma.$transaction(async (tx) => {
+        const existing = await tx.user.findUnique({ where: { username } })
+        if (existing) return null
 
-    const token = signToken({ userId: user.id, username: user.username, role: user.role })
-    res.cookie('token', token, COOKIE_OPTIONS)
-    return res.status(201).json(user)
+        const userCount = await tx.user.count()
+        const role = userCount === 0 ? 'ADMIN' : 'USER'
+
+        return tx.user.create({
+          data: {
+            username,
+            displayName,
+            email: email ?? null,
+            password: hashedPassword,
+            role,
+            avatarColor,
+          },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            email: true,
+            role: true,
+            active: true,
+            avatarColor: true,
+            createdAt: true,
+          },
+        })
+      })
+
+      if (!user) {
+        return res.status(409).json({ error: 'Nome de utilizador ja existe.' })
+      }
+
+      const token = signToken({ userId: user.id, username: user.username, role: user.role })
+      res.cookie('token', token, COOKIE_OPTIONS)
+      return res.status(201).json(user)
+    } catch {
+      return res.status(500).json({ error: 'Erro ao registar utilizador.' })
+    }
   })
 
   // POST /login
@@ -124,7 +132,7 @@ export function createAuthRouter(prisma: PrismaClient) {
     return res.json(user)
   })
 
-  // GET /users
+  // GET /users (no email — used for assignment dropdowns)
   r.get('/users', requireAuth, async (_req, res) => {
     const users = await prisma.user.findMany({
       where: { active: true },
@@ -132,7 +140,6 @@ export function createAuthRouter(prisma: PrismaClient) {
         id: true,
         username: true,
         displayName: true,
-        email: true,
         role: true,
         avatarColor: true,
         createdAt: true,
@@ -154,37 +161,87 @@ export function createAuthRouter(prisma: PrismaClient) {
       return res.status(400).json({ error: 'ID invalido.' })
     }
 
-    const user = await prisma.user.update({
-      where: { id },
-      data: parsed.data,
-      select: {
-        id: true,
-        username: true,
-        displayName: true,
-        email: true,
-        role: true,
-        active: true,
-        avatarColor: true,
-        createdAt: true,
-      },
-    })
+    // Prevent demoting yourself or deactivating yourself
+    if (id === req.user!.userId) {
+      if (parsed.data.role && parsed.data.role !== req.user!.role) {
+        return res.status(400).json({ error: 'Nao pode alterar o proprio role.' })
+      }
+      if (parsed.data.active === false) {
+        return res.status(400).json({ error: 'Nao pode desativar a propria conta.' })
+      }
+    }
 
-    return res.json(user)
+    // Prevent removing the last admin
+    if (parsed.data.role === 'USER') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN', active: true } })
+      if (adminCount <= 1) {
+        const target = await prisma.user.findUnique({ where: { id }, select: { role: true } })
+        if (target?.role === 'ADMIN') {
+          return res.status(400).json({ error: 'Tem de existir pelo menos um administrador.' })
+        }
+      }
+    }
+
+    try {
+      const user = await prisma.user.update({
+        where: { id },
+        data: parsed.data,
+        select: {
+          id: true,
+          username: true,
+          displayName: true,
+          email: true,
+          role: true,
+          active: true,
+          avatarColor: true,
+          createdAt: true,
+        },
+      })
+      return res.json(user)
+    } catch (err: unknown) {
+      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2025') {
+        return res.status(404).json({ error: 'Utilizador nao encontrado.' })
+      }
+      throw err
+    }
   })
 
-  // DELETE /users/:id
+  // DELETE /users/:id (deactivate)
   r.delete('/users/:id', requireAuth, requireAdmin, async (req, res) => {
     const id = Number(req.params.id)
     if (isNaN(id)) {
       return res.status(400).json({ error: 'ID invalido.' })
     }
 
-    await prisma.user.update({
-      where: { id },
-      data: { active: false },
-    })
+    // Prevent self-deactivation
+    if (id === req.user!.userId) {
+      return res.status(400).json({ error: 'Nao pode desativar a propria conta.' })
+    }
 
-    return res.json({ ok: true })
+    // Prevent removing the last admin
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true, active: true } })
+    if (!target || !target.active) {
+      return res.status(404).json({ error: 'Utilizador nao encontrado.' })
+    }
+    if (target.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN', active: true } })
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Tem de existir pelo menos um administrador.' })
+      }
+    }
+
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: { active: false },
+      })
+      return res.json({ ok: true })
+    } catch (err: unknown) {
+      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === 'P2025') {
+        return res.status(404).json({ error: 'Utilizador nao encontrado.' })
+      }
+      throw err
+    }
   })
 
   return r

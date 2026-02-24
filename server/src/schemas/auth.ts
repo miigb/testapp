@@ -17,5 +17,5 @@ export const updateUserSchema = z.object({
   email: z.string().email().nullable().optional(),
   role: z.enum(['ADMIN', 'USER']).optional(),
   active: z.boolean().optional(),
-  avatarColor: z.string().optional(),
+  avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
 })

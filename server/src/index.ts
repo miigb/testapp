@@ -21,7 +21,7 @@ import { databaseSetupHint } from './services/shared'
 
 // Fail fast in production when required env vars are missing
 if (process.env.NODE_ENV === 'production') {
-  const required = ['DATABASE_URL']
+  const required = ['DATABASE_URL', 'JWT_SECRET']
   const missing = required.filter((key) => !process.env[key])
   if (missing.length > 0) {
     console.error(`[startup] Missing required environment variables: ${missing.join(', ')}`)
