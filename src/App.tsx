@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  Bell,
   Calculator,
   LogOut,
   Minimize2,
@@ -45,6 +46,9 @@ import { useRecordActions } from './hooks/useRecordActions'
 import { useNotesExport } from './hooks/useNotesExport'
 import { useDashboardHandlers } from './hooks/useDashboardHandlers'
 import { useCalculator } from './hooks/useCalculator'
+import { useTodos } from './hooks/useTodos'
+import { useNotifications } from './hooks/useNotifications'
+import { useTrash } from './hooks/useTrash'
 import { useDashboardAnalytics } from './hooks/useDashboardAnalytics'
 import { useFilterOptions } from './hooks/useFilterOptions'
 import { useSelectedRecord } from './hooks/useSelectedRecord'
@@ -67,6 +71,8 @@ import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabel
 import { DsRecordDrawer } from './components/ds/DsRecordDrawer'
 import { PenhorasRecordDrawer } from './components/penhoras/PenhorasRecordDrawer'
 import { RecibosRecordDrawer } from './components/recibos/RecibosRecordDrawer'
+import { Sidebar } from './components/sidebar/Sidebar'
+import type { SidebarTab } from './components/sidebar/Sidebar'
 import { QuickNotesWindow } from './components/shared/QuickNotesWindow'
 import { SmartNotesWindow } from './components/shared/SmartNotesWindow'
 import { CalculatorWindow } from './components/shared/CalculatorWindow'
@@ -126,6 +132,46 @@ function App() {
   const [selectedPenhorasRecord, setSelectedPenhorasRecord] = useState<PenhorasRecord | null>(null)
   const [selectedPenhorasRecordEdit, setSelectedPenhorasRecordEdit] = useState<PenhorasEntryForm | null>(null)
   const [isPenhorasRecordEditing, setIsPenhorasRecordEditing] = useState(false)
+
+  // ── Sidebar state ──────────────────────────────────────────────────
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('todos')
+
+  const {
+    todos: sidebarTodos,
+    loading: todosLoading,
+    filters: todoFilters,
+    setFilters: setTodoFilters,
+    users: todoUsers,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+    restoreTodo: restoreTodoAction,
+    addSubtask,
+    toggleSubtask,
+    deleteSubtask,
+    fetchComments,
+    addComment,
+    refreshTodos,
+  } = useTodos(user?.id)
+
+  const {
+    notifications: sidebarNotifications,
+    unreadCount: notifUnreadCount,
+    loading: notificationsLoading,
+    preferences: notifPreferences,
+    markRead: markNotifRead,
+    markAllRead: markAllNotifsRead,
+    updatePreferences: updateNotifPrefs,
+  } = useNotifications(user?.id)
+
+  const {
+    items: trashItems,
+    loading: trashLoading,
+    totalCount: trashCount,
+    restore: restoreTrashItem,
+    refreshTrash,
+  } = useTrash(user?.id)
 
   const [layoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
   const [quickNotes, setQuickNotes] = useState(resolveInitialQuickNotes)
@@ -1034,6 +1080,24 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notesOpen, calculatorOpen, smartNotesOpen, evaluateCalculator, toolLayers])
 
+  function handleCreateTodoFromDrawer(module: string, recordId: string) {
+    setSidebarOpen(true)
+    setSidebarTab('todos')
+    void createTodo({ title: '', linkedModule: module, linkedRecordId: recordId })
+  }
+
+  // Sidebar keyboard shortcut: Alt+T
+  useEffect(() => {
+    function handleSidebarShortcut(event: KeyboardEvent) {
+      if (event.altKey && event.key === 't') {
+        event.preventDefault()
+        setSidebarOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleSidebarShortcut)
+    return () => window.removeEventListener('keydown', handleSidebarShortcut)
+  }, [])
+
   function switchModule(nextModule: ModuleId) {
     setActiveModule(nextModule)
     setActiveTab(nextModule === 'recibos' ? 'entrada' : 'consulta')
@@ -1153,7 +1217,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell module-${activeModule} ${layoutMode === 'wide' || isDashboardFocusMode ? 'wide' : ''} ${isDashboardFocusMode ? 'dashboard-focus-mode' : ''}`}
+      className={`app-shell module-${activeModule} ${layoutMode === 'wide' || isDashboardFocusMode ? 'wide' : ''} ${isDashboardFocusMode ? 'dashboard-focus-mode' : ''} ${sidebarOpen ? 'sidebar-open' : ''}`}
     >
       <header className="topbar unified">
         <div className={`brand-block module-brand-host ${activeModule}-active`}>
@@ -1204,6 +1268,20 @@ function App() {
                 placeholder="Pesquisar por processo, PE, recibo, exequente, gestor ou nota..."
               />
               {topActionButtons}
+              <div className="bell-btn-wrapper">
+                <button
+                  className="subtle-btn icon-btn"
+                  type="button"
+                  onClick={() => { setSidebarOpen(true); setSidebarTab('notifications') }}
+                  title="Notificações (Alt+T)"
+                  aria-label="Notificações"
+                >
+                  <Bell size={15} />
+                </button>
+                {notifUnreadCount > 0 && (
+                  <span className="bell-badge">{notifUnreadCount > 99 ? '99+' : notifUnreadCount}</span>
+                )}
+              </div>
               <div className="user-menu-wrapper" ref={userMenuRef}>
                 <button
                   className="user-avatar-btn"
@@ -1733,6 +1811,7 @@ function App() {
             onEditInput={handleDsRecordEditInput}
             onSave={() => void saveSelectedDsRecordEdits()}
             onStatusChange={(recordId, statusId) => void updateDsRecordStatus(recordId, statusId)}
+            onCreateTodo={handleCreateTodoFromDrawer}
           />
         )}
 
@@ -1750,6 +1829,7 @@ function App() {
             onEditInput={handlePenhorasRecordEditInput}
             onSave={() => void saveSelectedPenhorasRecordEdits()}
             onStatusChange={(recordId, statusId) => void updatePenhorasRecordStatus(recordId, statusId)}
+            onCreateTodo={handleCreateTodoFromDrawer}
           />
         )}
 
@@ -1769,9 +1849,42 @@ function App() {
             onRecalculate={() => selectedRecordEdit && setSelectedRecordEdit(applyFormAutoCalculations(selectedRecordEdit, calculationSettings, true))}
             onSave={() => void saveSelectedRecordEdits()}
             onStatusChange={(recordId, statusId) => void updateRecordStatus(recordId, statusId)}
+            onCreateTodo={handleCreateTodoFromDrawer}
           />
         )}
       </main >
+
+      <Sidebar
+        open={sidebarOpen}
+        activeTab={sidebarTab}
+        onTabChange={setSidebarTab}
+        onClose={() => setSidebarOpen(false)}
+        todos={sidebarTodos}
+        todosLoading={todosLoading}
+        todoFilters={todoFilters}
+        onTodoFiltersChange={setTodoFilters}
+        users={todoUsers}
+        currentUserId={user.id}
+        onCreateTodo={createTodo}
+        onUpdateTodo={updateTodo}
+        onDeleteTodo={deleteTodo}
+        onAddSubtask={addSubtask}
+        onToggleSubtask={toggleSubtask}
+        onDeleteSubtask={deleteSubtask}
+        onFetchComments={fetchComments}
+        onAddComment={addComment}
+        notifications={sidebarNotifications}
+        notificationsLoading={notificationsLoading}
+        unreadCount={notifUnreadCount}
+        notifPreferences={notifPreferences}
+        onMarkRead={markNotifRead}
+        onMarkAllRead={markAllNotifsRead}
+        onUpdateNotifPrefs={updateNotifPrefs}
+        trashItems={trashItems}
+        trashLoading={trashLoading}
+        trashCount={trashCount}
+        onRestore={restoreTrashItem}
+      />
     </div >
   )
 }
