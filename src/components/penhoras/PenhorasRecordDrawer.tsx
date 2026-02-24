@@ -1,4 +1,4 @@
-import { Pencil, Save, X } from 'lucide-react'
+import { CheckSquare, Pencil, Save, X } from 'lucide-react'
 import type { PenhorasEntryForm, PenhorasRecord, StatusDefinition } from '../../types'
 import { LabeledInput, LabeledSelect, Info } from '../shared/FormInputs'
 
@@ -15,6 +15,7 @@ export interface PenhorasRecordDrawerProps {
     onEditInput: <K extends keyof PenhorasEntryForm>(key: K, value: PenhorasEntryForm[K]) => void
     onSave: () => void
     onStatusChange: (recordId: string, statusId: string) => void
+    onCreateTodo?: (module: string, recordId: string) => void
 }
 
 export function PenhorasRecordDrawer({
@@ -30,6 +31,7 @@ export function PenhorasRecordDrawer({
     onEditInput,
     onSave,
     onStatusChange,
+    onCreateTodo,
 }: PenhorasRecordDrawerProps) {
     return (
         <div className="record-modal-overlay" onClick={onClose}>
@@ -42,6 +44,17 @@ export function PenhorasRecordDrawer({
                         </div>
                     </div>
                     <div className="actions-row modal-header-actions">
+                        {onCreateTodo && (
+                            <button
+                                className="drawer-create-todo-btn"
+                                type="button"
+                                onClick={() => onCreateTodo('penhoras', record.id)}
+                                title="Criar tarefa ligada a este registo"
+                            >
+                                <CheckSquare size={13} />
+                                Criar Tarefa
+                            </button>
+                        )}
                         <button className="subtle-btn" type="button" onClick={onToggleEdit}>
                             {isEditing ? <X size={15} /> : <Pencil size={15} />}
                             {isEditing ? 'Cancelar edição' : 'Editar'}

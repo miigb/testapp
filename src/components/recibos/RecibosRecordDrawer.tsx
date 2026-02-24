@@ -1,4 +1,4 @@
-import { Pencil, Save, X } from 'lucide-react'
+import { CheckSquare, Pencil, Save, X } from 'lucide-react'
 import type { EntryForm, ReceiptRecord, RecordSuggestions, RecordType, StatusDefinition } from '../../types'
 import { MONTHS } from '../../constants'
 import { formatCurrency } from '../../lib/formatters'
@@ -19,6 +19,7 @@ export interface RecibosRecordDrawerProps {
     onRecalculate: () => void
     onSave: () => void
     onStatusChange: (recordId: string, statusId: string) => void
+    onCreateTodo?: (module: string, recordId: string) => void
 }
 
 export function RecibosRecordDrawer({
@@ -36,6 +37,7 @@ export function RecibosRecordDrawer({
     onRecalculate,
     onSave,
     onStatusChange,
+    onCreateTodo,
 }: RecibosRecordDrawerProps) {
     return (
         <div className="record-modal-overlay" onClick={onClose}>
@@ -48,6 +50,17 @@ export function RecibosRecordDrawer({
                         </div>
                     </div>
                     <div className="actions-row modal-header-actions">
+                        {onCreateTodo && (
+                            <button
+                                className="drawer-create-todo-btn"
+                                type="button"
+                                onClick={() => onCreateTodo('recibos', record.id)}
+                                title="Criar tarefa ligada a este registo"
+                            >
+                                <CheckSquare size={13} />
+                                Criar Tarefa
+                            </button>
+                        )}
                         <button className="subtle-btn" type="button" onClick={onToggleEdit}>
                             {isEditing ? <X size={15} /> : <Pencil size={15} />}
                             {isEditing ? 'Cancelar edição' : 'Editar'}

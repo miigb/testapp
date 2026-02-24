@@ -1,4 +1,4 @@
-import { Pencil, Save, X } from 'lucide-react'
+import { CheckSquare, Pencil, Save, X } from 'lucide-react'
 import type { DsEntryForm, DsRecord, StatusDefinition } from '../../types'
 import { formatCurrency, toFormNumber } from '../../lib/formatters'
 import { LabeledInput, LabeledSelect, Info } from '../shared/FormInputs'
@@ -19,6 +19,7 @@ export interface DsRecordDrawerProps {
     onEditInput: <K extends keyof DsEntryForm>(key: K, value: DsEntryForm[K]) => void
     onSave: () => void
     onStatusChange: (recordId: string, statusId: string) => void
+    onCreateTodo?: (module: string, recordId: string) => void
 }
 
 export function DsRecordDrawer({
@@ -37,6 +38,7 @@ export function DsRecordDrawer({
     onEditInput,
     onSave,
     onStatusChange,
+    onCreateTodo,
 }: DsRecordDrawerProps) {
     return (
         <div className="record-modal-overlay" onClick={onClose}>
@@ -49,6 +51,17 @@ export function DsRecordDrawer({
                         </div>
                     </div>
                     <div className="actions-row modal-header-actions">
+                        {onCreateTodo && (
+                            <button
+                                className="drawer-create-todo-btn"
+                                type="button"
+                                onClick={() => onCreateTodo('ds', record.id)}
+                                title="Criar tarefa ligada a este registo"
+                            >
+                                <CheckSquare size={13} />
+                                Criar Tarefa
+                            </button>
+                        )}
                         <button className="subtle-btn" type="button" onClick={onToggleEdit}>
                             {isEditing ? <X size={15} /> : <Pencil size={15} />}
                             {isEditing ? 'Cancelar edição' : 'Editar'}
