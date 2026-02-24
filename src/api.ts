@@ -480,7 +480,7 @@ export const api = {
 
   // Auth
   login(credentials: LoginCredentials) {
-    return request<{ user: User }>('/api/auth/login', {
+    return request<User>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     })
@@ -497,7 +497,7 @@ export const api = {
   },
 
   register(data: RegisterData) {
-    return request<{ user: User }>('/api/auth/register', {
+    return request<User>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     })

@@ -20,8 +20,8 @@ export function useAuth() {
   const login = useCallback(async (credentials: LoginCredentials) => {
     setAuthError('')
     try {
-      const { user } = await api.login(credentials)
-      setUser(user)
+      const loggedIn = await api.login(credentials)
+      setUser(loggedIn)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Falha no login.'
       setAuthError(message)
@@ -32,8 +32,8 @@ export function useAuth() {
   const register = useCallback(async (data: RegisterData) => {
     setAuthError('')
     try {
-      const { user } = await api.register(data)
-      setUser(user)
+      const created = await api.register(data)
+      setUser(created)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Falha no registo.'
       setAuthError(message)
