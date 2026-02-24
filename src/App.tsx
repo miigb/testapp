@@ -6,6 +6,7 @@ import {
   LogOut,
   Minimize2,
   Plus,
+  ShieldCheck,
   SquareFunction,
   StickyNote,
   Undo2,
@@ -71,6 +72,7 @@ import { RecibosConsultaTabela } from './components/recibos/RecibosConsultaTabel
 import { DsRecordDrawer } from './components/ds/DsRecordDrawer'
 import { PenhorasRecordDrawer } from './components/penhoras/PenhorasRecordDrawer'
 import { RecibosRecordDrawer } from './components/recibos/RecibosRecordDrawer'
+import { UserManagement } from './components/admin/UserManagement'
 import { Sidebar } from './components/sidebar/Sidebar'
 import type { SidebarTab } from './components/sidebar/Sidebar'
 import { QuickNotesWindow } from './components/shared/QuickNotesWindow'
@@ -99,6 +101,7 @@ function resolveInitialLayoutMode(): LayoutMode {
 function App() {
   const { user, authLoading, authError, setAuthError, login, register, logout } = useAuth()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   const { theme, setTheme } = useTheme()
@@ -1322,6 +1325,16 @@ function App() {
                       <span className="user-menu-name">{user.displayName}</span>
                       <span className="user-menu-role">{user.role === 'ADMIN' ? 'Administrador' : 'Utilizador'}</span>
                     </div>
+                    {user.role === 'ADMIN' && (
+                      <button
+                        className="user-menu-action"
+                        type="button"
+                        onClick={() => { setUserMenuOpen(false); setAdminPanelOpen(true) }}
+                      >
+                        <ShieldCheck size={15} />
+                        Gerir Utilizadores
+                      </button>
+                    )}
                     <button
                       className="user-menu-logout"
                       type="button"
@@ -1914,6 +1927,12 @@ function App() {
         isAdmin={user.role === 'ADMIN'}
         onNotificationNavigate={handleNotificationNavigate}
       />
+      {adminPanelOpen && user.role === 'ADMIN' && (
+        <UserManagement
+          currentUser={user}
+          onClose={() => setAdminPanelOpen(false)}
+        />
+      )}
     </div >
   )
 }
