@@ -11,6 +11,7 @@ interface NotificationsPanelProps {
   onMarkRead: (id: number) => Promise<void>
   onMarkAllRead: () => Promise<void>
   onUpdatePreferences: (patch: Partial<NotificationPreferences>) => Promise<unknown>
+  onNavigate?: (module: string, recordId: string) => void
 }
 
 function groupNotifications(notifications: NotificationItem[]): { label: string; items: NotificationItem[] }[] {
@@ -51,6 +52,7 @@ export function NotificationsPanel({
   onMarkRead,
   onMarkAllRead,
   onUpdatePreferences,
+  onNavigate,
 }: NotificationsPanelProps) {
   const [showPrefs, setShowPrefs] = useState(false)
 
@@ -122,6 +124,7 @@ export function NotificationsPanel({
                 key={n.id}
                 notification={n}
                 onMarkRead={(id) => void onMarkRead(id)}
+                onNavigate={onNavigate}
               />
             ))}
           </div>

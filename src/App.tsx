@@ -150,7 +150,7 @@ function App() {
     addSubtask,
     toggleSubtask,
     deleteSubtask,
-    fetchComments,
+    getComments,
     addComment,
     refreshTodos,
   } = useTodos(user?.id)
@@ -170,6 +170,8 @@ function App() {
     loading: trashLoading,
     totalCount: trashCount,
     restore: restoreTrashItem,
+    permanentDelete: permanentDeleteTrashItem,
+    emptyTrash,
     refreshTrash,
   } = useTrash(user?.id)
 
@@ -1080,10 +1082,31 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notesOpen, calculatorOpen, smartNotesOpen, evaluateCalculator, toolLayers])
 
+  // Issue 11: Pre-fill the todo form instead of creating a blank todo immediately
+  const [pendingTodoLink, setPendingTodoLink] = useState<{ module: string; recordId: string } | null>(null)
+
   function handleCreateTodoFromDrawer(module: string, recordId: string) {
+    setPendingTodoLink({ module, recordId })
     setSidebarOpen(true)
     setSidebarTab('todos')
-    void createTodo({ title: '', linkedModule: module, linkedRecordId: recordId })
+  }
+
+  function handleNotificationNavigate(module: string, recordId: string) {
+    switch (module) {
+      case 'recibos':
+        switchModule('recibos')
+        setSelectedRecordId(recordId)
+        break
+      case 'ds':
+        switchModule('ds')
+        setSelectedDsRecordId(recordId)
+        break
+      case 'penhoras':
+        switchModule('penhoras')
+        setSelectedPenhorasRecordId(recordId)
+        break
+    }
+    setSidebarOpen(false)
   }
 
   // Sidebar keyboard shortcut: Alt+T
@@ -1871,8 +1894,10 @@ function App() {
         onAddSubtask={addSubtask}
         onToggleSubtask={toggleSubtask}
         onDeleteSubtask={deleteSubtask}
-        onFetchComments={fetchComments}
+        onFetchComments={getComments}
         onAddComment={addComment}
+        pendingTodoLink={pendingTodoLink}
+        onClearPendingTodoLink={() => setPendingTodoLink(null)}
         notifications={sidebarNotifications}
         notificationsLoading={notificationsLoading}
         unreadCount={notifUnreadCount}
@@ -1884,6 +1909,10 @@ function App() {
         trashLoading={trashLoading}
         trashCount={trashCount}
         onRestore={restoreTrashItem}
+        onPermanentDelete={permanentDeleteTrashItem}
+        onEmptyTrash={emptyTrash}
+        isAdmin={user.role === 'ADMIN'}
+        onNotificationNavigate={handleNotificationNavigate}
       />
     </div >
   )

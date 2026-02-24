@@ -58,6 +58,12 @@ export function TodoCard({ todo, onClick }: TodoCardProps) {
 
         {totalSubtasks > 0 && (
           <span className="todo-subtask-progress">
+            <span className="todo-subtask-bar">
+              <span
+                className="todo-subtask-bar-fill"
+                style={{ width: `${Math.round((completedSubtasks / totalSubtasks) * 100)}%` }}
+              />
+            </span>
             {completedSubtasks}/{totalSubtasks}
           </span>
         )}

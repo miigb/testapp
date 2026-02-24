@@ -5,7 +5,7 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 380px;
+  width: 360px;
   background: var(--surface);
   border-left: 1px solid var(--line);
   display: flex;
@@ -21,7 +21,7 @@
 }
 
 .app-shell.sidebar-open {
-  padding-right: 380px;
+  padding-right: 360px;
   transition: padding-right 0.25s ease;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .todo-priority-dot.LOW { background: #94a3b8; }
-.todo-priority-dot.MEDIUM { background: #f59e0b; }
+.todo-priority-dot.MEDIUM { background: #3b82f6; }
 .todo-priority-dot.HIGH { background: #f97316; }
 .todo-priority-dot.URGENT { background: #ef4444; }
 
@@ -250,8 +250,28 @@
 }
 
 .todo-subtask-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.68rem;
   color: var(--ink-muted);
+}
+
+.todo-subtask-bar {
+  display: inline-block;
+  width: 40px;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.todo-subtask-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  border-radius: 2px;
+  transition: width 0.2s ease;
 }
 
 /* ── Todo Expanded View ───────────────────────────────────────────── */

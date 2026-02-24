@@ -4,6 +4,7 @@ import type { NotificationItem } from '../../types'
 interface NotificationCardProps {
   notification: NotificationItem
   onMarkRead: (id: number) => void
+  onNavigate?: (module: string, recordId: string) => void
 }
 
 function getNotificationIcon(type: string) {
@@ -33,10 +34,13 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
 }
 
-export function NotificationCard({ notification, onMarkRead }: NotificationCardProps) {
+export function NotificationCard({ notification, onMarkRead, onNavigate }: NotificationCardProps) {
   function handleClick() {
     if (!notification.read) {
       onMarkRead(notification.id)
+    }
+    if (onNavigate && notification.linkedModule && notification.linkedRecordId) {
+      onNavigate(notification.linkedModule, notification.linkedRecordId)
     }
   }
 

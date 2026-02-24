@@ -7,12 +7,16 @@ interface TrashEntry {
   module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
   label: string
   deletedAt: string
+  deletedBy?: string
 }
 
 interface TrashPanelProps {
   items: TrashEntry[]
   loading: boolean
   onRestore: (module: string, id: string) => Promise<void>
+  onPermanentDelete?: (module: string, id: string) => Promise<void>
+  onEmptyTrash?: () => Promise<void>
+  isAdmin?: boolean
 }
 
 type TrashFilter = 'todos' | 'recibos' | 'ds' | 'penhoras' | 'tarefas'
@@ -25,10 +29,17 @@ const TRASH_TABS: { id: TrashFilter; label: string }[] = [
   { id: 'tarefas', label: 'Tarefas' },
 ]
 
-export function TrashPanel({ items, loading, onRestore }: TrashPanelProps) {
+export function TrashPanel({ items, loading, onRestore, onPermanentDelete, onEmptyTrash, isAdmin }: TrashPanelProps) {
   const [filter, setFilter] = useState<TrashFilter>('todos')
+  const [confirmEmpty, setConfirmEmpty] = useState(false)
 
   const filtered = filter === 'todos' ? items : items.filter((i) => i.module === filter)
+
+  async function handleEmptyTrash() {
+    if (!onEmptyTrash) return
+    await onEmptyTrash()
+    setConfirmEmpty(false)
+  }
 
   return (
     <>
@@ -45,6 +56,42 @@ export function TrashPanel({ items, loading, onRestore }: TrashPanelProps) {
         ))}
       </div>
 
+      {isAdmin && items.length > 0 && (
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)' }}>
+          {confirmEmpty ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem' }}>
+              <span style={{ color: '#ef4444', fontWeight: 600 }}>Eliminar tudo permanentemente?</span>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ padding: '4px 12px', fontSize: '0.72rem', background: '#ef4444', borderColor: '#ef4444' }}
+                onClick={() => void handleEmptyTrash()}
+              >
+                Confirmar
+              </button>
+              <button
+                type="button"
+                className="subtle-btn"
+                style={{ padding: '4px 12px', fontSize: '0.72rem' }}
+                onClick={() => setConfirmEmpty(false)}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="subtle-btn"
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#ef4444' }}
+              onClick={() => setConfirmEmpty(true)}
+            >
+              <Trash2 size={13} />
+              Esvaziar Lixeira
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="sidebar-empty">
           <div className="sidebar-empty-text">A carregar lixeira...</div>
@@ -60,6 +107,7 @@ export function TrashPanel({ items, loading, onRestore }: TrashPanelProps) {
             key={`${item.module}-${item.id}`}
             item={item}
             onRestore={() => void onRestore(item.module, item.id)}
+            onPermanentDelete={isAdmin && onPermanentDelete ? () => void onPermanentDelete(item.module, item.id) : undefined}
           />
         ))
       )}

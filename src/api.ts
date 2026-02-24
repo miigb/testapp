@@ -620,6 +620,24 @@ export const api = {
     return request<TodoItem>(`/api/todos/${id}/restore`, { method: 'POST' })
   },
 
+  permanentDeleteTodo(id: number) {
+    return request<{ success: true }>(`/api/todos/${id}/permanent`, { method: 'DELETE' })
+  },
+
+  // Empty trash endpoints
+  emptyRecibosTrash() {
+    return request<{ success: true; deleted: number }>('/api/records/trash/empty', { method: 'POST' })
+  },
+  emptyDsTrash() {
+    return request<{ success: true; deleted: number }>('/api/ds/records/trash/empty', { method: 'POST' })
+  },
+  emptyPenhorasTrash() {
+    return request<{ success: true; deleted: number }>('/api/penhoras/records/trash/empty', { method: 'POST' })
+  },
+  emptyTodosTrash() {
+    return request<{ success: true; deleted: number }>('/api/todos/trash/empty', { method: 'POST' })
+  },
+
   // Subtasks
   addSubtask(todoId: number, title: string) {
     return request<TodoSubtask>(`/api/todos/${todoId}/subtasks`, {

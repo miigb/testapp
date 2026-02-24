@@ -6,6 +6,7 @@ export interface TrashEntry {
   module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
   label: string
   deletedAt: string
+  deletedBy?: string
 }
 
 export function useTrash(userId: number | undefined) {
@@ -32,6 +33,7 @@ export function useTrash(userId: number | undefined) {
             module: 'recibos',
             label: item.processo || item.pe || item.reciboNumero || `Recibo #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
+            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
           })
         }
       }
@@ -43,6 +45,7 @@ export function useTrash(userId: number | undefined) {
             module: 'ds',
             label: item.referencia || item.proponentes || `DS #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
+            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
           })
         }
       }
@@ -54,6 +57,7 @@ export function useTrash(userId: number | undefined) {
             module: 'penhoras',
             label: item.pe || item.identificacao || `Penhora #${item.id.slice(0, 6)}`,
             deletedAt: item.deletedAt || item.updatedAt,
+            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
           })
         }
       }
@@ -65,6 +69,7 @@ export function useTrash(userId: number | undefined) {
             module: 'tarefas',
             label: item.title,
             deletedAt: item.deletedAt || item.updatedAt,
+            deletedBy: (item as Record<string, unknown>).deletedBy as string | undefined,
           })
         }
       }
@@ -101,11 +106,41 @@ export function useTrash(userId: number | undefined) {
     setItems((prev) => prev.filter((item) => !(item.id === id && item.module === module)))
   }, [])
 
+  const permanentDelete = useCallback(async (module: string, id: string) => {
+    switch (module) {
+      case 'recibos':
+        await api.permanentDeleteRecord(id)
+        break
+      case 'ds':
+        await api.permanentDeleteDsRecord(id)
+        break
+      case 'penhoras':
+        await api.permanentDeletePenhorasRecord(id)
+        break
+      case 'tarefas':
+        await api.permanentDeleteTodo(Number(id))
+        break
+    }
+    setItems((prev) => prev.filter((item) => !(item.id === id && item.module === module)))
+  }, [])
+
+  const emptyTrash = useCallback(async () => {
+    await Promise.allSettled([
+      api.emptyRecibosTrash(),
+      api.emptyDsTrash(),
+      api.emptyPenhorasTrash(),
+      api.emptyTodosTrash(),
+    ])
+    setItems([])
+  }, [])
+
   return {
     items,
     loading,
     totalCount: items.length,
     restore,
+    permanentDelete,
+    emptyTrash,
     refreshTrash,
   }
 }

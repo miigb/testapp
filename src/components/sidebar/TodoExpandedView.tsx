@@ -244,6 +244,14 @@ export function TodoExpandedView({
         <button
           type="button"
           className="subtle-btn"
+          onClick={onBack}
+          title="Cancelar edição"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="subtle-btn"
           onClick={onDelete}
           title="Eliminar tarefa"
         >

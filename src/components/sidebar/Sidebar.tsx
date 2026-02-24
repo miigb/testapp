@@ -12,6 +12,7 @@ interface TrashEntry {
   module: 'recibos' | 'ds' | 'penhoras' | 'tarefas'
   label: string
   deletedAt: string
+  deletedBy?: string
 }
 
 export interface SidebarProps {
@@ -45,11 +46,21 @@ export interface SidebarProps {
   onMarkAllRead: () => Promise<void>
   onUpdateNotifPrefs: (patch: Partial<NotificationPreferences>) => Promise<unknown>
 
+  // Todos pre-fill link (from drawer create-todo button)
+  pendingTodoLink?: { module: string; recordId: string } | null
+  onClearPendingTodoLink?: () => void
+
+  // Notifications navigation
+  onNotificationNavigate?: (module: string, recordId: string) => void
+
   // Trash
   trashItems: TrashEntry[]
   trashLoading: boolean
   trashCount: number
   onRestore: (module: string, id: string) => Promise<void>
+  onPermanentDelete?: (module: string, id: string) => Promise<void>
+  onEmptyTrash?: () => Promise<void>
+  isAdmin?: boolean
 }
 
 export function Sidebar({
@@ -71,6 +82,8 @@ export function Sidebar({
   onDeleteSubtask,
   onFetchComments,
   onAddComment,
+  pendingTodoLink,
+  onClearPendingTodoLink,
   notifications,
   notificationsLoading,
   unreadCount,
@@ -78,10 +91,14 @@ export function Sidebar({
   onMarkRead,
   onMarkAllRead,
   onUpdateNotifPrefs,
+  onNotificationNavigate,
   trashItems,
   trashLoading,
   trashCount,
   onRestore,
+  onPermanentDelete,
+  onEmptyTrash,
+  isAdmin,
 }: SidebarProps) {
   return (
     <div className={`sidebar ${open ? 'open' : ''}`}>
@@ -150,6 +167,8 @@ export function Sidebar({
             onDeleteSubtask={onDeleteSubtask}
             onFetchComments={onFetchComments}
             onAddComment={onAddComment}
+            pendingTodoLink={pendingTodoLink}
+            onClearPendingTodoLink={onClearPendingTodoLink}
           />
         )}
 
@@ -162,6 +181,7 @@ export function Sidebar({
             onMarkRead={onMarkRead}
             onMarkAllRead={onMarkAllRead}
             onUpdatePreferences={onUpdateNotifPrefs}
+            onNavigate={onNotificationNavigate}
           />
         )}
 
@@ -170,6 +190,9 @@ export function Sidebar({
             items={trashItems}
             loading={trashLoading}
             onRestore={onRestore}
+            onPermanentDelete={onPermanentDelete}
+            onEmptyTrash={onEmptyTrash}
+            isAdmin={isAdmin}
           />
         )}
       </div>

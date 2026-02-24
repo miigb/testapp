@@ -134,12 +134,20 @@ export function useTodos(currentUserId: number | undefined) {
     return comment
   }, [])
 
+  const allTodosCount = todos.length
+
+  const myTodosCount = todos.filter(
+    (t) => t.createdById === currentUserId || t.assigneeId === currentUserId,
+  ).length
+
   return {
     todos,
     loading,
     filters,
     setFilters,
     users,
+    myTodosCount,
+    allTodosCount,
     createTodo,
     updateTodo,
     deleteTodo,
@@ -147,7 +155,7 @@ export function useTodos(currentUserId: number | undefined) {
     addSubtask,
     toggleSubtask,
     deleteSubtask,
-    fetchComments,
+    getComments: fetchComments,
     addComment,
     refreshTodos,
   }

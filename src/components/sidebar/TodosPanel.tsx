@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Inbox } from 'lucide-react'
 import type { TodoItem, TodoFilters, TodoComment, UserSummary } from '../../types'
 import { TodoCard } from './TodoCard'
@@ -19,6 +19,8 @@ interface TodosPanelProps {
   onDeleteSubtask: (todoId: number, subtaskId: number) => Promise<void>
   onFetchComments: (todoId: number) => Promise<TodoComment[]>
   onAddComment: (todoId: number, content: string) => Promise<TodoComment>
+  pendingTodoLink?: { module: string; recordId: string } | null
+  onClearPendingTodoLink?: () => void
 }
 
 export function TodosPanel({
@@ -36,9 +38,21 @@ export function TodosPanel({
   onDeleteSubtask,
   onFetchComments,
   onAddComment,
+  pendingTodoLink,
+  onClearPendingTodoLink,
 }: TodosPanelProps) {
   const [quickTitle, setQuickTitle] = useState('')
   const [expandedTodoId, setExpandedTodoId] = useState<number | null>(null)
+  const [linkedContext, setLinkedContext] = useState<{ module: string; recordId: string } | null>(null)
+
+  // When a pending todo link arrives, pre-fill the linked context
+  useEffect(() => {
+    if (pendingTodoLink) {
+      setLinkedContext(pendingTodoLink)
+      setExpandedTodoId(null)
+      onClearPendingTodoLink?.()
+    }
+  }, [pendingTodoLink, onClearPendingTodoLink])
 
   const expandedTodo = expandedTodoId != null ? todos.find((t) => t.id === expandedTodoId) ?? null : null
 
@@ -46,7 +60,13 @@ export function TodosPanel({
     const title = quickTitle.trim()
     if (!title) return
     setQuickTitle('')
-    await onCreateTodo({ title })
+    const payload: { title: string; linkedModule?: string; linkedRecordId?: string } = { title }
+    if (linkedContext) {
+      payload.linkedModule = linkedContext.module
+      payload.linkedRecordId = linkedContext.recordId
+    }
+    await onCreateTodo(payload)
+    setLinkedContext(null)
   }
 
   if (expandedTodo) {
@@ -71,11 +91,22 @@ export function TodosPanel({
       <div className="todos-quick-add">
         <input
           type="text"
-          placeholder="Nova tarefa... (Enter para criar)"
+          placeholder={linkedContext ? `Nova tarefa para ${linkedContext.module} #${linkedContext.recordId.slice(0, 6)}...` : 'Nova tarefa... (Enter para criar)'}
           value={quickTitle}
           onChange={(e) => setQuickTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void handleQuickAdd() }}
         />
+        {linkedContext && (
+          <button
+            type="button"
+            className="filter-pill active"
+            onClick={() => setLinkedContext(null)}
+            title="Remover ligação"
+            style={{ fontSize: '0.65rem', whiteSpace: 'nowrap' }}
+          >
+            {linkedContext.module} #{linkedContext.recordId.slice(0, 6)} ✕
+          </button>
+        )}
       </div>
 
       <div className="todos-filter-bar">
@@ -106,6 +137,27 @@ export function TodosPanel({
           onClick={() => onFiltersChange({ ...filters, status: filters.status === 'DONE' ? 'all' : 'DONE' })}
         >
           Concluída
+        </button>
+        <button
+          type="button"
+          className={`filter-pill ${filters.priority === 'LOW' ? 'active' : ''}`}
+          onClick={() => onFiltersChange({ ...filters, priority: filters.priority === 'LOW' ? 'all' : 'LOW' })}
+        >
+          Baixa
+        </button>
+        <button
+          type="button"
+          className={`filter-pill ${filters.priority === 'MEDIUM' ? 'active' : ''}`}
+          onClick={() => onFiltersChange({ ...filters, priority: filters.priority === 'MEDIUM' ? 'all' : 'MEDIUM' })}
+        >
+          Média
+        </button>
+        <button
+          type="button"
+          className={`filter-pill ${filters.priority === 'HIGH' ? 'active' : ''}`}
+          onClick={() => onFiltersChange({ ...filters, priority: filters.priority === 'HIGH' ? 'all' : 'HIGH' })}
+        >
+          Alta
         </button>
         <button
           type="button"
