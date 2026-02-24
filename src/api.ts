@@ -9,6 +9,9 @@ import type {
   DsRecordsResponse,
   ImportPreviewResponse,
   LoginCredentials,
+  NotificationItem,
+  NotificationPreferences,
+  NotificationsResponse,
   PenhorasRecord,
   PenhorasRecordFilters,
   PenhorasRecordsResponse,
@@ -20,9 +23,14 @@ import type {
   RegisterData,
   SavedView,
   StatusDefinition,
+  TodoComment,
+  TodoItem,
+  TodoSubtask,
+  TodosResponse,
   TrashResponse,
   User,
   UserRole,
+  UserSummary,
 } from './types'
 
 type RecordWithStatusAliases = ReceiptRecord & {
@@ -561,5 +569,125 @@ export const api = {
   },
   getPenhorasRecordsTrash(page = 1, pageSize = 100) {
     return request<TrashResponse<PenhorasRecord>>(`/api/penhoras/records/trash?page=${page}&pageSize=${pageSize}`)
+  },
+
+  // ── Todos ─────────────────────────────────────────────────────────────
+
+  getTodos(params?: { status?: string; priority?: string; assigneeId?: number; deleted?: boolean }) {
+    const search = new URLSearchParams()
+    if (params?.status && params.status !== 'all') search.set('status', params.status)
+    if (params?.priority && params.priority !== 'all') search.set('priority', params.priority)
+    if (params?.assigneeId && params.assigneeId !== -1) search.set('assigneeId', String(params.assigneeId))
+    if (params?.deleted) search.set('deleted', 'true')
+    const qs = search.toString()
+    return request<TodosResponse>(`/api/todos${qs ? `?${qs}` : ''}`)
+  },
+
+  createTodo(payload: {
+    title: string
+    description?: string
+    priority?: string
+    dueDate?: string
+    assigneeId?: number
+    linkedModule?: string
+    linkedRecordId?: string
+  }) {
+    return request<TodoItem>('/api/todos', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updateTodo(id: number, payload: Partial<{
+    title: string
+    description: string | null
+    priority: string
+    status: string
+    dueDate: string | null
+    assigneeId: number | null
+  }>) {
+    return request<TodoItem>(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteTodo(id: number) {
+    return request<{ success: true }>(`/api/todos/${id}`, { method: 'DELETE' })
+  },
+
+  restoreTodo(id: number) {
+    return request<TodoItem>(`/api/todos/${id}/restore`, { method: 'POST' })
+  },
+
+  // Subtasks
+  addSubtask(todoId: number, title: string) {
+    return request<TodoSubtask>(`/api/todos/${todoId}/subtasks`, {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    })
+  },
+
+  updateSubtask(todoId: number, subtaskId: number, payload: Partial<{ title: string; completed: boolean }>) {
+    return request<TodoSubtask>(`/api/todos/${todoId}/subtasks/${subtaskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteSubtask(todoId: number, subtaskId: number) {
+    return request<{ success: true }>(`/api/todos/${todoId}/subtasks/${subtaskId}`, { method: 'DELETE' })
+  },
+
+  // Comments
+  getTodoComments(todoId: number) {
+    return request<TodoComment[]>(`/api/todos/${todoId}/comments`)
+  },
+
+  addTodoComment(todoId: number, content: string) {
+    return request<TodoComment>(`/api/todos/${todoId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    })
+  },
+
+  // ── Notifications ─────────────────────────────────────────────────────
+
+  getNotifications(params?: { page?: number; pageSize?: number; read?: boolean }) {
+    const search = new URLSearchParams()
+    if (params?.page) search.set('page', String(params.page))
+    if (params?.pageSize) search.set('pageSize', String(params.pageSize))
+    if (params?.read !== undefined) search.set('read', String(params.read))
+    const qs = search.toString()
+    return request<NotificationsResponse>(`/api/notifications${qs ? `?${qs}` : ''}`)
+  },
+
+  getUnreadCount() {
+    return request<{ count: number }>('/api/notifications/unread-count')
+  },
+
+  markNotificationRead(id: number) {
+    return request<NotificationItem>(`/api/notifications/${id}/read`, { method: 'PATCH' })
+  },
+
+  markAllNotificationsRead() {
+    return request<{ success: true }>('/api/notifications/read-all', { method: 'POST' })
+  },
+
+  getNotificationPreferences() {
+    return request<NotificationPreferences>('/api/notifications/preferences')
+  },
+
+  updateNotificationPreferences(payload: Partial<NotificationPreferences>) {
+    return request<NotificationPreferences>('/api/notifications/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  // ── Users (summary) ──────────────────────────────────────────────────
+
+  getUsersSummary() {
+    return request<UserSummary[]>('/api/auth/users')
   },
 }

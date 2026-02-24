@@ -416,3 +416,81 @@ export type TrashResponse<T> = {
   page: number
   pageSize: number
 }
+
+// ── Todos & Notifications ─────────────────────────────────────────────
+
+export type UserSummary = Pick<User, 'id' | 'username' | 'displayName' | 'avatarColor'>
+
+export interface TodoItem {
+  id: number
+  title: string
+  description: string | null
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+  status: 'PENDING' | 'IN_PROGRESS' | 'DONE'
+  dueDate: string | null
+  createdById: number
+  createdBy: UserSummary
+  assigneeId: number | null
+  assignee: UserSummary | null
+  linkedModule: string | null
+  linkedRecordId: string | null
+  subtasks: TodoSubtask[]
+  _count?: { comments: number }
+  deletedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TodoSubtask {
+  id: number
+  title: string
+  completed: boolean
+  order: number
+}
+
+export interface TodoComment {
+  id: number
+  content: string
+  author: UserSummary
+  createdAt: string
+}
+
+export interface NotificationItem {
+  id: number
+  type: string
+  title: string
+  message: string
+  read: boolean
+  linkedModule: string | null
+  linkedRecordId: string | null
+  linkedTodoId: number | null
+  createdAt: string
+}
+
+export interface NotificationPreferences {
+  taskAssigned: boolean
+  taskCompleted: boolean
+  taskCommented: boolean
+  taskDueSoon: boolean
+  recordStatusChange: boolean
+  mention: boolean
+}
+
+export type TodoFilters = {
+  status?: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'all'
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'all'
+  assigneeId?: number | 'all'
+  scope?: 'mine' | 'all'
+}
+
+export type TodosResponse = {
+  items: TodoItem[]
+  total: number
+}
+
+export type NotificationsResponse = {
+  items: NotificationItem[]
+  total: number
+  page: number
+  pageSize: number
+}
