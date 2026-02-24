@@ -3,24 +3,20 @@ import 'dotenv/config'
 import express from 'express'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus, type Status } from '@prisma/client'
+import { Prisma, PrismaClient, type DsStatus, type PenhorasStatus } from '@prisma/client'
 import { z } from 'zod'
 
 import { createCorsMiddleware } from './middleware/cors'
 import { createErrorHandler } from './middleware/errorHandler'
 import { aiRouter } from './routes/ai'
+import { createRecordsRouter } from './routes/records'
 
-import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES, DEFAULT_STATUSES, DEFAULT_TAX_RULES } from './defaults'
+import { DEFAULT_DS_STATUSES, DEFAULT_PENHORAS_STATUSES } from './defaults'
 import {
-  recordInputSchema,
-  recordPatchSchema,
-  importCommitSchema,
-  importPreviewSchema,
   saveViewSchema,
   taxRuleSchema,
   calculationSettingsSchema,
   statusSchema,
-  bulkUpdateSchema,
 } from './schemas/records'
 import {
   dsRecordInputSchema,
@@ -35,32 +31,26 @@ import {
   penhorasImportCommitSchema,
 } from './schemas/penhoras'
 import {
-  applyCalculations,
   buildUniqueRecordKey,
   normalizeText,
-  prismaRecordToDto,
   toIsoDateOrUndefined,
   toNumberOrUndefined,
   toPrismaRecordData,
-  type RecordInputData,
 } from './utils'
 import {
   databaseSetupHint,
-  toStatusDto,
   statusDto,
   dsStatusDto,
   penhorasStatusDto,
   savedViewDto,
   normalizeStatusToken,
-  duplicateVariant,
   toApiTaxRule,
   parseLooseNumber,
   detectDsIvaKind,
   toDateOrNull,
-  normalizeSuggestionValues,
   queryValue,
-  toNumberFromDecimal,
 } from './services/shared'
+import { ensureDefaults, asRecordInput } from './services/records'
 
 // Fail fast in production when required env vars are missing
 if (process.env.NODE_ENV === 'production') {
@@ -162,166 +152,6 @@ async function runPenhorasDataMaintenance() {
       AND TRIM("gestor") <> ''
       AND UPPER(REGEXP_REPLACE(TRIM("gestor"), '\s+', ' ', 'g')) <> "gestor"
   `
-}
-
-type PrismaCurrentRecord = {
-  id: string
-  tipo: 'exequente' | 'executado'
-  mes: number
-  ano: number
-  processo: string | null
-  pe: string | null
-  reciboNumero: string | null
-  dataLevantamento: Date | null
-  dataRecibo: Date | null
-  valorIndicado: unknown
-  valorSemIva: unknown
-  iva: unknown
-  retencao: unknown
-  valorEmissao: unknown
-  meu5: unknown
-  outrasTaxas: unknown
-  gestor: string | null
-  exequente: string | null
-  descricaoValor: string | null
-  indicacoes: string | null
-  sourceColor: string | null
-  sourceSheet: string | null
-  statusId: string
-}
-
-function mergeRecordWithPatch(current: PrismaCurrentRecord, patch: z.infer<typeof recordPatchSchema>): RecordInputData {
-  const merged: RecordInputData = {
-    tipo: patch.tipo ?? current.tipo,
-    mes: patch.mes ?? current.mes,
-    ano: patch.ano ?? current.ano,
-    processo: patch.processo ?? current.processo ?? undefined,
-    pe: patch.pe ?? current.pe ?? undefined,
-    reciboNumero: patch.reciboNumero ?? current.reciboNumero ?? undefined,
-    dataLevantamento: toIsoDateOrUndefined(patch.dataLevantamento) ?? (current.dataLevantamento ? current.dataLevantamento.toISOString().slice(0, 10) : undefined),
-    dataRecibo: toIsoDateOrUndefined(patch.dataRecibo) ?? (current.dataRecibo ? current.dataRecibo.toISOString().slice(0, 10) : undefined),
-    valorIndicado: patch.valorIndicado ?? Number(current.valorIndicado ?? NaN),
-    valorSemIva: patch.valorSemIva ?? Number(current.valorSemIva ?? NaN),
-    iva: patch.iva ?? Number(current.iva ?? NaN),
-    retencao: patch.retencao ?? Number(current.retencao ?? NaN),
-    valorEmissao: patch.valorEmissao ?? Number(current.valorEmissao ?? NaN),
-    meu5: patch.meu5 ?? Number(current.meu5 ?? NaN),
-    outrasTaxas: patch.outrasTaxas ?? Number(current.outrasTaxas ?? NaN),
-    gestor: patch.gestor ?? current.gestor ?? undefined,
-    exequente: patch.exequente ?? current.exequente ?? undefined,
-    descricaoValor: patch.descricaoValor ?? current.descricaoValor ?? undefined,
-    indicacoes: patch.indicacoes ?? current.indicacoes ?? undefined,
-    sourceColor: patch.sourceColor ?? current.sourceColor ?? undefined,
-    sourceSheet: patch.sourceSheet ?? current.sourceSheet ?? undefined,
-    statusId: patch.statusId ?? patch.estadoId ?? current.statusId,
-  }
-
-  for (const key of ['valorIndicado', 'valorSemIva', 'iva', 'retencao', 'valorEmissao', 'meu5', 'outrasTaxas'] as const) {
-    if (!Number.isFinite(merged[key] ?? NaN)) {
-      merged[key] = undefined
-    }
-  }
-
-  return merged
-}
-
-function asRecordInput(raw: Record<string, unknown>): RecordInputData | null {
-  const tipoRaw = raw.tipo
-  const tipo = tipoRaw === 'executado' ? 'executado' : tipoRaw === 'exequente' ? 'exequente' : undefined
-  const mes = toNumberOrUndefined(raw.mes)
-  const ano = toNumberOrUndefined(raw.ano)
-
-  if (!tipo || !mes || !ano) {
-    return null
-  }
-
-  const getText = (value: unknown) => {
-    if (value === undefined || value === null) {
-      return undefined
-    }
-    const text = String(value).trim()
-    return text || undefined
-  }
-
-  const record: RecordInputData = {
-    tipo,
-    mes,
-    ano,
-    processo: getText(raw.processo),
-    pe: getText(raw.pe),
-    reciboNumero: getText(raw.reciboNumero),
-    dataLevantamento: toIsoDateOrUndefined(raw.dataLevantamento),
-    dataRecibo: toIsoDateOrUndefined(raw.dataRecibo),
-    valorIndicado: toNumberOrUndefined(raw.valorIndicado),
-    valorSemIva: toNumberOrUndefined(raw.valorSemIva),
-    iva: toNumberOrUndefined(raw.iva),
-    retencao: toNumberOrUndefined(raw.retencao),
-    valorEmissao: toNumberOrUndefined(raw.valorEmissao),
-    meu5: toNumberOrUndefined(raw.meu5),
-    outrasTaxas: toNumberOrUndefined(raw.outrasTaxas),
-    gestor: getText(raw.gestor),
-    exequente: getText(raw.exequente),
-    descricaoValor: getText(raw.descricaoValor),
-    indicacoes: getText(raw.indicacoes),
-    sourceColor: getText(raw.sourceColor),
-    sourceSheet: getText(raw.sourceSheet),
-    statusId: getText(raw.statusId) ?? getText(raw.estadoId),
-  }
-
-  return record
-}
-
-
-async function ensureDefaults() {
-  await prisma.calculationSettings.upsert({
-    where: { id: 'default' },
-    update: {},
-    create: {
-      id: 'default',
-      autoApplyRules: true,
-      autoComputeValorSemIva: true,
-      autoComputeValorEmissao: false,
-      roundTo: 2,
-    },
-  })
-
-  for (const status of DEFAULT_STATUSES) {
-    await prisma.status.upsert({
-      where: { key: status.key },
-      update: {
-        label: status.label,
-        icon: status.icon,
-        color: status.color,
-      },
-      create: status,
-    })
-  }
-
-  for (const rule of DEFAULT_TAX_RULES) {
-    await prisma.taxRule.upsert({
-      where: { code: rule.code },
-      update: {
-        label: rule.label,
-      },
-      create: {
-        ...rule,
-        rate: new Prisma.Decimal(rule.rate),
-      },
-    })
-  }
-
-  const [statuses, calculationSettings, taxRules] = await Promise.all([
-    prisma.status.findMany({ orderBy: [{ order: 'asc' }, { label: 'asc' }] }),
-    prisma.calculationSettings.findUniqueOrThrow({ where: { id: 'default' } }),
-    prisma.taxRule.findMany({ orderBy: [{ order: 'asc' }, { label: 'asc' }] }),
-  ])
-
-  return {
-    statuses,
-    calculationSettings,
-    taxRules,
-    statusByKey: new Map(statuses.map((status) => [status.key, status.id])),
-  }
 }
 
 async function ensureDsDefaults() {
@@ -526,24 +356,6 @@ function resolvePenhorasStatusId(
   if (byLabel) return byLabel.id
 
   return derivePenhorasStatusFromToken(normalized, defaults) ?? fallbackStatusId
-}
-
-function detectStatusIdFromColor(
-  sourceColor: string | undefined,
-  colorMapping: Record<string, string> | undefined,
-  statuses: Status[],
-  fallbackStatusId: string,
-) {
-  if (!sourceColor) {
-    return fallbackStatusId
-  }
-
-  if (colorMapping?.[sourceColor]) {
-    return colorMapping[sourceColor]
-  }
-
-  const exact = statuses.find((status) => normalizeText(status.color) === normalizeText(sourceColor))
-  return exact?.id ?? fallbackStatusId
 }
 
 type DsInputData = {
@@ -1114,64 +926,8 @@ function mergePenhorasRecordWithPatch(
   return merged
 }
 
-function buildRecordWhere(query: Record<string, unknown>): Prisma.RecordWhereInput {
-  const where: Prisma.RecordWhereInput = {}
-
-  const textQuery = queryValue(query, 'q')?.trim()
-  if (textQuery) {
-    where.OR = [
-      { processo: { contains: textQuery, mode: 'insensitive' } },
-      { pe: { contains: textQuery, mode: 'insensitive' } },
-      { reciboNumero: { contains: textQuery, mode: 'insensitive' } },
-      { gestor: { contains: textQuery, mode: 'insensitive' } },
-      { exequente: { contains: textQuery, mode: 'insensitive' } },
-      { indicacoes: { contains: textQuery, mode: 'insensitive' } },
-    ]
-  }
-
-  const tipoRaw = queryValue(query, 'tipo')
-  const tipo = tipoRaw === 'exequente' || tipoRaw === 'executado' ? tipoRaw : undefined
-  if (tipo) {
-    where.tipo = tipo
-  }
-
-  const estadoId = queryValue(query, 'estadoId')?.trim()
-  if (estadoId) {
-    where.status = {
-      is: {
-        OR: [
-          { id: estadoId },
-          { key: { equals: estadoId, mode: 'insensitive' } },
-          { label: { equals: estadoId, mode: 'insensitive' } },
-        ],
-      },
-    }
-  }
-
-  const mes = Number(queryValue(query, 'mes'))
-  if (Number.isFinite(mes) && mes >= 1 && mes <= 12) {
-    where.mes = mes
-  }
-
-  const ano = Number(queryValue(query, 'ano'))
-  if (Number.isFinite(ano) && ano > 2000) {
-    where.ano = ano
-  }
-
-  const exequente = queryValue(query, 'exequente')?.trim()
-  if (exequente) {
-    where.exequente = { contains: exequente, mode: 'insensitive' }
-  }
-
-  const gestor = queryValue(query, 'gestor')?.trim()
-  if (gestor) {
-    where.gestor = { contains: gestor, mode: 'insensitive' }
-  }
-
-  return where
-}
-
 app.use('/api/ai', aiRouter)
+app.use('/api', createRecordsRouter(prisma))
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -1179,27 +935,6 @@ app.get('/api/health', async (_req, res) => {
     res.json({ ok: true, db: 'up', now: new Date().toISOString() })
   } catch {
     res.status(503).json({ ok: false, db: 'down', now: new Date().toISOString() })
-  }
-})
-
-app.get('/api/bootstrap', async (_req, res) => {
-  try {
-    const defaults = await ensureDefaults()
-    const savedViews = await prisma.savedView.findMany({ orderBy: { updatedAt: 'desc' } })
-    const recordCount = await prisma.record.count()
-
-    res.json({
-      statuses: defaults.statuses.map(statusDto),
-      calculationSettings: {
-        ...defaults.calculationSettings,
-        taxRules: defaults.taxRules.map(toApiTaxRule),
-      },
-      savedViews: savedViews.map(savedViewDto),
-      recordCount,
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(503).json({ error: databaseSetupHint() })
   }
 })
 
@@ -1939,474 +1674,8 @@ app.post('/api/penhoras/import/commit', async (req, res) => {
   })
 })
 
-app.get('/api/records', async (req, res) => {
-  const page = Number(req.query.page ?? 1)
-  const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
-  const skip = Math.max(page - 1, 0) * pageSize
-
-  const where = buildRecordWhere(req.query as Record<string, unknown>)
-
-  const [items, total] = await Promise.all([
-    prisma.record.findMany({
-      where,
-      skip,
-      take: pageSize,
-      orderBy: [{ updatedAt: 'desc' }],
-      include: {
-        status: true,
-      },
-    }),
-    prisma.record.count({ where }),
-  ])
-
-  res.json({
-    items: items.map(prismaRecordToDto),
-    total,
-    page,
-    pageSize,
-  })
-})
-
-app.get('/api/analytics/summary', async (req, res) => {
-  const where = buildRecordWhere(req.query as Record<string, unknown>)
-
-  const [statuses, totalsAggregate, byStatusRows, byTypeRows, byMonthRows, byGestorRows, byExequenteRows] = await Promise.all([
-    prisma.status.findMany(),
-    prisma.record.aggregate({
-      where,
-      _count: { _all: true },
-      _sum: {
-        valorIndicado: true,
-        valorSemIva: true,
-        iva: true,
-        retencao: true,
-        meu5: true,
-        valorEmissao: true,
-        outrasTaxas: true,
-      },
-    }),
-    prisma.record.groupBy({
-      by: ['statusId'],
-      where,
-      _count: { _all: true },
-      _sum: { valorSemIva: true, iva: true, valorEmissao: true },
-    }),
-    prisma.record.groupBy({
-      by: ['tipo'],
-      where,
-      _count: { _all: true },
-      _sum: { valorSemIva: true, iva: true, valorEmissao: true },
-    }),
-    prisma.record.groupBy({
-      by: ['ano', 'mes'],
-      where,
-      _count: { _all: true },
-      _sum: { valorSemIva: true, iva: true, valorEmissao: true },
-      orderBy: [{ ano: 'asc' }, { mes: 'asc' }],
-    }),
-    prisma.record.groupBy({
-      by: ['gestor'],
-      where: {
-        AND: [where, { gestor: { not: null } }],
-      },
-      _count: { _all: true },
-      _sum: { valorSemIva: true, valorEmissao: true },
-      orderBy: { _count: { gestor: 'desc' } },
-      take: 12,
-    }),
-    prisma.record.groupBy({
-      by: ['exequente'],
-      where: {
-        AND: [where, { exequente: { not: null } }],
-      },
-      _count: { _all: true },
-      _sum: { valorSemIva: true, valorEmissao: true },
-      orderBy: { _count: { exequente: 'desc' } },
-      take: 12,
-    }),
-  ])
-
-  const statusMap = new Map(statuses.map((status) => [status.id, status]))
-
-  const totals = {
-    registos: totalsAggregate._count._all,
-    valorIndicado: toNumberFromDecimal(totalsAggregate._sum.valorIndicado),
-    valorSemIva: toNumberFromDecimal(totalsAggregate._sum.valorSemIva),
-    iva: toNumberFromDecimal(totalsAggregate._sum.iva),
-    retencao: toNumberFromDecimal(totalsAggregate._sum.retencao),
-    meu5: toNumberFromDecimal(totalsAggregate._sum.meu5),
-    valorEmissao: toNumberFromDecimal(totalsAggregate._sum.valorEmissao),
-    outrasTaxas: toNumberFromDecimal(totalsAggregate._sum.outrasTaxas),
-    levantadoComIva: toNumberFromDecimal(totalsAggregate._sum.valorSemIva) + toNumberFromDecimal(totalsAggregate._sum.iva),
-  }
-
-  const byStatus = byStatusRows
-    .map((row) => {
-      const status = statusMap.get(row.statusId)
-      return {
-        statusId: row.statusId,
-        statusKey: status?.key ?? row.statusId,
-        statusLabel: status?.label ?? row.statusId,
-        statusColor: status?.color ?? '#BFC4CC',
-        statusIcon: status?.icon ?? 'circle',
-        count: row._count._all,
-        valorSemIva: toNumberFromDecimal(row._sum.valorSemIva),
-        iva: toNumberFromDecimal(row._sum.iva),
-        valorEmissao: toNumberFromDecimal(row._sum.valorEmissao),
-      }
-    })
-    .sort((a, b) => b.count - a.count)
-
-  const byType = byTypeRows
-    .map((row) => ({
-      tipo: row.tipo,
-      count: row._count._all,
-      valorSemIva: toNumberFromDecimal(row._sum.valorSemIva),
-      iva: toNumberFromDecimal(row._sum.iva),
-      valorEmissao: toNumberFromDecimal(row._sum.valorEmissao),
-    }))
-    .sort((a, b) => b.count - a.count)
-
-  const byMonth = byMonthRows.map((row) => ({
-    ano: row.ano,
-    mes: row.mes,
-    count: row._count._all,
-    valorSemIva: toNumberFromDecimal(row._sum.valorSemIva),
-    iva: toNumberFromDecimal(row._sum.iva),
-    valorEmissao: toNumberFromDecimal(row._sum.valorEmissao),
-  }))
-
-  const topGestores = byGestorRows
-    .map((row) => {
-      const name = row.gestor?.trim()
-      if (!name) return null
-      return {
-        name,
-        count: row._count._all,
-        valorSemIva: toNumberFromDecimal(row._sum.valorSemIva),
-        valorEmissao: toNumberFromDecimal(row._sum.valorEmissao),
-      }
-    })
-    .filter((row): row is { name: string; count: number; valorSemIva: number; valorEmissao: number } => Boolean(row))
-    .slice(0, 8)
-
-  const topExequentes = byExequenteRows
-    .map((row) => {
-      const name = row.exequente?.trim()
-      if (!name) return null
-      return {
-        name,
-        count: row._count._all,
-        valorSemIva: toNumberFromDecimal(row._sum.valorSemIva),
-        valorEmissao: toNumberFromDecimal(row._sum.valorEmissao),
-      }
-    })
-    .filter((row): row is { name: string; count: number; valorSemIva: number; valorEmissao: number } => Boolean(row))
-    .slice(0, 8)
-
-  res.json({
-    totals,
-    byStatus,
-    byType,
-    byMonth,
-    topGestores,
-    topExequentes,
-  })
-})
-
-app.get('/api/records/suggestions', async (req, res) => {
-  const rawLimit = Number(req.query.limit ?? 120)
-  const limit = Math.max(20, Math.min(400, Number.isFinite(rawLimit) ? rawLimit : 120))
-
-  const [processoRows, peRows, reciboRows, gestorRows, exequenteRows] = await Promise.all([
-    prisma.record.findMany({
-      where: { processo: { not: null } },
-      select: { processo: true },
-      distinct: ['processo'],
-      take: limit,
-      orderBy: { processo: 'asc' },
-    }),
-    prisma.record.findMany({
-      where: { pe: { not: null } },
-      select: { pe: true },
-      distinct: ['pe'],
-      take: limit,
-      orderBy: { pe: 'asc' },
-    }),
-    prisma.record.findMany({
-      where: { reciboNumero: { not: null } },
-      select: { reciboNumero: true },
-      distinct: ['reciboNumero'],
-      take: limit,
-      orderBy: { reciboNumero: 'asc' },
-    }),
-    prisma.record.findMany({
-      where: { gestor: { not: null } },
-      select: { gestor: true },
-      distinct: ['gestor'],
-      take: limit,
-      orderBy: { gestor: 'asc' },
-    }),
-    prisma.record.findMany({
-      where: { exequente: { not: null } },
-      select: { exequente: true },
-      distinct: ['exequente'],
-      take: limit,
-      orderBy: { exequente: 'asc' },
-    }),
-  ])
-
-  res.json({
-    processo: normalizeSuggestionValues(processoRows.map((row) => row.processo)),
-    pe: normalizeSuggestionValues(peRows.map((row) => row.pe)),
-    reciboNumero: normalizeSuggestionValues(reciboRows.map((row) => row.reciboNumero)),
-    gestor: normalizeSuggestionValues(gestorRows.map((row) => row.gestor)),
-    exequente: normalizeSuggestionValues(exequenteRows.map((row) => row.exequente)),
-  })
-})
-
-app.get('/api/records/export', async (_req, res) => {
-  const [records, statuses, calculationSettings, taxRules, savedViews] = await Promise.all([
-    prisma.record.findMany({
-      orderBy: [{ ano: 'desc' }, { mes: 'desc' }, { updatedAt: 'desc' }],
-      include: {
-        status: true,
-        history: { orderBy: { createdAt: 'desc' } },
-      },
-    }),
-    prisma.status.findMany({ orderBy: [{ order: 'asc' }, { label: 'asc' }] }),
-    prisma.calculationSettings.findUniqueOrThrow({ where: { id: 'default' } }),
-    prisma.taxRule.findMany({ orderBy: [{ order: 'asc' }, { label: 'asc' }] }),
-    prisma.savedView.findMany({ orderBy: { updatedAt: 'desc' } }),
-  ])
-
-  res.json({
-    exportedAt: new Date().toISOString(),
-    totals: { records: records.length, statuses: statuses.length, savedViews: savedViews.length },
-    statuses: statuses.map(statusDto),
-    calculationSettings: {
-      ...calculationSettings,
-      taxRules: taxRules.map(toApiTaxRule),
-    },
-    savedViews: savedViews.map(savedViewDto),
-    records: records.map(prismaRecordToDto),
-  })
-})
-
-app.get('/api/records/:id', async (req, res) => {
-  const record = await prisma.record.findUnique({
-    where: { id: req.params.id },
-    include: {
-      status: true,
-      history: {
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  })
-
-  if (!record) {
-    return res.status(404).json({ error: 'Registo não encontrado.' })
-  }
-
-  return res.json(prismaRecordToDto(record))
-})
-
-app.post('/api/records', async (req, res) => {
-  const parsed = recordInputSchema.safeParse(req.body)
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
-  }
-
-  const defaults = await ensureDefaults()
-  const forceRecalculate = req.body.forceRecalculate === true
-  const statusId = parsed.data.statusId || parsed.data.estadoId || defaults.statusByKey.get('status-prep') || defaults.statuses[0]?.id
-
-  if (!statusId) {
-    return res.status(500).json({ error: 'Não foi possível resolver estado padrão.' })
-  }
-
-  const calculated = applyCalculations(
-    {
-      ...parsed.data,
-      dataLevantamento: toIsoDateOrUndefined(parsed.data.dataLevantamento),
-      dataRecibo: toIsoDateOrUndefined(parsed.data.dataRecibo),
-      statusId,
-    },
-    defaults.calculationSettings,
-    defaults.taxRules,
-    forceRecalculate,
-  )
-
-  try {
-    const created = await prisma.record.create({
-      data: {
-        ...toPrismaRecordData(calculated),
-        statusId,
-        history: {
-          create: {
-            message: 'Registo criado via API.',
-          },
-        },
-      },
-      include: { status: true },
-    })
-
-    return res.status(201).json(prismaRecordToDto(created))
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return res.status(409).json({ error: 'Registo duplicado para o mesmo período.' })
-    }
-    throw error
-  }
-})
-
-app.patch('/api/records/:id', async (req, res) => {
-  const parsed = recordPatchSchema.safeParse(req.body)
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
-  }
-
-  const current = await prisma.record.findUnique({ where: { id: req.params.id } })
-  if (!current) {
-    return res.status(404).json({ error: 'Registo não encontrado.' })
-  }
-
-  const defaults = await ensureDefaults()
-  const merged = mergeRecordWithPatch(current, parsed.data)
-
-  const forceRecalculate = req.body.forceRecalculate === true
-  const calculated = applyCalculations(merged, defaults.calculationSettings, defaults.taxRules, forceRecalculate)
-
-  const updated = await prisma.record.update({
-    where: { id: req.params.id },
-    data: {
-      ...toPrismaRecordData(calculated),
-      statusId: calculated.statusId,
-      history: {
-        create: {
-          message: 'Registo atualizado via API.',
-        },
-      },
-    },
-    include: { status: true },
-  })
-
-  return res.json(prismaRecordToDto(updated))
-})
-
-app.patch('/api/records/:id/status', async (req, res) => {
-  const body = z.object({ statusId: z.string().min(1) }).safeParse(req.body)
-  if (!body.success) {
-    return res.status(400).json({ error: 'Status inválido.' })
-  }
-
-  const old = await prisma.record.findUnique({ where: { id: req.params.id }, include: { status: true } })
-  if (!old) {
-    return res.status(404).json({ error: 'Registo não encontrado.' })
-  }
-
-  const updated = await prisma.record.update({
-    where: { id: req.params.id },
-    data: {
-      statusId: body.data.statusId,
-      history: {
-        create: {
-          message: `Estado alterado para ${body.data.statusId}.`,
-        },
-      },
-    },
-    include: { status: true },
-  })
-
-  return res.json(prismaRecordToDto(updated))
-})
-
-app.post('/api/records/bulk/status', async (req, res) => {
-  const body = z
-    .object({
-      recordIds: z.array(z.string()).min(1),
-      statusId: z.string().min(1),
-    })
-    .safeParse(req.body)
-
-  if (!body.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: body.error.flatten() })
-  }
-
-  const now = new Date()
-
-  await prisma.$transaction([
-    prisma.record.updateMany({
-      where: { id: { in: body.data.recordIds } },
-      data: {
-        statusId: body.data.statusId,
-        updatedAt: now,
-      },
-    }),
-    prisma.recordHistory.createMany({
-      data: body.data.recordIds.map((recordId) => ({
-        recordId,
-        message: `Estado alterado em lote para ${body.data.statusId}.`,
-      })),
-    }),
-  ])
-
-  return res.json({ ok: true, updated: body.data.recordIds.length })
-})
-
-app.post('/api/records/bulk/update', async (req, res) => {
-  const parsed = bulkUpdateSchema.safeParse(req.body)
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
-  }
-
-  if (Object.keys(parsed.data.patch).length === 0) {
-    return res.status(400).json({ error: 'Indique pelo menos um campo para atualizar em lote.' })
-  }
-
-  const defaults = await ensureDefaults()
-  const records = await prisma.record.findMany({
-    where: { id: { in: parsed.data.recordIds } },
-  })
-
-  if (records.length === 0) {
-    return res.json({ ok: true, updated: 0 })
-  }
-
-  const updates = records.map((current) => {
-    const merged = mergeRecordWithPatch(current, parsed.data.patch)
-    const calculated = applyCalculations(
-      merged,
-      defaults.calculationSettings,
-      defaults.taxRules,
-      parsed.data.forceRecalculate === true,
-    )
-    return { id: current.id, calculated }
-  })
-
-  await prisma.$transaction([
-    ...updates.map((item) =>
-      prisma.record.update({
-        where: { id: item.id },
-        data: {
-          ...toPrismaRecordData(item.calculated),
-          statusId: item.calculated.statusId,
-        },
-      }),
-    ),
-    prisma.recordHistory.createMany({
-      data: updates.map((item) => ({
-        recordId: item.id,
-        message: 'Registo atualizado em lote.',
-      })),
-    }),
-  ])
-
-  return res.json({ ok: true, updated: updates.length })
-})
-
 app.get('/api/statuses', async (_req, res) => {
-  const defaults = await ensureDefaults()
+  const defaults = await ensureDefaults(prisma)
   res.json(defaults.statuses.map(statusDto))
 })
 
@@ -2468,7 +1737,7 @@ app.delete('/api/statuses/:id', async (req, res) => {
 })
 
 app.get('/api/calculation-settings', async (_req, res) => {
-  const defaults = await ensureDefaults()
+  const defaults = await ensureDefaults(prisma)
   res.json({
     ...defaults.calculationSettings,
     taxRules: defaults.taxRules.map(toApiTaxRule),
@@ -2518,7 +1787,7 @@ app.patch('/api/calculation-settings', async (req, res) => {
     }
   }
 
-  const defaults = await ensureDefaults()
+  const defaults = await ensureDefaults(prisma)
   res.json({
     ...defaults.calculationSettings,
     taxRules: defaults.taxRules.map(toApiTaxRule),
@@ -2564,224 +1833,13 @@ app.delete('/api/saved-views/:id', async (req, res) => {
   res.json({ ok: true })
 })
 
-app.post('/api/import/preview', async (req, res) => {
-  const parsed = importPreviewSchema.safeParse(req.body)
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
-  }
-
-  const defaults = await ensureDefaults()
-  const fallbackStatusId = defaults.statusByKey.get('status-sem') || defaults.statuses[0]?.id
-  if (!fallbackStatusId) {
-    return res.status(500).json({ error: 'Estado padrão indisponível.' })
-  }
-
-  const existingRecords = await prisma.record.findMany({
-    select: {
-      id: true,
-      tipo: true,
-      ano: true,
-      mes: true,
-      processo: true,
-      pe: true,
-      reciboNumero: true,
-    },
-  })
-
-  const existingByKey = new Map(existingRecords.map((record) => [buildUniqueRecordKey(record), record.id]))
-
-  const items = parsed.data.rows.map((raw, index) => {
-    const row = asRecordInput(raw)
-    if (!row) {
-      return {
-        index,
-        valid: false,
-        action: 'error',
-        reason: 'Linha sem campos mínimos (tipo, mês, ano).',
-      }
-    }
-
-    const statusId = row.statusId || detectStatusIdFromColor(row.sourceColor, parsed.data.colorMapping, defaults.statuses, fallbackStatusId)
-    const key = buildUniqueRecordKey(row)
-    const existingId = existingByKey.get(key)
-
-    return {
-      index,
-      valid: true,
-      key,
-      statusId,
-      conflict: Boolean(existingId),
-      existingId,
-      suggestedAction: existingId ? 'update' : 'create',
-    }
-  })
-
-  const summary = {
-    total: items.length,
-    valid: items.filter((item) => item.valid).length,
-    conflicts: items.filter((item) => item.valid && item.conflict).length,
-    creates: items.filter((item) => item.valid && !item.conflict).length,
-    invalid: items.filter((item) => !item.valid).length,
-  }
-
-  res.json({ summary, items })
-})
-
-app.post('/api/import/commit', async (req, res) => {
-  const parsed = importCommitSchema.safeParse(req.body)
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
-  }
-
-  const defaults = await ensureDefaults()
-  const fallbackStatusId = defaults.statusByKey.get('status-sem') || defaults.statuses[0]?.id
-  if (!fallbackStatusId) {
-    return res.status(500).json({ error: 'Estado padrão indisponível.' })
-  }
-
-  const existingRecords = await prisma.record.findMany({
-    select: {
-      id: true,
-      tipo: true,
-      ano: true,
-      mes: true,
-      processo: true,
-      pe: true,
-      reciboNumero: true,
-    },
-  })
-
-  const existingByKey = new Map(existingRecords.map((record) => [buildUniqueRecordKey(record), record.id]))
-
-  let created = 0
-  let updated = 0
-  let skipped = 0
-  let invalid = 0
-  let duplicatesCreated = 0
-
-  let duplicateCounter = 1
-
-  for (const raw of parsed.data.rows) {
-    const row = asRecordInput(raw)
-    if (!row) {
-      invalid += 1
-      continue
-    }
-
-    const statusId = row.statusId || detectStatusIdFromColor(row.sourceColor, parsed.data.colorMapping, defaults.statuses, fallbackStatusId)
-    const prepared = applyCalculations(
-      {
-        ...row,
-        statusId,
-      },
-      defaults.calculationSettings,
-      defaults.taxRules,
-      parsed.data.forceRecalculate === true,
-    )
-
-    let key = buildUniqueRecordKey(prepared)
-    const existingId = existingByKey.get(key)
-
-    if (existingId) {
-      if (parsed.data.strategy === 'skip') {
-        skipped += 1
-        continue
-      }
-
-      if (parsed.data.strategy === 'update') {
-        await prisma.record.update({
-          where: { id: existingId },
-          data: {
-            ...toPrismaRecordData(prepared),
-            statusId,
-            history: {
-              create: {
-                message: 'Atualizado por importação.',
-              },
-            },
-          },
-        })
-        updated += 1
-        continue
-      }
-
-      if (parsed.data.strategy === 'duplicate') {
-        let candidate = duplicateVariant(prepared, duplicateCounter)
-        let candidateKey = buildUniqueRecordKey(candidate)
-
-        while (existingByKey.has(candidateKey)) {
-          duplicateCounter += 1
-          candidate = duplicateVariant(prepared, duplicateCounter)
-          candidateKey = buildUniqueRecordKey(candidate)
-        }
-
-        const createdRecord = await prisma.record.create({
-          data: {
-            ...toPrismaRecordData(candidate),
-            statusId,
-            history: {
-              create: {
-                message: 'Criado por importação (duplicado resolvido).',
-              },
-            },
-          },
-          select: { id: true },
-        })
-
-        existingByKey.set(candidateKey, createdRecord.id)
-        created += 1
-        duplicatesCreated += 1
-        duplicateCounter += 1
-        continue
-      }
-    }
-
-    try {
-      const createdRecord = await prisma.record.create({
-        data: {
-          ...toPrismaRecordData(prepared),
-          statusId,
-          history: {
-            create: {
-              message: 'Criado por importação.',
-            },
-          },
-        },
-        select: { id: true },
-      })
-
-      key = buildUniqueRecordKey(prepared)
-      existingByKey.set(key, createdRecord.id)
-      created += 1
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        skipped += 1
-        continue
-      }
-      throw error
-    }
-  }
-
-  res.json({
-    ok: true,
-    summary: {
-      created,
-      updated,
-      skipped,
-      invalid,
-      duplicatesCreated,
-      strategy: parsed.data.strategy,
-    },
-  })
-})
-
 app.post('/api/seed', async (req, res) => {
   const body = z.object({ replace: z.boolean().optional() }).safeParse(req.body)
   if (!body.success) {
     return res.status(400).json({ error: 'Payload inválido.' })
   }
 
-  const defaults = await ensureDefaults()
+  const defaults = await ensureDefaults(prisma)
 
   if (body.data.replace) {
     await prisma.$transaction([prisma.recordHistory.deleteMany(), prisma.record.deleteMany()])
@@ -2881,7 +1939,7 @@ app.post('/api/migrate/local-storage', async (req, res) => {
     return res.json({ ok: true, migrated: 0 })
   }
 
-  const defaults = await ensureDefaults()
+  const defaults = await ensureDefaults(prisma)
 
   if (Array.isArray(body.data.statuses)) {
     for (const raw of body.data.statuses) {
