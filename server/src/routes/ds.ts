@@ -13,7 +13,6 @@ import {
   databaseSetupHint,
   dsStatusDto,
   savedViewDto,
-  queryValue,
 } from '../services/shared'
 import { toNumberOrUndefined } from '../utils'
 import {

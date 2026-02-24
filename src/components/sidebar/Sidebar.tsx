@@ -101,9 +101,9 @@ export function Sidebar({
           className={`sidebar-tab-btn ${activeTab === 'todos' ? 'active' : ''}`}
           onClick={() => onTabChange('todos')}
           title="Tarefas"
+          aria-label="Tarefas"
         >
-          <CheckSquare size={15} />
-          Tarefas
+          <CheckSquare size={16} />
           {todos.length > 0 && (
             <span className="sidebar-tab-badge">{todos.length}</span>
           )}
@@ -113,9 +113,9 @@ export function Sidebar({
           className={`sidebar-tab-btn ${activeTab === 'notifications' ? 'active' : ''}`}
           onClick={() => onTabChange('notifications')}
           title="Notificações"
+          aria-label="Notificações"
         >
-          <Bell size={15} />
-          Notificações
+          <Bell size={16} />
           {unreadCount > 0 && (
             <span className="sidebar-tab-badge">{unreadCount}</span>
           )}
@@ -125,9 +125,9 @@ export function Sidebar({
           className={`sidebar-tab-btn ${activeTab === 'trash' ? 'active' : ''}`}
           onClick={() => onTabChange('trash')}
           title="Lixeira"
+          aria-label="Lixeira"
         >
-          <Trash2 size={15} />
-          Lixeira
+          <Trash2 size={16} />
           {trashCount > 0 && (
             <span className="sidebar-tab-badge">{trashCount}</span>
           )}

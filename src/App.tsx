@@ -149,13 +149,11 @@ function App() {
     createTodo,
     updateTodo,
     deleteTodo,
-    restoreTodo: restoreTodoAction,
     addSubtask,
     toggleSubtask,
     deleteSubtask,
     getComments,
     addComment,
-    refreshTodos,
   } = useTodos(user?.id)
 
   const {
@@ -175,7 +173,6 @@ function App() {
     restore: restoreTrashItem,
     permanentDelete: permanentDeleteTrashItem,
     emptyTrash,
-    refreshTrash,
   } = useTrash(user?.id)
 
   const [layoutMode] = useState<LayoutMode>(resolveInitialLayoutMode)
@@ -1224,6 +1221,13 @@ function App() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [userMenuOpen])
+
+  // Close user menu when any drawer/modal/sidebar opens
+  useEffect(() => {
+    if (selectedRecordId || selectedDsRecordId || selectedPenhorasRecordId || sidebarOpen) {
+      setUserMenuOpen(false)
+    }
+  }, [selectedRecordId, selectedDsRecordId, selectedPenhorasRecordId, sidebarOpen])
 
   if (authLoading) {
     return <div className={`app-shell module-${activeModule} ${layoutMode === 'wide' ? 'wide' : ''}`}><div className="panel">A carregar autenticacao...</div></div>

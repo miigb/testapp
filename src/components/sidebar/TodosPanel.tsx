@@ -29,7 +29,8 @@ export function TodosPanel({
   filters,
   onFiltersChange,
   users,
-  currentUserId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- available for future per-user filtering
+  currentUserId: _currentUserId,
   onCreateTodo,
   onUpdateTodo,
   onDeleteTodo,
@@ -45,9 +46,10 @@ export function TodosPanel({
   const [expandedTodoId, setExpandedTodoId] = useState<number | null>(null)
   const [linkedContext, setLinkedContext] = useState<{ module: string; recordId: string } | null>(null)
 
-  // When a pending todo link arrives, pre-fill the linked context
+  // When a pending todo link arrives, copy to local state and clear parent
   useEffect(() => {
     if (pendingTodoLink) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: copy prop to local state once
       setLinkedContext(pendingTodoLink)
       setExpandedTodoId(null)
       onClearPendingTodoLink?.()

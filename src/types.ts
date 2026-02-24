@@ -437,6 +437,7 @@ export interface TodoItem {
   subtasks: TodoSubtask[]
   _count?: { comments: number }
   deletedAt?: string | null
+  deletedBy?: { displayName: string } | null
   createdAt: string
   updatedAt: string
 }

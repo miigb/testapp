@@ -67,7 +67,7 @@ export function useTrash(userId: number | undefined) {
 
       if (todosResult.status === 'fulfilled') {
         for (const item of todosResult.value.items) {
-          const deletedByObj = (item as Record<string, unknown>).deletedBy as { displayName: string } | null | undefined
+          const deletedByObj = item.deletedBy
           entries.push({
             id: String(item.id),
             module: 'tarefas',

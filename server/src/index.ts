@@ -20,6 +20,7 @@ import { createTodosRouter } from './routes/todos'
 import { createNotificationsRouter } from './routes/notifications'
 
 import { databaseSetupHint } from './services/shared'
+import { startPurgeScheduler } from './services/purge'
 
 // Fail fast in production when required env vars are missing
 if (process.env.NODE_ENV === 'production') {
@@ -72,6 +73,9 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }
+
+// Auto-purge trash items older than 30 days (runs daily at 3am)
+startPurgeScheduler(prisma)
 
 app.use(createErrorHandler(databaseSetupHint))
 

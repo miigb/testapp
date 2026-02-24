@@ -2,12 +2,43 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { api } from '../api'
 import type { NotificationItem, NotificationPreferences } from '../types'
 
+/** Register service worker and request notification permission */
+async function setupPushNotifications(): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator) || !('Notification' in window)) return null
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js')
+    if (Notification.permission === 'default') {
+      await Notification.requestPermission()
+    }
+    return registration
+  } catch {
+    return null
+  }
+}
+
+/** Show a native browser notification when tab is not visible */
+function showNativeNotification(
+  notification: NotificationItem,
+  registration: ServiceWorkerRegistration | null,
+) {
+  if (document.visibilityState === 'visible') return
+  if (Notification.permission !== 'granted') return
+  if (!registration) return
+
+  registration.showNotification(notification.title ?? 'Nova notificação', {
+    body: notification.message ?? '',
+    icon: '/favicon.ico',
+    tag: `notif-${notification.id}`,
+  })
+}
+
 export function useNotifications(userId: number | undefined) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null)
 
   // Fetch initial notifications and unread count
   const refreshNotifications = useCallback(async () => {
@@ -43,6 +74,14 @@ export function useNotifications(userId: number | undefined) {
       .catch(() => { /* ignore */ })
   }, [userId])
 
+  // Register Service Worker for push notifications
+  useEffect(() => {
+    if (!userId) return
+    setupPushNotifications().then((reg) => {
+      swRegistrationRef.current = reg
+    })
+  }, [userId])
+
   // SSE for real-time notifications
   useEffect(() => {
     if (!userId) return
@@ -61,6 +100,8 @@ export function useNotifications(userId: number | undefined) {
           const notification = JSON.parse(event.data) as NotificationItem
           setNotifications((prev) => [notification, ...prev])
           setUnreadCount((prev) => prev + 1)
+          // Show native notification if tab is in background
+          showNativeNotification(notification, swRegistrationRef.current)
         } catch {
           // ignore parse errors
         }

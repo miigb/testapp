@@ -516,8 +516,9 @@ a {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
-  height: 42px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: var(--text-sm);
   box-shadow: var(--shadow);
 }
 
@@ -531,7 +532,7 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 8px 11px;
+  padding: 6px 10px;
 }
 
 .tab-nav.tab-nav-inline {
@@ -546,8 +547,8 @@ a {
 
 .tab-nav-inline .tab-btn {
   white-space: nowrap;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.91rem;
+  padding: 0.34rem 0.62rem;
+  font-size: 0.85rem;
 }
 
 .topbar-search-actions {
@@ -561,10 +562,24 @@ a {
 }
 
 .topbar-search-actions .global-search {
-  height: 40px;
+  height: 36px;
   box-shadow: none;
   flex: 1 1 auto;
-  min-width: 220px;
+  min-width: 140px;
+  max-width: 280px;
+}
+
+/* Compact topbar when sidebar is open */
+.app-shell.sidebar-open .topbar {
+  grid-template-columns: 260px 1fr auto;
+}
+.app-shell.sidebar-open .tab-nav-inline .tab-btn {
+  padding: 0.3rem 0.46rem;
+  font-size: 0.8rem;
+}
+.app-shell.sidebar-open .topbar-search-actions .global-search {
+  min-width: 100px;
+  max-width: 200px;
 }
 
 .tab-nav {
@@ -820,7 +835,7 @@ a {
   align-items: center;
   gap: 0.35rem;
   font-weight: 600;
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
 
 .primary-btn:hover,
@@ -841,6 +856,11 @@ a {
   color: var(--ink);
 }
 
+.subtle-btn:hover:not(:disabled) {
+  border-color: color-mix(in oklab, var(--line) 60%, var(--brand) 40%);
+  background: color-mix(in oklab, var(--surface-strong) 85%, var(--brand) 15%);
+}
+
 .subtle-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -848,9 +868,9 @@ a {
 }
 
 .icon-btn {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   padding: 0;
   justify-content: center;
 }
@@ -916,6 +936,12 @@ a {
   box-shadow: var(--shadow);
   z-index: 200;
   overflow: hidden;
+  animation: dropdown-appear 140ms ease;
+}
+
+@keyframes dropdown-appear {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .user-menu-info {
@@ -1425,11 +1451,11 @@ a {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface-strong);
-  padding: 15px 16px;
+  padding: 12px 14px;
   display: grid;
   grid-template-columns: minmax(230px, 1.6fr) minmax(190px, 1fr) auto auto auto;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
   text-align: left;
   color: var(--ink);
   transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
@@ -1452,13 +1478,13 @@ a {
 
 .card-actions {
   display: inline-flex;
-  gap: 8px;
+  gap: 6px;
   justify-self: end;
 }
 
 .card-actions .subtle-btn {
-  padding: 0.42rem 0.78rem;
-  font-size: var(--text-sm);
+  padding: 0.34rem 0.64rem;
+  font-size: var(--text-xs);
 }
 
 .result-title {
@@ -2013,9 +2039,9 @@ a {
 
 .ds-status-select {
   width: 100%;
-  min-width: 136px;
-  font-size: 0.82rem;
-  padding: 0.42rem 0.55rem;
+  min-width: 110px;
+  font-size: 0.8rem;
+  padding: 0.32rem 0.48rem;
 }
 
 .ds-records-table td:nth-child(7) .subtle-btn {
@@ -2315,14 +2341,14 @@ a {
 .dashboard-widget-actions {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 6px;
   opacity: 0;
   transform: translateY(-2px);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .dashboard-widget-card:hover .dashboard-widget-actions,
@@ -2486,15 +2512,16 @@ tbody tr:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-size: var(--text-xs);
-  padding-top: 11px;
-  padding-bottom: 11px;
+  padding-top: 7px;
+  padding-bottom: 7px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
 
 .records-table td {
-  padding-top: 13px;
-  padding-bottom: 13px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: var(--text-sm);
   vertical-align: middle;
 }
 
@@ -2526,7 +2553,7 @@ tbody tr:hover {
 
 .records-table th:last-child,
 .records-table td:last-child {
-  min-width: 210px;
+  min-width: 170px;
 }
 
 .import-box {
@@ -2712,30 +2739,67 @@ tbody tr:hover {
 }
 
 .status-cell-actions {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
 .status-cell-actions select {
-  min-width: 160px;
+  min-width: 120px;
+  flex: 1 1 auto;
 }
 
 .subtle-btn.compact {
-  padding: 0.44rem 0.7rem;
+  padding: 0.3rem 0.58rem;
+  font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+.subtle-btn.danger {
+  color: var(--danger, #c62828);
+  border-color: color-mix(in oklab, var(--danger, #c62828) 30%, var(--line) 70%);
+  background: color-mix(in oklab, var(--surface-strong) 94%, var(--danger, #c62828) 6%);
+}
+
+.subtle-btn.danger:hover {
+  border-color: var(--danger, #c62828);
+  background: color-mix(in oklab, var(--surface-strong) 84%, var(--danger, #c62828) 16%);
+}
+
+.records-table .icon-btn,
+.ds-records-table .icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+}
+
+.records-table .subtle-btn.compact,
+.ds-records-table .subtle-btn.compact {
+  padding: 0.24rem 0.5rem;
+  font-size: 0.76rem;
+}
+
+.records-table select,
+.ds-records-table select {
+  font-size: var(--text-sm);
+  padding: 0.32rem 0.48rem;
 }
 
 .record-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 300;
   background: rgba(6, 20, 35, 0.46);
   backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   padding: 20px;
+  animation: overlay-fade-in 180ms ease;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .record-modal {
@@ -2747,6 +2811,12 @@ tbody tr:hover {
   box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--line) inset;
   border-radius: calc(var(--radius-lg) + 2px);
   padding: 16px;
+  animation: modal-slide-up 220ms ease;
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .record-modal .drawer-header {
@@ -2776,12 +2846,17 @@ tbody tr:hover {
 .modal-title-block {
   display: grid;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .modal-title-block h3 {
   font-size: clamp(1.28rem, 1.06rem + 0.8vw, 1.54rem);
   line-height: 1.15;
   letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-meta {
@@ -2791,10 +2866,12 @@ tbody tr:hover {
 .modal-header-actions {
   justify-content: flex-end;
   gap: 9px;
+  flex-shrink: 0;
 }
 
 .modal-header-actions .subtle-btn {
   padding: 0.52rem 0.9rem;
+  white-space: nowrap;
 }
 
 .detail-grid {
