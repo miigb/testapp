@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { z } from 'zod'
 
 import {
@@ -38,7 +38,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
         where: { scope: { startsWith: 'ds-' } },
         orderBy: { updatedAt: 'desc' },
       })
-      const recordCount = await prisma.dsRecord.count()
+      const recordCount = await prisma.dsRecord.count({ where: { deletedAt: null } })
 
       res.json({
         statuses: defaults.statuses.map(dsStatusDto),
@@ -56,7 +56,10 @@ export function createDsRouter(prisma: PrismaClient): Router {
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
 
-    const where = buildDsRecordWhere(req.query as Record<string, unknown>)
+    const where: Prisma.DsRecordWhereInput = {
+      ...buildDsRecordWhere(req.query as Record<string, unknown>),
+      deletedAt: null,
+    }
 
     const [items, total] = await Promise.all([
       prisma.dsRecord.findMany({
@@ -77,9 +80,43 @@ export function createDsRouter(prisma: PrismaClient): Router {
     })
   })
 
+  router.get('/records/trash', async (req, res) => {
+    const page = Number(req.query.page ?? 1)
+    const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
+    const skip = Math.max(page - 1, 0) * pageSize
+    const where: Prisma.DsRecordWhereInput = { deletedAt: { not: null } }
+
+    const [items, total] = await Promise.all([
+      prisma.dsRecord.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { deletedAt: 'desc' },
+        include: {
+          status: true,
+          deletedBy: {
+            select: { id: true, username: true, displayName: true },
+          },
+        },
+      }),
+      prisma.dsRecord.count({ where }),
+    ])
+
+    return res.json({
+      items: items.map((record) => ({
+        ...prismaDsRecordToDto(record),
+        deletedAt: record.deletedAt?.toISOString() ?? null,
+        deletedBy: record.deletedBy ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    })
+  })
+
   router.get('/records/:id', async (req, res) => {
-    const record = await prisma.dsRecord.findUnique({
-      where: { id: req.params.id },
+    const record = await prisma.dsRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
       include: { status: true },
     })
 
@@ -122,8 +159,8 @@ export function createDsRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Payload DS inválido.', details: parsed.error.flatten() })
     }
 
-    const current = await prisma.dsRecord.findUnique({
-      where: { id: req.params.id },
+    const current = await prisma.dsRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
     })
     if (!current) {
       return res.status(404).json({ error: 'Registo DS não encontrado.' })
@@ -154,7 +191,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Status DS inválido.' })
     }
 
-    const old = await prisma.dsRecord.findUnique({ where: { id: req.params.id } })
+    const old = await prisma.dsRecord.findFirst({ where: { id: req.params.id, deletedAt: null } })
     if (!old) {
       return res.status(404).json({ error: 'Registo DS não encontrado.' })
     }
@@ -248,6 +285,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     }
 
     const existing = await prisma.dsRecord.findMany({
+      where: { deletedAt: null },
       select: { id: true, gestora: true, referencia: true, dataEscritura: true, proponentes: true, produto: true, valor: true },
     })
     const existingByKey = new Map(
@@ -315,6 +353,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
 
     const importBatchId = `ds-${Date.now()}`
     const existing = await prisma.dsRecord.findMany({
+      where: { deletedAt: null },
       select: { id: true, gestora: true, referencia: true, dataEscritura: true, proponentes: true, produto: true, valor: true },
     })
     const existingByKey = new Map(
@@ -397,6 +436,71 @@ export function createDsRouter(prisma: PrismaClient): Router {
         strategy: parsed.data.strategy,
       },
     })
+  })
+
+  router.delete('/records/:id', async (req, res) => {
+    const record = await prisma.dsRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo DS não encontrado.' })
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ error: 'Autenticação necessária.' })
+    }
+
+    await prisma.dsRecord.update({
+      where: { id: req.params.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: req.user.userId,
+      },
+    })
+
+    return res.json({ success: true })
+  })
+
+  router.post('/records/:id/restore', async (req, res) => {
+    const record = await prisma.dsRecord.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo DS não encontrado ou não está eliminado.' })
+    }
+
+    const restored = await prisma.dsRecord.update({
+      where: { id: req.params.id },
+      data: {
+        deletedAt: null,
+        deletedById: null,
+      },
+      include: { status: true },
+    })
+
+    return res.json(prismaDsRecordToDto(restored))
+  })
+
+  router.delete('/records/:id/permanent', async (req, res) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
+    }
+
+    const record = await prisma.dsRecord.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo DS não encontrado ou não está eliminado.' })
+    }
+
+    await prisma.dsRecord.delete({
+      where: { id: req.params.id },
+    })
+
+    return res.json({ success: true })
   })
 
   return router

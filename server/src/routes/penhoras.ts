@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { z } from 'zod'
 
 import {
@@ -36,7 +36,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
         where: { scope: { startsWith: 'penhoras-' } },
         orderBy: { updatedAt: 'desc' },
       })
-      const recordCount = await prisma.penhorasRecord.count()
+      const recordCount = await prisma.penhorasRecord.count({ where: { deletedAt: null } })
 
       res.json({
         statuses: defaults.statuses.map(penhorasStatusDto),
@@ -54,7 +54,10 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
 
-    const where = buildPenhorasRecordWhere(req.query as Record<string, unknown>)
+    const where: Prisma.PenhorasRecordWhereInput = {
+      ...buildPenhorasRecordWhere(req.query as Record<string, unknown>),
+      deletedAt: null,
+    }
 
     const [items, total] = await Promise.all([
       prisma.penhorasRecord.findMany({
@@ -75,9 +78,43 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     })
   })
 
+  router.get('/records/trash', async (req, res) => {
+    const page = Number(req.query.page ?? 1)
+    const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
+    const skip = Math.max(page - 1, 0) * pageSize
+    const where: Prisma.PenhorasRecordWhereInput = { deletedAt: { not: null } }
+
+    const [items, total] = await Promise.all([
+      prisma.penhorasRecord.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { deletedAt: 'desc' },
+        include: {
+          status: true,
+          deletedBy: {
+            select: { id: true, username: true, displayName: true },
+          },
+        },
+      }),
+      prisma.penhorasRecord.count({ where }),
+    ])
+
+    return res.json({
+      items: items.map((record) => ({
+        ...prismaPenhorasRecordToDto(record),
+        deletedAt: record.deletedAt?.toISOString() ?? null,
+        deletedBy: record.deletedBy ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    })
+  })
+
   router.get('/records/:id', async (req, res) => {
-    const record = await prisma.penhorasRecord.findUnique({
-      where: { id: req.params.id },
+    const record = await prisma.penhorasRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
       include: { status: true },
     })
 
@@ -120,8 +157,8 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Payload Penhoras inválido.', details: parsed.error.flatten() })
     }
 
-    const current = await prisma.penhorasRecord.findUnique({
-      where: { id: req.params.id },
+    const current = await prisma.penhorasRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
     })
     if (!current) {
       return res.status(404).json({ error: 'Registo Penhoras não encontrado.' })
@@ -152,7 +189,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
       return res.status(400).json({ error: 'Status Penhoras inválido.' })
     }
 
-    const old = await prisma.penhorasRecord.findUnique({ where: { id: req.params.id } })
+    const old = await prisma.penhorasRecord.findFirst({ where: { id: req.params.id, deletedAt: null } })
     if (!old) {
       return res.status(404).json({ error: 'Registo Penhoras não encontrado.' })
     }
@@ -252,6 +289,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     }
 
     const existing = await prisma.penhorasRecord.findMany({
+      where: { deletedAt: null },
       select: { id: true, pe: true, acto: true, dataPedido: true, identificacao: true, pedido: true, gestor: true },
     })
     const existingByKey = new Map(
@@ -313,6 +351,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
 
     const importBatchId = `penhoras-${Date.now()}`
     const existing = await prisma.penhorasRecord.findMany({
+      where: { deletedAt: null },
       select: { id: true, pe: true, acto: true, dataPedido: true, identificacao: true, pedido: true, gestor: true },
     })
     const existingByKey = new Map(
@@ -395,6 +434,71 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
         strategy: parsed.data.strategy,
       },
     })
+  })
+
+  router.delete('/records/:id', async (req, res) => {
+    const record = await prisma.penhorasRecord.findFirst({
+      where: { id: req.params.id, deletedAt: null },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo Penhoras não encontrado.' })
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ error: 'Autenticação necessária.' })
+    }
+
+    await prisma.penhorasRecord.update({
+      where: { id: req.params.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: req.user.userId,
+      },
+    })
+
+    return res.json({ success: true })
+  })
+
+  router.post('/records/:id/restore', async (req, res) => {
+    const record = await prisma.penhorasRecord.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo Penhoras não encontrado ou não está eliminado.' })
+    }
+
+    const restored = await prisma.penhorasRecord.update({
+      where: { id: req.params.id },
+      data: {
+        deletedAt: null,
+        deletedById: null,
+      },
+      include: { status: true },
+    })
+
+    return res.json(prismaPenhorasRecordToDto(restored))
+  })
+
+  router.delete('/records/:id/permanent', async (req, res) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
+    }
+
+    const record = await prisma.penhorasRecord.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
+    })
+
+    if (!record) {
+      return res.status(404).json({ error: 'Registo Penhoras não encontrado ou não está eliminado.' })
+    }
+
+    await prisma.penhorasRecord.delete({
+      where: { id: req.params.id },
+    })
+
+    return res.json({ success: true })
   })
 
   return router
