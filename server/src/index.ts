@@ -2,10 +2,13 @@ import 'dotenv/config'
 
 import express from 'express'
 import path from 'node:path'
+import cookieParser from 'cookie-parser'
 import { PrismaClient } from '@prisma/client'
 
 import { createCorsMiddleware } from './middleware/cors'
 import { createErrorHandler } from './middleware/errorHandler'
+import { requireAuth } from './middleware/auth'
+import { createAuthRouter } from './routes/auth'
 import { aiRouter } from './routes/ai'
 import { createRecordsRouter } from './routes/records'
 import { createDsRouter } from './routes/ds'
@@ -33,14 +36,16 @@ const prisma = new PrismaClient()
 
 app.use(createCorsMiddleware())
 app.use(express.json({ limit: '30mb' }))
+app.use(cookieParser())
 
-app.use('/api/ai', aiRouter)
-app.use('/api', createRecordsRouter(prisma))
-app.use('/api/ds', createDsRouter(prisma))
-app.use('/api/penhoras', createPenhorasRouter(prisma))
-app.use('/api', createStatusesRouter(prisma))
-app.use('/api', createSettingsRouter(prisma))
-app.use('/api', createDataRouter(prisma))
+app.use('/api/auth', createAuthRouter(prisma))
+app.use('/api/ai', requireAuth, aiRouter)
+app.use('/api', requireAuth, createRecordsRouter(prisma))
+app.use('/api/ds', requireAuth, createDsRouter(prisma))
+app.use('/api/penhoras', requireAuth, createPenhorasRouter(prisma))
+app.use('/api', requireAuth, createStatusesRouter(prisma))
+app.use('/api', requireAuth, createSettingsRouter(prisma))
+app.use('/api', requireAuth, createDataRouter(prisma))
 
 app.get('/api/health', async (_req, res) => {
   try {
