@@ -328,7 +328,7 @@ export type RecordSuggestions = {
 }
 
 // Auth types
-export type UserRole = 'ADMIN' | 'USER'
+export type UserRole = 'ADMIN' | 'USER' | 'CONSULTANT'
 
 export type User = {
   id: number
@@ -336,6 +336,7 @@ export type User = {
   displayName: string
   email: string | null
   role: UserRole
+  allowedModules: string[]
   avatarColor: string | null
   active: boolean
   createdAt: string

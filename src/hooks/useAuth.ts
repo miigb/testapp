@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
-import type { User, LoginCredentials, RegisterData } from '../types'
+import type { User, LoginCredentials, RegisterData, ModuleId } from '../types'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -46,5 +46,17 @@ export function useAuth() {
     setUser(null)
   }, [])
 
-  return { user, authLoading, authError, setAuthError, login, register, logout }
+  const canAccessModule = useCallback((moduleId: ModuleId): boolean => {
+    if (!user) return false
+    if (user.role === 'ADMIN') return true
+    return user.allowedModules.includes(moduleId)
+  }, [user])
+
+  const canWrite = useCallback((moduleId: ModuleId): boolean => {
+    if (!user) return false
+    if (user.role === 'CONSULTANT') return false
+    return canAccessModule(moduleId)
+  }, [user, canAccessModule])
+
+  return { user, authLoading, authError, setAuthError, login, register, logout, canAccessModule, canWrite }
 }

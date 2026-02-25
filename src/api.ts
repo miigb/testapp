@@ -516,7 +516,7 @@ export const api = {
     return request<User[]>('/api/auth/users')
   },
 
-  updateUser(id: number, data: Partial<{ displayName: string; email: string | null; role: UserRole; active: boolean; avatarColor: string }>) {
+  updateUser(id: number, data: Partial<{ displayName: string; email: string | null; role: UserRole; active: boolean; avatarColor: string; allowedModules: string[] }>) {
     return request<User>(`/api/auth/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
