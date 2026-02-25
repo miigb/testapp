@@ -35,6 +35,7 @@ enum DsIvaKind {
 enum UserRole {
   ADMIN
   USER
+  CONSULTANT
 }
 
 model User {
@@ -43,8 +44,9 @@ model User {
   displayName String
   email       String?   @unique
   password    String
-  role        UserRole  @default(USER)
-  avatarColor String?
+  role            UserRole  @default(USER)
+  allowedModules  String[]  @default([])
+  avatarColor     String?
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
