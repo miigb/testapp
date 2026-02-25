@@ -99,7 +99,7 @@ function resolveInitialLayoutMode(): LayoutMode {
 }
 
 function App() {
-  const { user, authLoading, authError, setAuthError, login, register, logout } = useAuth()
+  const { user, authLoading, authError, setAuthError, login, register, logout, canAccessModule, canWrite } = useAuth()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [adminPanelOpen, setAdminPanelOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -119,6 +119,17 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabId>('entrada')
   const [feedback, setFeedback] = useState('')
   const [feedbackClosing, setFeedbackClosing] = useState(false)
+
+  // Default active module to first allowed module
+  useEffect(() => {
+    if (!user) return
+    const modules: ModuleId[] = ['recibos', 'ds', 'penhoras']
+    const firstAllowed = modules.find((m) => canAccessModule(m))
+    if (firstAllowed && !canAccessModule(activeModule)) {
+      setActiveModule(firstAllowed)
+      setActiveTab(firstAllowed === 'recibos' ? 'entrada' : 'consulta')
+    }
+  }, [user, canAccessModule])
 
   const [globalSearch, setGlobalSearch] = useState('')
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -1122,8 +1133,17 @@ function App() {
   }, [])
 
   function switchModule(nextModule: ModuleId) {
+    if (!canAccessModule(nextModule)) {
+      setFeedback('Sem acesso a este modulo.')
+      return
+    }
     setActiveModule(nextModule)
-    setActiveTab(nextModule === 'recibos' ? 'entrada' : 'consulta')
+    // Consultants can only see consulta tab
+    if (user?.role === 'CONSULTANT') {
+      setActiveTab('consulta')
+    } else {
+      setActiveTab(nextModule === 'recibos' ? 'entrada' : 'consulta')
+    }
     if (nextModule !== 'recibos') setSelectedRecordId(null)
     if (nextModule !== 'ds') setSelectedDsRecordId(null)
     if (nextModule !== 'penhoras') setSelectedPenhorasRecordId(null)
@@ -1181,23 +1201,29 @@ function App() {
           </button>
         </div>
       )}
-      <button
-        className="primary-btn icon-btn"
-        type="button"
-        onClick={() => setActiveTab('entrada')}
-        title={
-          activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
-        }
-        aria-label={
-          activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
-        }
-      >
-        <Plus size={16} />
-      </button>
+      {canWrite(activeModule) && (
+        <button
+          className="primary-btn icon-btn"
+          type="button"
+          onClick={() => setActiveTab('entrada')}
+          title={
+            activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
+          }
+          aria-label={
+            activeModule === 'ds' ? 'Novo registo DS' : activeModule === 'penhoras' ? 'Novo registo Penhoras' : 'Novo registo'
+          }
+        >
+          <Plus size={16} />
+        </button>
+      )}
     </div>
   )
 
-  const tabButtons = TABS.map((tab) => (
+  const visibleTabs = user?.role === 'CONSULTANT'
+    ? TABS.filter((tab) => tab.id === 'consulta')
+    : TABS
+
+  const tabButtons = visibleTabs.map((tab) => (
     <button
       key={tab.id}
       className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
@@ -1254,7 +1280,7 @@ function App() {
           <div className={`module-brand-stack ${activeModule}-active`}>
             <button
               type="button"
-              className={`module-brand-card back module-${nextModuleCard.id}`}
+              className={`module-brand-card back module-${nextModuleCard.id}${!canAccessModule(nextModuleCard.id) ? ' module-locked' : ''}`}
               onClick={() => switchModule(nextModuleCard.id)}
               title={`Trocar para ${nextModuleCard.title}`}
               aria-label={`Trocar para ${nextModuleCard.title}`}
@@ -1264,7 +1290,7 @@ function App() {
             </button>
             <button
               type="button"
-              className={`module-brand-card front module-${activeModuleCard.id}`}
+              className={`module-brand-card front module-${activeModuleCard.id}${!canAccessModule(activeModuleCard.id) ? ' module-locked' : ''}`}
               onClick={() => switchModule(nextModuleCard.id)}
               title={`Módulo ativo: ${activeModuleCard.title}. Clique para trocar para ${nextModuleCard.title}.`}
               aria-label={`Módulo ativo: ${activeModuleCard.title}. Clique para trocar para ${nextModuleCard.title}.`}
