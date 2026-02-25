@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Pencil, Plus, ShieldAlert, ShieldCheck, UserX, X } from 'lucide-react'
+import { Pencil, Plus, RotateCcw, ShieldAlert, ShieldCheck, UserX, X } from 'lucide-react'
 import { api } from '../../api'
 import type { User, UserRole, RegisterData } from '../../types'
 
@@ -164,6 +164,19 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
       setError(err instanceof Error ? err.message : 'Erro ao desativar utilizador')
     } finally {
       setDeactivating(false)
+    }
+  }
+
+  // ── Reactivate User ─────────────────────────────────────────────
+
+  async function handleReactivate(user: User) {
+    setError('')
+    try {
+      await api.updateUser(user.id, { active: true })
+      showFeedback(`Utilizador "${user.displayName}" reativado.`)
+      await loadUsers()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao reativar utilizador')
     }
   }
 
@@ -360,6 +373,7 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
                                 className="subtle-btn icon-btn micro"
                                 title="Editar utilizador"
                                 onClick={() => startEdit(u)}
+                                disabled={!u.active}
                               >
                                 <Pencil size={14} />
                               </button>
@@ -371,6 +385,16 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
                                   onClick={() => setConfirmDeactivate(u)}
                                 >
                                   <UserX size={14} />
+                                </button>
+                              )}
+                              {!u.active && (
+                                <button
+                                  type="button"
+                                  className="subtle-btn icon-btn micro"
+                                  title="Reativar utilizador"
+                                  onClick={() => void handleReactivate(u)}
+                                >
+                                  <RotateCcw size={14} />
                                 </button>
                               )}
                             </>

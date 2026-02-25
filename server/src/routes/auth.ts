@@ -153,17 +153,18 @@ export function createAuthRouter(prisma: PrismaClient) {
   // GET /users (admin only — includes roles/modules)
   r.get('/users', requireAuth, requireAdmin, async (_req, res) => {
     const users = await prisma.user.findMany({
-      where: { active: true },
       select: {
         id: true,
         username: true,
         displayName: true,
+        email: true,
         role: true,
+        active: true,
         avatarColor: true,
         allowedModules: true,
         createdAt: true,
       },
-      orderBy: { displayName: 'asc' },
+      orderBy: [{ active: 'desc' }, { displayName: 'asc' }],
     })
     return res.json(users)
   })
