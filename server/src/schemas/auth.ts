@@ -12,10 +12,13 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 })
 
+const validModules = ['recibos', 'ds', 'penhoras'] as const
+
 export const updateUserSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   email: z.string().email().nullable().optional(),
-  role: z.enum(['ADMIN', 'USER']).optional(),
+  role: z.enum(['ADMIN', 'USER', 'CONSULTANT']).optional(),
   active: z.boolean().optional(),
   avatarColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  allowedModules: z.array(z.enum(validModules)).optional(),
 })

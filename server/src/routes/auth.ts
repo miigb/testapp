@@ -52,6 +52,7 @@ export function createAuthRouter(prisma: PrismaClient) {
             role: true,
             active: true,
             avatarColor: true,
+            allowedModules: true,
             createdAt: true,
           },
         })
@@ -61,7 +62,7 @@ export function createAuthRouter(prisma: PrismaClient) {
         return res.status(409).json({ error: 'Nome de utilizador ja existe.' })
       }
 
-      const token = signToken({ userId: user.id, username: user.username, role: user.role })
+      const token = signToken({ userId: user.id, username: user.username, role: user.role, allowedModules: user.allowedModules })
       res.cookie('token', token, COOKIE_OPTIONS)
       return res.status(201).json(user)
     } catch {
@@ -88,7 +89,7 @@ export function createAuthRouter(prisma: PrismaClient) {
       return res.status(401).json({ error: 'Credenciais invalidas.' })
     }
 
-    const token = signToken({ userId: user.id, username: user.username, role: user.role })
+    const token = signToken({ userId: user.id, username: user.username, role: user.role, allowedModules: user.allowedModules })
     res.cookie('token', token, COOKIE_OPTIONS)
     return res.json({
       id: user.id,
@@ -98,6 +99,7 @@ export function createAuthRouter(prisma: PrismaClient) {
       role: user.role,
       active: user.active,
       avatarColor: user.avatarColor,
+      allowedModules: user.allowedModules,
       createdAt: user.createdAt,
     })
   })
@@ -120,6 +122,7 @@ export function createAuthRouter(prisma: PrismaClient) {
         role: true,
         active: true,
         avatarColor: true,
+        allowedModules: true,
         createdAt: true,
       },
     })
@@ -157,6 +160,7 @@ export function createAuthRouter(prisma: PrismaClient) {
         displayName: true,
         role: true,
         avatarColor: true,
+        allowedModules: true,
         createdAt: true,
       },
       orderBy: { displayName: 'asc' },
@@ -187,7 +191,7 @@ export function createAuthRouter(prisma: PrismaClient) {
     }
 
     // Prevent removing the last admin
-    if (parsed.data.role === 'USER') {
+    if (parsed.data.role && parsed.data.role !== 'ADMIN') {
       const adminCount = await prisma.user.count({ where: { role: 'ADMIN', active: true } })
       if (adminCount <= 1) {
         const target = await prisma.user.findUnique({ where: { id }, select: { role: true } })
@@ -209,6 +213,7 @@ export function createAuthRouter(prisma: PrismaClient) {
           role: true,
           active: true,
           avatarColor: true,
+          allowedModules: true,
           createdAt: true,
         },
       })
