@@ -1353,7 +1353,7 @@ function App() {
                   <div className="user-menu-dropdown">
                     <div className="user-menu-info">
                       <span className="user-menu-name">{user.displayName}</span>
-                      <span className="user-menu-role">{user.role === 'ADMIN' ? 'Administrador' : 'Utilizador'}</span>
+                      <span className="user-menu-role">{user.role === 'ADMIN' ? 'Administrador' : user.role === 'CONSULTANT' ? 'Consultor' : 'Utilizador'}</span>
                     </div>
                     {user.role === 'ADMIN' && (
                       <button

@@ -512,6 +512,13 @@ export const api = {
     })
   },
 
+  adminCreateUser(data: RegisterData & { role?: UserRole; allowedModules?: string[] }) {
+    return request<User>('/api/auth/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
   getUsers() {
     return request<User[]>('/api/auth/users')
   },

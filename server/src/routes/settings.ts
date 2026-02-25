@@ -4,11 +4,12 @@ import { Prisma, type PrismaClient } from '@prisma/client'
 import { saveViewSchema, calculationSettingsSchema } from '../schemas/records'
 import { savedViewDto, toApiTaxRule } from '../services/shared'
 import { ensureDefaults } from '../services/records'
+import { requireModuleAccess, requireWriteAccess } from '../middleware/auth'
 
 export function createSettingsRouter(prisma: PrismaClient): Router {
   const router = Router()
 
-  router.get('/calculation-settings', async (_req, res) => {
+  router.get('/calculation-settings', requireModuleAccess('recibos'), async (_req, res) => {
     const defaults = await ensureDefaults(prisma)
     res.json({
       ...defaults.calculationSettings,
@@ -16,7 +17,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.patch('/calculation-settings', async (req, res) => {
+  router.patch('/calculation-settings', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = calculationSettingsSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -66,7 +67,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/saved-views', async (req, res) => {
+  router.get('/saved-views', requireModuleAccess('recibos'), async (req, res) => {
     const scope = typeof req.query.scope === 'string' ? req.query.scope : undefined
     const views = await prisma.savedView.findMany({
       where: scope ? { scope } : undefined,
@@ -75,7 +76,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
     res.json(views.map(savedViewDto))
   })
 
-  router.post('/saved-views', async (req, res) => {
+  router.post('/saved-views', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = saveViewSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -85,7 +86,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
     res.status(201).json(savedViewDto(created))
   })
 
-  router.patch('/saved-views/:id', async (req, res) => {
+  router.patch('/saved-views/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = saveViewSchema.partial().safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -100,7 +101,7 @@ export function createSettingsRouter(prisma: PrismaClient): Router {
     res.json(savedViewDto(updated))
   })
 
-  router.delete('/saved-views/:id', async (req, res) => {
+  router.delete('/saved-views/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     await prisma.savedView.delete({ where: { id: req.params.id } })
     res.json({ ok: true })
   })

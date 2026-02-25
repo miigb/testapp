@@ -150,8 +150,8 @@ export function createAuthRouter(prisma: PrismaClient) {
     return res.json(users)
   })
 
-  // GET /users (no email — used for assignment dropdowns)
-  r.get('/users', requireAuth, async (_req, res) => {
+  // GET /users (admin only — includes roles/modules)
+  r.get('/users', requireAuth, requireAdmin, async (_req, res) => {
     const users = await prisma.user.findMany({
       where: { active: true },
       select: {
@@ -223,6 +223,59 @@ export function createAuthRouter(prisma: PrismaClient) {
         return res.status(404).json({ error: 'Utilizador nao encontrado.' })
       }
       throw err
+    }
+  })
+
+  // POST /users (admin-only create user — does NOT set cookie)
+  r.post('/users', requireAuth, requireAdmin, async (req, res) => {
+    const parsed = registerSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Dados invalidos.', details: parsed.error.flatten() })
+    }
+
+    const { username, displayName, email, password } = parsed.data
+    const role = (req.body.role === 'ADMIN' || req.body.role === 'CONSULTANT') ? req.body.role : 'USER'
+    const allowedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : []
+
+    const hashedPassword = await hashPassword(password)
+    const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
+
+    try {
+      const user = await prisma.$transaction(async (tx) => {
+        const existing = await tx.user.findUnique({ where: { username } })
+        if (existing) return null
+
+        return tx.user.create({
+          data: {
+            username,
+            displayName,
+            email: email ?? null,
+            password: hashedPassword,
+            role,
+            allowedModules: role === 'ADMIN' ? [] : allowedModules,
+            avatarColor,
+          },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            email: true,
+            role: true,
+            active: true,
+            avatarColor: true,
+            allowedModules: true,
+            createdAt: true,
+          },
+        })
+      })
+
+      if (!user) {
+        return res.status(409).json({ error: 'Nome de utilizador ja existe.' })
+      }
+
+      return res.status(201).json(user)
+    } catch {
+      return res.status(500).json({ error: 'Erro ao criar utilizador.' })
     }
   })
 

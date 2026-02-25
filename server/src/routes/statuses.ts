@@ -4,16 +4,17 @@ import type { PrismaClient } from '@prisma/client'
 import { statusSchema } from '../schemas/records'
 import { statusDto } from '../services/shared'
 import { ensureDefaults } from '../services/records'
+import { requireModuleAccess, requireWriteAccess } from '../middleware/auth'
 
 export function createStatusesRouter(prisma: PrismaClient): Router {
   const router = Router()
 
-  router.get('/statuses', async (_req, res) => {
+  router.get('/statuses', requireModuleAccess('recibos'), async (_req, res) => {
     const defaults = await ensureDefaults(prisma)
     res.json(defaults.statuses.map(statusDto))
   })
 
-  router.post('/statuses', async (req, res) => {
+  router.post('/statuses', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -23,7 +24,7 @@ export function createStatusesRouter(prisma: PrismaClient): Router {
     res.status(201).json(statusDto(created))
   })
 
-  router.patch('/statuses/:id', async (req, res) => {
+  router.patch('/statuses/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.partial().safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -33,7 +34,7 @@ export function createStatusesRouter(prisma: PrismaClient): Router {
     res.json(statusDto(updated))
   })
 
-  router.delete('/statuses/:id', async (req, res) => {
+  router.delete('/statuses/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const existingStatus = await prisma.status.findUnique({ where: { id: req.params.id } })
     if (!existingStatus) {
       return res.status(404).json({ error: 'Estado não encontrado.' })

@@ -90,26 +90,19 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
     setCreateSaving(true)
     setError('')
     try {
-      const payload: RegisterData & { role?: UserRole } = {
+      const payload: RegisterData & { role?: UserRole; allowedModules?: string[] } = {
         username: createForm.username.trim(),
         displayName: createForm.displayName.trim(),
         password: createForm.password,
+        role: createForm.role,
       }
       if (createForm.email.trim()) {
         payload.email = createForm.email.trim()
       }
-      // Register user first, then update role and allowedModules if needed
-      const created = await api.register(payload)
-      const updates: Record<string, unknown> = {}
-      if (createForm.role !== 'USER') {
-        updates.role = createForm.role
-      }
       if (createForm.role !== 'ADMIN' && createForm.allowedModules.length > 0) {
-        updates.allowedModules = createForm.allowedModules
+        payload.allowedModules = createForm.allowedModules
       }
-      if (Object.keys(updates).length > 0) {
-        await api.updateUser(created.id, updates as Parameters<typeof api.updateUser>[1])
-      }
+      const created = await api.adminCreateUser(payload)
       setCreateOpen(false)
       showFeedback(`Utilizador "${created.displayName}" criado com sucesso.`)
       await loadUsers()
@@ -137,12 +130,15 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
     setEditSaving(true)
     setError('')
     try {
-      await api.updateUser(editingUser.id, {
+      const updatePayload: Parameters<typeof api.updateUser>[1] = {
         displayName: editingUser.displayName.trim(),
         email: editingUser.email.trim() || null,
         role: editingUser.role,
-        allowedModules: editingUser.role === 'ADMIN' ? [] : editingUser.allowedModules,
-      })
+      }
+      if (editingUser.role !== 'ADMIN') {
+        updatePayload.allowedModules = editingUser.allowedModules
+      }
+      await api.updateUser(editingUser.id, updatePayload)
       setEditingUser(null)
       showFeedback('Utilizador atualizado com sucesso.')
       await loadUsers()
