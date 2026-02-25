@@ -3856,4 +3856,55 @@ tbody tr:hover {
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
+
+  /* ── Table horizontal scroll ── */
+  .table-wrapper,
+  .records-table-wrap,
+  .main-grid table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .main-grid table {
+    min-width: 600px;
+  }
+
+  /* ── Touch targets ── */
+  button,
+  .tab-btn,
+  .filter-pill,
+  .subtle-btn,
+  .icon-btn,
+  select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Prevent iOS auto-zoom on input focus */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Spacing bumps */
+  .main-grid {
+    padding: 0 8px;
+  }
+
+  .panel {
+    padding: 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Record modal full-width */
+  .record-modal-overlay {
+    padding: 0;
+  }
+
+  .record-modal {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
 }

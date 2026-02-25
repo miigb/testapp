@@ -771,3 +771,16 @@
   color: var(--brand);
   border-color: var(--brand);
 }
+
+/* ── Mobile sidebar ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100vw;
+  }
+
+  .sidebar-collapse-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
