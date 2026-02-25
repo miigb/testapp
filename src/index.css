@@ -3698,3 +3698,162 @@ tbody tr:hover {
   margin-top: 4px;
   border-top: 1px solid var(--line);
 }
+
+/* ── Mobile Module Bar ─────────────────────────────────────────────── */
+
+.mobile-module-bar {
+  display: none;
+}
+
+/* ── Mobile Responsive (≤ 768px) ─────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .app-shell {
+    width: 100vw;
+    margin: 0;
+    padding: 0 0 64px;
+    gap: var(--space-2);
+  }
+
+  .topbar,
+  .topbar.unified {
+    grid-template-columns: 1fr;
+    padding-inline: 10px;
+    gap: 6px;
+  }
+
+  .brand-block {
+    min-height: auto;
+    padding: 8px 0;
+  }
+
+  .module-brand-stack {
+    min-height: auto;
+    height: 44px;
+  }
+
+  .module-brand-card {
+    height: 44px;
+    border-radius: var(--radius-sm);
+  }
+
+  .module-brand-card.back {
+    display: none;
+  }
+
+  .module-brand-card.front {
+    position: relative;
+    transform: none;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .brand-logo-img {
+    max-height: 28px;
+  }
+
+  /* Sidebar-open overrides: don't shrink topbar on mobile */
+  .app-shell.sidebar-open .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell.sidebar-open {
+    padding-right: 0;
+  }
+
+  /* ── Scrollable tab strip ── */
+  .topbar-command {
+    grid-template-columns: 1fr;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .tab-nav.tab-nav-inline {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    gap: 2px;
+  }
+
+  .tab-nav.tab-nav-inline::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-nav-inline .tab-btn {
+    white-space: nowrap;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+  }
+
+  .topbar-search-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .topbar-search-actions .global-search {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    font-size: 16px; /* prevent iOS zoom */
+  }
+
+  /* ── Bottom module bar ── */
+  .mobile-module-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    z-index: 300;
+    padding: 0 8px;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .mobile-module-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex: 1;
+    height: 100%;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--ink-muted);
+    padding: 4px;
+    transition: color 0.15s;
+  }
+
+  .mobile-module-btn.active {
+    color: var(--brand);
+  }
+
+  .mobile-module-btn.locked {
+    opacity: 0.4;
+  }
+
+  .mobile-module-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+
+  .mobile-module-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+}

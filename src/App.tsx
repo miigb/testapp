@@ -1227,7 +1227,10 @@ function App() {
     <button
       key={tab.id}
       className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
-      onClick={() => setActiveTab(tab.id)}
+      onClick={(e) => {
+        setActiveTab(tab.id)
+        e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+      }}
       type="button"
     >
       {tab.label}
@@ -1380,6 +1383,21 @@ function App() {
           )}
         </div>
       </header>
+
+      {/* Mobile bottom module bar — hidden on desktop */}
+      <nav className="mobile-module-bar">
+        {moduleCards.map((mc) => (
+          <button
+            key={mc.id}
+            type="button"
+            className={`mobile-module-btn ${activeModule === mc.id ? 'active' : ''}${!canAccessModule(mc.id) ? ' locked' : ''}`}
+            onClick={() => switchModule(mc.id)}
+          >
+            <img src={mc.logoSrc} alt={mc.title} className="mobile-module-icon" />
+            <span className="mobile-module-label">{mc.title.split(' ').slice(-1)[0]}</span>
+          </button>
+        ))}
+      </nav>
 
       {feedback && !isDashboardFocusMode && (
         <div className={`panel import-feedback ${feedbackClosing ? 'closing' : ''}`} role="status">
