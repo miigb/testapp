@@ -512,6 +512,12 @@ a {
   color: color-mix(in oklab, var(--ink-muted) 72%, #944b00 28%);
 }
 
+.module-brand-card.module-locked {
+  opacity: 0.4;
+  filter: grayscale(0.6);
+  cursor: not-allowed;
+}
+
 .global-search {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3411,6 +3417,11 @@ tbody tr:hover {
   color: var(--ink-muted);
 }
 
+.admin-role-badge.consultant {
+  background: color-mix(in oklab, #1a5276 14%, var(--surface));
+  color: #1a5276;
+}
+
 .admin-status-badge {
   display: inline-block;
   font-size: 0.72rem;
@@ -3433,6 +3444,46 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.admin-module-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-module-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.admin-module-check input[type="checkbox"] {
+  margin: 0;
+}
+
+.admin-cell-muted {
+  color: var(--ink-muted);
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.admin-cell-modules {
+  font-size: 0.8rem;
+}
+
+.admin-field-modules {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.admin-field-modules legend {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0 4px;
 }
 
 .admin-inline-input {
