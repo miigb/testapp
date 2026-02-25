@@ -9,6 +9,7 @@ export interface JwtPayload {
   userId: number
   username: string
   role: string
+  allowedModules: string[]
 }
 
 export function hashPassword(plain: string): Promise<string> {
