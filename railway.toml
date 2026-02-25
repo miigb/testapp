@@ -1,8 +1,8 @@
 [build]
-buildCommand = "npm install && npx prisma generate && npx prisma migrate deploy && npm run build:prod"
+buildCommand = "npm install && npx prisma generate && npm run build:prod"
 
 [deploy]
-startCommand = "npm run start:prod"
+startCommand = "npx prisma migrate deploy && npm run start:prod"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
