@@ -1388,12 +1388,13 @@ function App() {
       </header>
 
       {/* Mobile bottom module bar — hidden on desktop */}
-      <nav className="mobile-module-bar">
+      <nav className="mobile-module-bar" aria-label="Navegação de módulos">
         {moduleCards.map((mc) => (
           <button
             key={mc.id}
             type="button"
             className={`mobile-module-btn ${activeModule === mc.id ? 'active' : ''}${!canAccessModule(mc.id) ? ' locked' : ''}`}
+            aria-disabled={!canAccessModule(mc.id) || undefined}
             onClick={() => switchModule(mc.id)}
           >
             <img src={mc.logoSrc} alt={mc.title} className="mobile-module-icon" />

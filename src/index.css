@@ -3711,7 +3711,7 @@ tbody tr:hover {
   .app-shell {
     width: 100vw;
     margin: 0;
-    padding: 0 0 64px;
+    padding: 0 0 64px; /* 56px bar + 8px buffer */
     gap: var(--space-2);
   }
 
@@ -3787,7 +3787,7 @@ tbody tr:hover {
     white-space: nowrap;
     scroll-snap-align: start;
     flex-shrink: 0;
-    min-height: 36px;
+    min-height: 36px; /* intentionally below 44px for compact scrollable strip */
     padding: 0.35rem 0.65rem;
     font-size: 0.78rem;
   }
