@@ -1,7 +1,7 @@
 # Mesa de Recibos — Codebase Improvement Plan
 
-Last updated: 2026-02-20
-Status: Planning
+Last updated: 2026-02-24
+Status: Phases 0-4 and 6-7 complete
 
 ---
 
@@ -344,8 +344,8 @@ Risk: **Medium.** Routes are isolated by path prefix — use those as natural ex
 | 3 - Extract hooks | ✅ Done | 20 hooks in `src/hooks/` — App.tsx: 8129 → 1733 lines |
 | 4 - Extract module components | ✅ Done | 21 components across recibos/, ds/, penhoras/ |
 | 5 - Context/state slicing | 🔲 Not started | Optional — defer until prop drilling is painful |
-| 6 - Server refactor | 🔲 Not started | `server/src/index.ts` still 3249 lines |
-| 7 - Tests & polish | 🔲 Not started | Ongoing |
+| 6 - Server refactor | ✅ Done | `server/src/index.ts` → 89 lines. 10 routes, 8 services, 3 middleware, 6 schemas |
+| 7 - Tests & polish | ✅ Partially done | 258 Vitest unit tests passing across 8 test files. Component tests not yet added |
 
 ---
 
