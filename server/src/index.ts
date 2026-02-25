@@ -79,8 +79,8 @@ startPurgeScheduler(prisma)
 
 app.use(createErrorHandler(databaseSetupHint))
 
-app.listen(PORT, () => {
-  console.log(`[api] running on http://localhost:${PORT}`)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[api] running on http://0.0.0.0:${PORT}`)
 })
 
 process.on('SIGINT', async () => {
