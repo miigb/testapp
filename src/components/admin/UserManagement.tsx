@@ -13,6 +13,7 @@ type EditingUser = {
   displayName: string
   email: string
   role: UserRole
+  allowedModules: string[]
 }
 
 type CreateForm = {
@@ -21,7 +22,14 @@ type CreateForm = {
   email: string
   password: string
   role: UserRole
+  allowedModules: string[]
 }
+
+const MODULE_OPTIONS: { id: string; label: string }[] = [
+  { id: 'recibos', label: 'Mesa de Recibos' },
+  { id: 'ds', label: 'DS Gestora' },
+  { id: 'penhoras', label: 'Penhoras' },
+]
 
 const emptyCreateForm: CreateForm = {
   username: '',
@@ -29,6 +37,7 @@ const emptyCreateForm: CreateForm = {
   email: '',
   password: '',
   role: 'USER',
+  allowedModules: [],
 }
 
 export function UserManagement({ currentUser, onClose }: UserManagementProps) {
@@ -89,10 +98,17 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
       if (createForm.email.trim()) {
         payload.email = createForm.email.trim()
       }
-      // Register user first, then update role if not default
+      // Register user first, then update role and allowedModules if needed
       const created = await api.register(payload)
+      const updates: Record<string, unknown> = {}
       if (createForm.role !== 'USER') {
-        await api.updateUser(created.id, { role: createForm.role })
+        updates.role = createForm.role
+      }
+      if (createForm.role !== 'ADMIN' && createForm.allowedModules.length > 0) {
+        updates.allowedModules = createForm.allowedModules
+      }
+      if (Object.keys(updates).length > 0) {
+        await api.updateUser(created.id, updates as Parameters<typeof api.updateUser>[1])
       }
       setCreateOpen(false)
       showFeedback(`Utilizador "${created.displayName}" criado com sucesso.`)
@@ -112,6 +128,7 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
       displayName: user.displayName,
       email: user.email || '',
       role: user.role,
+      allowedModules: user.allowedModules ?? [],
     })
   }
 
@@ -124,6 +141,7 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
         displayName: editingUser.displayName.trim(),
         email: editingUser.email.trim() || null,
         role: editingUser.role,
+        allowedModules: editingUser.role === 'ADMIN' ? [] : editingUser.allowedModules,
       })
       setEditingUser(null)
       showFeedback('Utilizador atualizado com sucesso.')
@@ -201,6 +219,7 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
                   <th>Username</th>
                   <th>Email</th>
                   <th>Papel</th>
+                  <th>Módulos</th>
                   <th>Estado</th>
                   <th>Ações</th>
                 </tr>
@@ -264,14 +283,48 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
                           >
                             <option value="USER">Utilizador</option>
                             <option value="ADMIN">Administrador</option>
+                            <option value="CONSULTANT">Consultor</option>
                           </select>
                         ) : (
-                          <span className={`admin-role-badge ${u.role === 'ADMIN' ? 'admin' : 'user'}`}>
+                          <span className={`admin-role-badge ${u.role === 'ADMIN' ? 'admin' : u.role === 'CONSULTANT' ? 'consultant' : 'user'}`}>
                             {u.role === 'ADMIN' ? (
                               <><ShieldAlert size={12} /> Admin</>
+                            ) : u.role === 'CONSULTANT' ? (
+                              'Consultor'
                             ) : (
                               'Utilizador'
                             )}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Modules */}
+                      <td>
+                        {u.role === 'ADMIN' ? (
+                          <span className="admin-cell-muted">Todos</span>
+                        ) : isEditing ? (
+                          <div className="admin-module-checks">
+                            {MODULE_OPTIONS.map((mod) => (
+                              <label key={mod.id} className="admin-module-check">
+                                <input
+                                  type="checkbox"
+                                  checked={editingUser.allowedModules.includes(mod.id)}
+                                  onChange={(e) => {
+                                    const next = e.target.checked
+                                      ? [...editingUser.allowedModules, mod.id]
+                                      : editingUser.allowedModules.filter((m) => m !== mod.id)
+                                    setEditingUser({ ...editingUser, allowedModules: next })
+                                  }}
+                                />
+                                <span>{mod.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="admin-cell-modules">
+                            {(u.allowedModules ?? []).length > 0
+                              ? (u.allowedModules ?? []).map((m) => MODULE_OPTIONS.find((o) => o.id === m)?.label ?? m).join(', ')
+                              : '—'}
                           </span>
                         )}
                       </td>
@@ -392,8 +445,29 @@ export function UserManagement({ currentUser, onClose }: UserManagementProps) {
                   >
                     <option value="USER">Utilizador</option>
                     <option value="ADMIN">Administrador</option>
+                    <option value="CONSULTANT">Consultor</option>
                   </select>
                 </label>
+                {createForm.role !== 'ADMIN' && (
+                  <fieldset className="admin-field admin-field-modules">
+                    <legend>Módulos com acesso</legend>
+                    {MODULE_OPTIONS.map((mod) => (
+                      <label key={mod.id} className="admin-module-check">
+                        <input
+                          type="checkbox"
+                          checked={createForm.allowedModules.includes(mod.id)}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? [...createForm.allowedModules, mod.id]
+                              : createForm.allowedModules.filter((m) => m !== mod.id)
+                            setCreateForm({ ...createForm, allowedModules: next })
+                          }}
+                        />
+                        <span>{mod.label}</span>
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
                 <div className="admin-dialog-actions">
                   <button
                     type="button"
