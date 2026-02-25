@@ -1229,7 +1229,10 @@ function App() {
       className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
       onClick={(e) => {
         setActiveTab(tab.id)
-        e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        const parent = e.currentTarget.parentElement
+        if (parent && parent.scrollWidth > parent.clientWidth) {
+          e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+        }
       }}
       type="button"
     >

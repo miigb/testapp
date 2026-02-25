@@ -3814,7 +3814,7 @@ tbody tr:hover {
     height: 56px;
     background: var(--surface);
     border-top: 1px solid var(--line);
-    z-index: 300;
+    z-index: 250; /* below modals (z-index: 300) */
     padding: 0 8px;
     align-items: center;
     justify-content: space-around;
