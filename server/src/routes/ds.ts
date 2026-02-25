@@ -8,6 +8,7 @@ import {
   dsImportPreviewSchema,
   dsImportCommitSchema,
 } from '../schemas/ds'
+import { requireModuleAccess, requireWriteAccess } from '../middleware/auth'
 import { statusSchema } from '../schemas/records'
 import {
   databaseSetupHint,
@@ -30,7 +31,7 @@ import {
 export function createDsRouter(prisma: PrismaClient): Router {
   const router = Router()
 
-  router.get('/bootstrap', async (_req, res) => {
+  router.get('/bootstrap', requireModuleAccess('ds'), async (_req, res) => {
     try {
       const defaults = await ensureDsDefaults(prisma)
       const savedViews = await prisma.savedView.findMany({
@@ -50,7 +51,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     }
   })
 
-  router.get('/records', async (req, res) => {
+  router.get('/records', requireModuleAccess('ds'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -79,7 +80,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/trash', async (req, res) => {
+  router.get('/records/trash', requireModuleAccess('ds'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -113,7 +114,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/:id', async (req, res) => {
+  router.get('/records/:id', requireModuleAccess('ds'), async (req, res) => {
     const record = await prisma.dsRecord.findFirst({
       where: { id: req.params.id, deletedAt: null },
       include: { status: true },
@@ -126,7 +127,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json(prismaDsRecordToDto(record))
   })
 
-  router.post('/records', async (req, res) => {
+  router.post('/records', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = dsRecordInputSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload DS inválido.', details: parsed.error.flatten() })
@@ -152,7 +153,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.status(201).json(prismaDsRecordToDto(created))
   })
 
-  router.patch('/records/:id', async (req, res) => {
+  router.patch('/records/:id', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = dsRecordPatchSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload DS inválido.', details: parsed.error.flatten() })
@@ -184,7 +185,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json(prismaDsRecordToDto(updated))
   })
 
-  router.patch('/records/:id/status', async (req, res) => {
+  router.patch('/records/:id/status', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const body = z.object({ statusId: z.string().min(1) }).safeParse(req.body)
     if (!body.success) {
       return res.status(400).json({ error: 'Status DS inválido.' })
@@ -215,12 +216,12 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json(prismaDsRecordToDto(updated))
   })
 
-  router.get('/statuses', async (_req, res) => {
+  router.get('/statuses', requireModuleAccess('ds'), async (_req, res) => {
     const defaults = await ensureDsDefaults(prisma)
     res.json(defaults.statuses.map(dsStatusDto))
   })
 
-  router.post('/statuses', async (req, res) => {
+  router.post('/statuses', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -230,7 +231,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     res.status(201).json(dsStatusDto(created))
   })
 
-  router.patch('/statuses/:id', async (req, res) => {
+  router.patch('/statuses/:id', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.partial().safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -240,7 +241,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     res.json(dsStatusDto(updated))
   })
 
-  router.delete('/statuses/:id', async (req, res) => {
+  router.delete('/statuses/:id', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const existingStatus = await prisma.dsStatus.findUnique({ where: { id: req.params.id } })
     if (!existingStatus) {
       return res.status(404).json({ error: 'Estado DS não encontrado.' })
@@ -277,7 +278,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json({ ok: true })
   })
 
-  router.post('/import/preview', async (req, res) => {
+  router.post('/import/preview', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = dsImportPreviewSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload DS inválido.', details: parsed.error.flatten() })
@@ -338,7 +339,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json({ summary, items })
   })
 
-  router.post('/import/commit', async (req, res) => {
+  router.post('/import/commit', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const parsed = dsImportCommitSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload DS inválido.', details: parsed.error.flatten() })
@@ -437,7 +438,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.delete('/records/:id', async (req, res) => {
+  router.delete('/records/:id', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const record = await prisma.dsRecord.findFirst({
       where: { id: req.params.id, deletedAt: null },
     })
@@ -461,7 +462,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json({ success: true })
   })
 
-  router.post('/records/:id/restore', async (req, res) => {
+  router.post('/records/:id/restore', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     const record = await prisma.dsRecord.findFirst({
       where: { id: req.params.id, deletedAt: { not: null } },
     })
@@ -482,7 +483,7 @@ export function createDsRouter(prisma: PrismaClient): Router {
     return res.json(prismaDsRecordToDto(restored))
   })
 
-  router.delete('/records/:id/permanent', async (req, res) => {
+  router.delete('/records/:id/permanent', requireModuleAccess('ds'), requireWriteAccess, async (req, res) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
     }

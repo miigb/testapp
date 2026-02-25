@@ -9,6 +9,7 @@ import {
   importPreviewSchema,
   bulkUpdateSchema,
 } from '../schemas/records'
+import { requireModuleAccess, requireWriteAccess } from '../middleware/auth'
 import {
   applyCalculations,
   buildUniqueRecordKey,
@@ -36,7 +37,7 @@ import {
 export function createRecordsRouter(prisma: PrismaClient): Router {
   const router = Router()
 
-  router.get('/bootstrap', async (_req, res) => {
+  router.get('/bootstrap', requireModuleAccess('recibos'), async (_req, res) => {
     try {
       const defaults = await ensureDefaults(prisma)
       const savedViews = await prisma.savedView.findMany({ orderBy: { updatedAt: 'desc' } })
@@ -57,7 +58,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     }
   })
 
-  router.get('/records', async (req, res) => {
+  router.get('/records', requireModuleAccess('recibos'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -88,7 +89,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/analytics/summary', async (req, res) => {
+  router.get('/analytics/summary', requireModuleAccess('recibos'), async (req, res) => {
     const where: Prisma.RecordWhereInput = {
       ...buildRecordWhere(req.query as Record<string, unknown>),
       deletedAt: null,
@@ -238,7 +239,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/suggestions', async (req, res) => {
+  router.get('/records/suggestions', requireModuleAccess('recibos'), async (req, res) => {
     const rawLimit = Number(req.query.limit ?? 120)
     const limit = Math.max(20, Math.min(400, Number.isFinite(rawLimit) ? rawLimit : 120))
 
@@ -289,7 +290,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/export', async (_req, res) => {
+  router.get('/records/export', requireModuleAccess('recibos'), async (_req, res) => {
     const [records, statuses, calculationSettings, taxRules, savedViews] = await Promise.all([
       prisma.record.findMany({
         where: { deletedAt: null },
@@ -318,7 +319,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/trash', async (req, res) => {
+  router.get('/records/trash', requireModuleAccess('recibos'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -352,7 +353,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/:id', async (req, res) => {
+  router.get('/records/:id', requireModuleAccess('recibos'), async (req, res) => {
     const record = await prisma.record.findFirst({
       where: { id: req.params.id, deletedAt: null },
       include: {
@@ -370,7 +371,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json(prismaRecordToDto(record))
   })
 
-  router.post('/records', async (req, res) => {
+  router.post('/records', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = recordInputSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -419,7 +420,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     }
   })
 
-  router.patch('/records/:id', async (req, res) => {
+  router.patch('/records/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = recordPatchSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -453,7 +454,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json(prismaRecordToDto(updated))
   })
 
-  router.patch('/records/:id/status', async (req, res) => {
+  router.patch('/records/:id/status', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const body = z.object({ statusId: z.string().min(1) }).safeParse(req.body)
     if (!body.success) {
       return res.status(400).json({ error: 'Status inválido.' })
@@ -480,7 +481,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json(prismaRecordToDto(updated))
   })
 
-  router.post('/records/bulk/status', async (req, res) => {
+  router.post('/records/bulk/status', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const body = z
       .object({
         recordIds: z.array(z.string()).min(1),
@@ -513,7 +514,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json({ ok: true, updated: body.data.recordIds.length })
   })
 
-  router.post('/records/bulk/update', async (req, res) => {
+  router.post('/records/bulk/update', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = bulkUpdateSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -564,7 +565,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json({ ok: true, updated: updates.length })
   })
 
-  router.post('/import/preview', async (req, res) => {
+  router.post('/import/preview', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = importPreviewSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -628,7 +629,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     res.json({ summary, items })
   })
 
-  router.post('/import/commit', async (req, res) => {
+  router.post('/import/commit', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const parsed = importCommitSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -777,7 +778,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.delete('/records/:id', async (req, res) => {
+  router.delete('/records/:id', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const record = await prisma.record.findFirst({
       where: { id: req.params.id, deletedAt: null },
     })
@@ -801,7 +802,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json({ success: true })
   })
 
-  router.post('/records/:id/restore', async (req, res) => {
+  router.post('/records/:id/restore', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     const record = await prisma.record.findFirst({
       where: { id: req.params.id, deletedAt: { not: null } },
     })
@@ -822,7 +823,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
     return res.json(prismaRecordToDto(restored))
   })
 
-  router.delete('/records/:id/permanent', async (req, res) => {
+  router.delete('/records/:id/permanent', requireModuleAccess('recibos'), requireWriteAccess, async (req, res) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
     }

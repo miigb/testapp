@@ -8,6 +8,7 @@ import {
   penhorasImportPreviewSchema,
   penhorasImportCommitSchema,
 } from '../schemas/penhoras'
+import { requireModuleAccess, requireWriteAccess } from '../middleware/auth'
 import { statusSchema } from '../schemas/records'
 import {
   databaseSetupHint,
@@ -29,7 +30,7 @@ import {
 export function createPenhorasRouter(prisma: PrismaClient): Router {
   const router = Router()
 
-  router.get('/bootstrap', async (_req, res) => {
+  router.get('/bootstrap', requireModuleAccess('penhoras'), async (_req, res) => {
     try {
       const defaults = await ensurePenhorasDefaults(prisma)
       const savedViews = await prisma.savedView.findMany({
@@ -49,7 +50,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     }
   })
 
-  router.get('/records', async (req, res) => {
+  router.get('/records', requireModuleAccess('penhoras'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -78,7 +79,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/trash', async (req, res) => {
+  router.get('/records/trash', requireModuleAccess('penhoras'), async (req, res) => {
     const page = Number(req.query.page ?? 1)
     const pageSize = Math.min(Number(req.query.pageSize ?? 100), 300)
     const skip = Math.max(page - 1, 0) * pageSize
@@ -112,7 +113,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.get('/records/:id', async (req, res) => {
+  router.get('/records/:id', requireModuleAccess('penhoras'), async (req, res) => {
     const record = await prisma.penhorasRecord.findFirst({
       where: { id: req.params.id, deletedAt: null },
       include: { status: true },
@@ -125,7 +126,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json(prismaPenhorasRecordToDto(record))
   })
 
-  router.post('/records', async (req, res) => {
+  router.post('/records', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = penhorasRecordInputSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload Penhoras inválido.', details: parsed.error.flatten() })
@@ -151,7 +152,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.status(201).json(prismaPenhorasRecordToDto(created))
   })
 
-  router.patch('/records/:id', async (req, res) => {
+  router.patch('/records/:id', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = penhorasRecordPatchSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload Penhoras inválido.', details: parsed.error.flatten() })
@@ -183,7 +184,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json(prismaPenhorasRecordToDto(updated))
   })
 
-  router.patch('/records/:id/status', async (req, res) => {
+  router.patch('/records/:id/status', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const body = z.object({ statusId: z.string().min(1) }).safeParse(req.body)
     if (!body.success) {
       return res.status(400).json({ error: 'Status Penhoras inválido.' })
@@ -214,12 +215,12 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json(prismaPenhorasRecordToDto(updated))
   })
 
-  router.get('/statuses', async (_req, res) => {
+  router.get('/statuses', requireModuleAccess('penhoras'), async (_req, res) => {
     const defaults = await ensurePenhorasDefaults(prisma)
     res.json(defaults.statuses.map(penhorasStatusDto))
   })
 
-  router.post('/statuses', async (req, res) => {
+  router.post('/statuses', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -229,7 +230,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     res.status(201).json(penhorasStatusDto(created))
   })
 
-  router.patch('/statuses/:id', async (req, res) => {
+  router.patch('/statuses/:id', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = statusSchema.partial().safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
@@ -239,7 +240,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     res.json(penhorasStatusDto(updated))
   })
 
-  router.delete('/statuses/:id', async (req, res) => {
+  router.delete('/statuses/:id', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const existingStatus = await prisma.penhorasStatus.findUnique({ where: { id: req.params.id } })
     if (!existingStatus) {
       return res.status(404).json({ error: 'Estado Penhoras não encontrado.' })
@@ -276,7 +277,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json({ ok: true })
   })
 
-  router.post('/import/preview', async (req, res) => {
+  router.post('/import/preview', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = penhorasImportPreviewSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload Penhoras inválido.', details: parsed.error.flatten() })
@@ -337,7 +338,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json({ summary, items })
   })
 
-  router.post('/import/commit', async (req, res) => {
+  router.post('/import/commit', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const parsed = penhorasImportCommitSchema.safeParse(req.body)
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload Penhoras inválido.', details: parsed.error.flatten() })
@@ -436,7 +437,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     })
   })
 
-  router.delete('/records/:id', async (req, res) => {
+  router.delete('/records/:id', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const record = await prisma.penhorasRecord.findFirst({
       where: { id: req.params.id, deletedAt: null },
     })
@@ -460,7 +461,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json({ success: true })
   })
 
-  router.post('/records/:id/restore', async (req, res) => {
+  router.post('/records/:id/restore', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     const record = await prisma.penhorasRecord.findFirst({
       where: { id: req.params.id, deletedAt: { not: null } },
     })
@@ -481,7 +482,7 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
     return res.json(prismaPenhorasRecordToDto(restored))
   })
 
-  router.delete('/records/:id/permanent', async (req, res) => {
+  router.delete('/records/:id/permanent', requireModuleAccess('penhoras'), requireWriteAccess, async (req, res) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Apenas administradores podem eliminar permanentemente.' })
     }
