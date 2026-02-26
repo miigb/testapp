@@ -101,7 +101,7 @@ export function ExportWizard({
 
       // AI summary (same pattern as old ExportComposer)
       if (useAiSummary) {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ai/summary`, {
+        const response = await fetch('/api/ai/summary', {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
