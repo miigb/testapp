@@ -24,10 +24,10 @@ export function createAuthRouter(prisma: PrismaClient) {
 
     const { username, displayName, email, password } = parsed.data
 
-    const hashedPassword = await hashPassword(password)
-    const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
-
     try {
+      const hashedPassword = await hashPassword(password)
+      const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
+
       const user = await prisma.$transaction(async (tx) => {
         const existing = await tx.user.findUnique({ where: { username } })
         if (existing) return null
@@ -65,7 +65,8 @@ export function createAuthRouter(prisma: PrismaClient) {
       const token = signToken({ userId: user.id, username: user.username, role: user.role, allowedModules: user.allowedModules })
       res.cookie('token', token, COOKIE_OPTIONS)
       return res.status(201).json(user)
-    } catch {
+    } catch (err) {
+      console.error('[register] Error:', err)
       return res.status(500).json({ error: 'Erro ao registar utilizador.' })
     }
   })
@@ -238,10 +239,10 @@ export function createAuthRouter(prisma: PrismaClient) {
     const role = (req.body.role === 'ADMIN' || req.body.role === 'CONSULTANT') ? req.body.role : 'USER'
     const allowedModules = Array.isArray(req.body.allowedModules) ? req.body.allowedModules : []
 
-    const hashedPassword = await hashPassword(password)
-    const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
-
     try {
+      const hashedPassword = await hashPassword(password)
+      const avatarColor = `#${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')}`
+
       const user = await prisma.$transaction(async (tx) => {
         const existing = await tx.user.findUnique({ where: { username } })
         if (existing) return null
@@ -275,7 +276,8 @@ export function createAuthRouter(prisma: PrismaClient) {
       }
 
       return res.status(201).json(user)
-    } catch {
+    } catch (err) {
+      console.error('[admin-create-user] Error:', err)
       return res.status(500).json({ error: 'Erro ao criar utilizador.' })
     }
   })

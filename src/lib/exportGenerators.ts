@@ -33,6 +33,116 @@ function getEffectiveRows(data: ExportData): Record<string, unknown>[] {
     return data.rows.slice(0, data.maxRows)
 }
 
+/**
+ * Render a markdown string into jsPDF with bold (**) support.
+ * Returns the total height consumed.
+ */
+function renderMarkdownBlock(
+    pdf: jsPDF,
+    text: string,
+    x: number,
+    startY: number,
+    maxWidth: number,
+    fontSize: number,
+    color: string,
+): number {
+    pdf.setFontSize(fontSize)
+    pdf.setTextColor(color)
+    const lineHeight = fontSize * 1.5
+
+    let y = startY
+
+    // Split into paragraphs (double newline or single newline)
+    const paragraphs = text.split(/\n/)
+
+    for (const para of paragraphs) {
+        const trimmed = para.trim()
+        if (trimmed === '') {
+            y += lineHeight * 0.5
+            continue
+        }
+
+        // Check if line is a list item (- or *)
+        const listMatch = trimmed.match(/^[-*]\s+(.*)/)
+        const lineX = listMatch ? x + 12 : x
+        const lineMaxW = listMatch ? maxWidth - 12 : maxWidth
+        const content = listMatch ? listMatch[1] : trimmed
+
+        if (listMatch) {
+            pdf.setFont('helvetica', 'normal')
+            pdf.text('\u2022', x, y)
+        }
+
+        // Parse **bold** segments
+        const segments: { text: string; bold: boolean }[] = []
+        const boldRegex = /\*\*(.+?)\*\*/g
+        let lastIndex = 0
+        let match: RegExpExecArray | null
+        while ((match = boldRegex.exec(content)) !== null) {
+            if (match.index > lastIndex) {
+                segments.push({ text: content.slice(lastIndex, match.index), bold: false })
+            }
+            segments.push({ text: match[1], bold: true })
+            lastIndex = match.index + match[0].length
+        }
+        if (lastIndex < content.length) {
+            segments.push({ text: content.slice(lastIndex), bold: false })
+        }
+
+        // Flatten segments into word-wrapped lines with mixed formatting
+        // Simple approach: build full plain text, word-wrap, then re-map formatting per line
+        const fullText = segments.map((s) => s.text).join('')
+        const wrappedLines = pdf.splitTextToSize(fullText, lineMaxW) as string[]
+
+        let charOffset = 0
+        for (const wrappedLine of wrappedLines) {
+            let curX = lineX
+            let remaining = wrappedLine
+            // Walk through segments to render each part of this line
+            let segIdx = 0
+            let segCharOffset = 0
+            // Find which segment charOffset falls into
+            let acc = 0
+            for (let i = 0; i < segments.length; i++) {
+                if (acc + segments[i].text.length > charOffset) {
+                    segIdx = i
+                    segCharOffset = charOffset - acc
+                    break
+                }
+                acc += segments[i].text.length
+            }
+
+            while (remaining.length > 0 && segIdx < segments.length) {
+                const seg = segments[segIdx]
+                const availFromSeg = seg.text.slice(segCharOffset)
+                const take = Math.min(remaining.length, availFromSeg.length)
+                const chunk = remaining.slice(0, take)
+
+                pdf.setFont('helvetica', seg.bold ? 'bold' : 'normal')
+                pdf.text(chunk, curX, y)
+                curX += pdf.getTextWidth(chunk)
+
+                remaining = remaining.slice(take)
+                segCharOffset += take
+                if (segCharOffset >= seg.text.length) {
+                    segIdx++
+                    segCharOffset = 0
+                }
+            }
+
+            charOffset += wrappedLine.length
+            // Skip whitespace that splitTextToSize consumed as line break
+            const fullAfter = fullText.slice(charOffset)
+            if (fullAfter.length > 0 && fullAfter[0] === ' ') {
+                charOffset++
+            }
+            y += lineHeight
+        }
+    }
+
+    return y - startY
+}
+
 function triggerDownload(blob: Blob, filename: string) {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -171,21 +281,16 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         currentY += 20
     }
 
-    // AI Summary
+    // AI Summary (with markdown bold support)
     if (data.summaryText) {
         pdf.setFontSize(12)
         pdf.setFont('helvetica', 'bold')
         pdf.text('Resumo Executivo (IA):', 40, currentY)
         currentY += 20
 
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(10)
-
-        const lines = pdf.splitTextToSize(data.summaryText, pageWidth - 80)
-        pdf.setTextColor('#4b5563')
-        pdf.text(lines, 40, currentY)
+        const summaryHeight = renderMarkdownBlock(pdf, data.summaryText, 40, currentY, pageWidth - 80, 10, '#4b5563')
         pdf.setTextColor('#000000')
-        currentY += (lines.length * 14) + 20
+        currentY += summaryHeight + 20
     }
 
     // Render dashboard summary cards

@@ -32,10 +32,17 @@ Dados do Módulo:
 ${JSON.stringify(payload.contextData, null, 2)}
 `
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        })
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout after 30s')), 30_000),
+        )
+
+        const response = await Promise.race([
+            ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            }),
+            timeoutPromise,
+        ])
 
         const summary = response.text
         return res.json({ summary })
