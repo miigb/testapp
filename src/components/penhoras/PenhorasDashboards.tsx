@@ -1,11 +1,10 @@
-import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
+import { type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2, Download } from 'lucide-react'
 import type { PenhorasRecordFilters, StatusDefinition } from '../../types'
 import type { PenhorasDashboardWidget, PenhorasDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { PENHORAS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultPenhorasDashboardWidgets } from '../../lib/dashboardWidgets'
 import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
-import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -43,6 +42,7 @@ export interface PenhorasDashboardsProps {
     patchPenhorasFilters: <K extends keyof PenhorasRecordFilters>(key: K, value: PenhorasRecordFilters[K]) => void
     penhorasRecordsLoading: boolean
     penhorasTotalRecords: number
+    onOpenExport: () => void
 }
 
 export function PenhorasDashboards({
@@ -79,8 +79,8 @@ export function PenhorasDashboards({
     patchPenhorasFilters,
     penhorasRecordsLoading,
     penhorasTotalRecords,
+    onOpenExport,
 }: PenhorasDashboardsProps) {
-    const [isExportOpen, setIsExportOpen] = useState(false)
 
     return (
         <section className="panel dashboard-experiment ds-panel penhoras-panel penhoras-dashboard-panel" id="penhoras-dashboard-view">
@@ -153,7 +153,7 @@ export function PenhorasDashboards({
                             <Maximize2 size={15} />
                             Expandir dashboard
                         </button>
-                        <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                        <button className="subtle-btn" type="button" onClick={onOpenExport}>
                             <Download size={15} />
                             Exportar
                         </button>
@@ -294,25 +294,6 @@ export function PenhorasDashboards({
                 </div>
             )}
 
-            <ExportComposer
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                moduleName="Dashboard Penhoras"
-                columns={[
-                    { header: 'Registos', key: 'registos', width: 15 },
-                    { header: 'Com Data Pedido', key: 'comDataPedido', width: 20 },
-                    { header: 'Recusados/Desistência', key: 'recusados', width: 20 },
-                    { header: 'Pendentes de Registo', key: 'pendentes', width: 20 },
-                ]}
-                data={penhorasDashboardTotals ? [{
-                    registos: penhorasDashboardTotals.registos,
-                    comDataPedido: penhorasDashboardTotals.comDataPedido,
-                    recusados: penhorasDashboardTotals.recusados,
-                    pendentes: penhorasDashboardTotals.pendentes
-                }] : []}
-                dashboardElementId="penhoras-dashboard-view"
-                themeColor="#d97706"
-            />
         </section>
     )
 }

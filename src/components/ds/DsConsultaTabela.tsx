@@ -3,8 +3,6 @@ import { Eye, EyeOff, FilterX, Trash2, AlertTriangle, Download } from 'lucide-re
 import type { DsRecord, DsRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import { api } from '../../api'
 import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
-import { ExportComposer } from '../shared/ExportComposer'
-import { DS_TABLE_COLUMNS } from '../../constants/exportColumns'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
@@ -51,6 +49,7 @@ export interface DsConsultaTabelaProps {
     // Feedback & refresh
     setFeedback: (msg: string) => void
     onRefresh: () => void
+    onOpenExport: () => void
 }
 
 export function DsConsultaTabela({
@@ -81,16 +80,9 @@ export function DsConsultaTabela({
     formatCurrency,
     setFeedback,
     onRefresh,
+    onOpenExport,
 }: DsConsultaTabelaProps) {
-    const [isExportOpen, setIsExportOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-
-    const exportColumns = DS_TABLE_COLUMNS
-
-    const exportData = dsRecords.map(r => ({
-        ...r,
-        estadoId: getStatus(dsStatuses, r.estadoId)?.label || r.estadoId || 'Sem estado',
-    }))
 
     return (
         <section className="panel ds-panel ds-results-panel">
@@ -142,7 +134,7 @@ export function DsConsultaTabela({
                     <button className="subtle-btn" type="button" onClick={() => void saveCurrentView('ds-tabela', { ...dsFilters, q: globalSearch })}>
                         Guardar vista
                     </button>
-                    <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                    <button className="subtle-btn" type="button" onClick={onOpenExport}>
                         <Download size={15} />
                         Exportar
                     </button>
@@ -336,14 +328,6 @@ export function DsConsultaTabela({
                     </table>
                 </div>
             )}
-
-            <ExportComposer
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                moduleName="DS (Escrituras)"
-                columns={exportColumns}
-                data={exportData}
-            />
 
             <ConfirmDeleteModal
                 open={deleteTarget !== null}

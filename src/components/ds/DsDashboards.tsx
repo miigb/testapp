@@ -1,11 +1,10 @@
-import { useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
+import { type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { Eye, EyeOff, FilterX, Maximize2, Plus, Trash2, Download } from 'lucide-react'
 import type { DsRecordFilters, StatusDefinition } from '../../types'
 import type { DsDashboardWidget, DsDashboardWidgetType } from '../../lib/dashboardWidgets'
 import { DS_DASHBOARD_WIDGET_LIBRARY, cloneDefaultDsDashboardWidgets } from '../../lib/dashboardWidgets'
 import type { SavedView, SavedViewScope } from '../../types'
 import { LabeledSelect } from '../shared/FormInputs'
-import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -52,6 +51,7 @@ export interface DsDashboardsProps {
     dsRecordsLoading: boolean
     dsTotalRecords: number
     dashboardName?: string
+    onOpenExport: () => void
 }
 
 export function DsDashboards({
@@ -91,8 +91,8 @@ export function DsDashboards({
     dsRecordsLoading,
     dsTotalRecords,
     dashboardName,
+    onOpenExport,
 }: DsDashboardsProps) {
-    const [isExportOpen, setIsExportOpen] = useState(false)
 
     return (
         <section className="panel dashboard-experiment ds-panel ds-dashboard-panel" id="ds-dashboard-view">
@@ -165,7 +165,7 @@ export function DsDashboards({
                             <Maximize2 size={15} />
                             Expandir dashboard
                         </button>
-                        <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                        <button className="subtle-btn" type="button" onClick={onOpenExport}>
                             <Download size={15} />
                             Exportar
                         </button>
@@ -312,24 +312,6 @@ export function DsDashboards({
                 </div>
             )}
 
-            <ExportComposer
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                moduleName="Dashboard DS"
-                columns={[
-                    { header: 'Registos', key: 'registos', width: 15 },
-                    { header: 'Passaporte', key: 'passaporte', width: 20 },
-                    { header: 'Total C/Iva', key: 'totalComIva', width: 20 },
-                ]}
-                data={dsDashboardTotals ? [{
-                    registos: dsDashboardTotals.registos,
-                    passaporte: dsDashboardTotals.comissaoLoja,
-                    totalComIva: dsDashboardTotals.totalComissaoLojaCmIva
-                }] : []}
-                dashboardElementId="ds-dashboard-view"
-                themeColor="#0c6ea8"
-                dashboardName={dashboardName}
-            />
         </section>
     )
 }

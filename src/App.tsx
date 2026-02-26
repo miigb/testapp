@@ -26,6 +26,7 @@ import type {
   PenhorasRecord,
   ReceiptRecord,
   RecordFilters,
+  ReportTemplate,
   TabId,
 } from './types'
 
@@ -93,6 +94,15 @@ import { resolveInitialQuickNotes } from './lib/localStorage'
 import { getInitialEntryForm, extractGpeSeFromIndicacoes } from './lib/recordHelpers'
 import { getInitialDsEntryForm } from './lib/dsHelpers'
 import { getInitialPenhorasEntryForm } from './lib/penhorasHelpers'
+import { ExportWizard } from './components/shared/ExportWizard'
+import {
+  RECIBOS_TABLE_COLUMNS,
+  RECIBOS_DASHBOARD_COLUMNS,
+  DS_TABLE_COLUMNS,
+  DS_DASHBOARD_COLUMNS,
+  PENHORAS_TABLE_COLUMNS,
+  PENHORAS_DASHBOARD_COLUMNS,
+} from './constants/exportColumns'
 
 function resolveInitialLayoutMode(): LayoutMode {
   return 'wide'
@@ -311,6 +321,8 @@ function App() {
   const [penhorasDashboardPickerOpen, setPenhorasDashboardPickerOpen] = useState(false)
   const [draggedDashboardWidgetId, setDraggedDashboardWidgetId] = useState<string | null>(null)
   const [dropDashboardWidgetId, setDropDashboardWidgetId] = useState<string | null>(null)
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([])
+  const [exportWizardOpen, setExportWizardOpen] = useState<{ module: ModuleId; content: 'dashboard' | 'table' } | null>(null)
 
   const {
     savedViews,
@@ -637,6 +649,38 @@ function App() {
       levantadoComIva,
     }
   }, [records])
+
+  useEffect(() => {
+    api.getReportTemplates().then(setReportTemplates).catch(() => {})
+  }, [])
+
+  const handleSaveTemplate = async (payload: Pick<ReportTemplate, 'name' | 'module' | 'settings'>) => {
+    const created = await api.createReportTemplate(payload)
+    setReportTemplates((prev) => [...prev, created])
+  }
+
+  const handleDeleteTemplate = async (id: string) => {
+    await api.deleteReportTemplate(id)
+    setReportTemplates((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const recibosTableExportData = useMemo(() => {
+    const source = selectedIds.length > 0 ? records.filter((r) => selectedIds.includes(r.id)) : records
+    return source.map((r) => ({
+      ...r,
+      estadoId: statuses.find((s) => s.id === r.estadoId)?.label || r.estadoId || 'Sem estado',
+    }))
+  }, [records, selectedIds, statuses])
+
+  const dsTableExportData = useMemo(
+    () => dsRecords.map((r) => ({ ...r, estadoId: dsStatuses.find((s) => s.id === r.estadoId)?.label || r.estadoId || 'Sem estado' })),
+    [dsRecords, dsStatuses],
+  )
+
+  const penhorasTableExportData = useMemo(
+    () => penhorasRecords.map((r) => ({ ...r, estadoId: penhorasStatuses.find((s) => s.id === r.estadoId)?.label || r.estadoId || 'Sem estado' })),
+    [penhorasRecords, penhorasStatuses],
+  )
 
   const {
     dsDashboardTotals,
@@ -1543,6 +1587,7 @@ function App() {
             patchDsFilters={patchDsFilters}
             dsRecordsLoading={dsRecordsLoading}
             dsTotalRecords={dsTotalRecords}
+            onOpenExport={() => setExportWizardOpen({ module: 'ds', content: 'dashboard' })}
           />
         )}
 
@@ -1575,6 +1620,7 @@ function App() {
             formatCurrency={formatCurrency}
             setFeedback={setFeedback}
             onRefresh={refreshDsRecords}
+            onOpenExport={() => setExportWizardOpen({ module: 'ds', content: 'table' })}
           />
         )}
 
@@ -1656,6 +1702,7 @@ function App() {
             patchPenhorasFilters={patchPenhorasFilters}
             penhorasRecordsLoading={penhorasRecordsLoading}
             penhorasTotalRecords={penhorasTotalRecords}
+            onOpenExport={() => setExportWizardOpen({ module: 'penhoras', content: 'dashboard' })}
           />
         )}
 
@@ -1687,6 +1734,7 @@ function App() {
             updatePenhorasRecordStatus={updatePenhorasRecordStatus}
             setFeedback={setFeedback}
             onRefresh={refreshPenhorasRecords}
+            onOpenExport={() => setExportWizardOpen({ module: 'penhoras', content: 'table' })}
           />
         )}
 
@@ -1796,6 +1844,7 @@ function App() {
               formatCurrency={formatCurrency}
               setFeedback={setFeedback}
               onRefresh={refreshRecords}
+              onOpenExport={() => setExportWizardOpen({ module: 'recibos', content: 'table' })}
             />
           )
         }
@@ -1836,6 +1885,7 @@ function App() {
               dashboardSideWidgets={dashboardSideWidgets}
               dashboardHasSideStack={dashboardHasSideStack}
               renderDashboardWidget={renderDashboardWidget}
+              onOpenExport={() => setExportWizardOpen({ module: 'recibos', content: 'dashboard' })}
             />
           )
         }
@@ -1940,6 +1990,62 @@ function App() {
             onCreateTodo={handleCreateTodoFromDrawer}
           />
         )}
+
+        <ExportWizard
+          isOpen={exportWizardOpen?.module === 'recibos'}
+          onClose={() => setExportWizardOpen(null)}
+          defaultContent={exportWizardOpen?.content ?? 'table'}
+          moduleId="recibos"
+          moduleName="Mesa de Recibos"
+          moduleLogoSrc={recibosLogoSrc}
+          themeColor="#be185d"
+          tableColumns={RECIBOS_TABLE_COLUMNS}
+          tableData={recibosTableExportData}
+          dashboardElementId="recibos-dashboard-view"
+          dashboardSummaryColumns={RECIBOS_DASHBOARD_COLUMNS}
+          dashboardSummaryData={dashboardSummary ? [{ registos: totalsSnapshot.registos, valorEmissao: totalsSnapshot.valorEmissao, levantado: totalsSnapshot.levantadoComIva }] : []}
+          dashboardName={dashboardName}
+          dashboardWidgetCount={dashboardWidgets.length}
+          templates={reportTemplates.filter((t) => t.module === 'recibos')}
+          onSaveTemplate={handleSaveTemplate}
+          onDeleteTemplate={handleDeleteTemplate}
+        />
+        <ExportWizard
+          isOpen={exportWizardOpen?.module === 'ds'}
+          onClose={() => setExportWizardOpen(null)}
+          defaultContent={exportWizardOpen?.content ?? 'table'}
+          moduleId="ds"
+          moduleName="DS Intermediários de Crédito"
+          moduleLogoSrc={dsLogoSrc}
+          themeColor="#0c6ea8"
+          tableColumns={DS_TABLE_COLUMNS}
+          tableData={dsTableExportData}
+          dashboardElementId="ds-dashboard-view"
+          dashboardSummaryColumns={DS_DASHBOARD_COLUMNS}
+          dashboardSummaryData={[{ registos: dsDashboardTotals.registos, passaporte: dsDashboardTotals.comissaoLoja, totalComIva: dsDashboardTotals.totalComissaoLojaCmIva }]}
+          dashboardWidgetCount={dsDashboardWidgets.length}
+          templates={reportTemplates.filter((t) => t.module === 'ds')}
+          onSaveTemplate={handleSaveTemplate}
+          onDeleteTemplate={handleDeleteTemplate}
+        />
+        <ExportWizard
+          isOpen={exportWizardOpen?.module === 'penhoras'}
+          onClose={() => setExportWizardOpen(null)}
+          defaultContent={exportWizardOpen?.content ?? 'table'}
+          moduleId="penhoras"
+          moduleName="Penhoras Imóveis"
+          moduleLogoSrc={penhorasLogoSrc}
+          themeColor="#d97706"
+          tableColumns={PENHORAS_TABLE_COLUMNS}
+          tableData={penhorasTableExportData}
+          dashboardElementId="penhoras-dashboard-view"
+          dashboardSummaryColumns={PENHORAS_DASHBOARD_COLUMNS}
+          dashboardSummaryData={[{ registos: penhorasDashboardTotals.registos, comDataPedido: penhorasDashboardTotals.comDataPedido, recusados: penhorasDashboardTotals.recusados, pendentes: penhorasDashboardTotals.pendentes }]}
+          dashboardWidgetCount={penhorasDashboardWidgets.length}
+          templates={reportTemplates.filter((t) => t.module === 'penhoras')}
+          onSaveTemplate={handleSaveTemplate}
+          onDeleteTemplate={handleDeleteTemplate}
+        />
       </main >
 
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}

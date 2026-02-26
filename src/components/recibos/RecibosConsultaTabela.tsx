@@ -11,8 +11,6 @@ import { colorWithAlpha } from '../../lib/formatters'
 import { getPrimaryRecordReference, getSecondaryRecordReference } from '../../lib/recordHelpers'
 import { StatusPill, EntityIdentity } from '../shared/StatusComponents'
 import { LabeledSelect, AutocompleteInput } from '../shared/FormInputs'
-import { ExportComposer } from '../shared/ExportComposer'
-import { RECIBOS_TABLE_COLUMNS } from '../../constants/exportColumns'
 
 function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
     if (!statusId) return undefined
@@ -82,6 +80,7 @@ export interface RecibosConsultaTabelaProps {
     // Feedback & refresh
     setFeedback: (msg: string) => void
     onRefresh: () => void
+    onOpenExport: () => void
 }
 
 export function RecibosConsultaTabela({
@@ -138,18 +137,9 @@ export function RecibosConsultaTabela({
     formatCurrency,
     setFeedback,
     onRefresh,
+    onOpenExport,
 }: RecibosConsultaTabelaProps) {
-    const [isExportOpen, setIsExportOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-
-    const exportColumns = RECIBOS_TABLE_COLUMNS
-
-    const recordsToExport = selectedIds.length > 0 ? records.filter(r => selectedIds.includes(r.id)) : records
-
-    const exportData = recordsToExport.map(r => ({
-        ...r,
-        estadoId: getStatus(statuses, r.estadoId)?.label || r.estadoId || 'Sem estado',
-    }))
 
     return (
         <section className="panel">
@@ -253,7 +243,7 @@ export function RecibosConsultaTabela({
                     <button
                         className="subtle-btn"
                         type="button"
-                        onClick={() => setIsExportOpen(true)}
+                        onClick={onOpenExport}
                     >
                         <Download size={15} />
                         Exportar
@@ -335,7 +325,7 @@ export function RecibosConsultaTabela({
                                     <input type="checkbox" checked={allSelectedInTable} onChange={toggleSelectAllRecords} />
                                     Selecionar todos
                                 </label>
-                                <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                                <button className="subtle-btn" type="button" onClick={onOpenExport}>
                                     <Download size={15} />
                                     Exportar {selectedIds.length > 0 ? "Selecionados" : "Vista Atual"}
                                 </button>
@@ -551,14 +541,6 @@ export function RecibosConsultaTabela({
                     </table>
                 </div>
             )}
-
-            <ExportComposer
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                moduleName="Recibos"
-                columns={exportColumns}
-                data={exportData}
-            />
 
             <ConfirmDeleteModal
                 open={deleteTarget !== null}

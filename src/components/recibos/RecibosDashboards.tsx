@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
 import { Eye, EyeOff, FilterX, Maximize2, Plus, Save, Trash2, Download } from 'lucide-react'
 import type { RecordFilters, StatusDefinition, SavedView } from '../../types'
 import type { DashboardWidget, DashboardWidgetType } from '../../lib/dashboardWidgets'
@@ -6,7 +6,6 @@ import { DASHBOARD_WIDGET_LIBRARY } from '../../lib/dashboardWidgets'
 import { DEFAULT_DASHBOARD_FILTERS } from '../../constants'
 import { LabeledSelect } from '../shared/FormInputs'
 import { LabeledInput } from '../shared/FormInputs'
-import { ExportComposer } from '../shared/ExportComposer'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -52,6 +51,7 @@ export interface RecibosDashboardsProps {
     dashboardSideWidgets: DashboardWidget[]
     dashboardHasSideStack: boolean
     renderDashboardWidget: (widget: DashboardWidget) => ReactNode
+    onOpenExport: () => void
 }
 
 export function RecibosDashboards({
@@ -88,8 +88,8 @@ export function RecibosDashboards({
     dashboardSideWidgets,
     dashboardHasSideStack,
     renderDashboardWidget,
+    onOpenExport,
 }: RecibosDashboardsProps) {
-    const [isExportOpen, setIsExportOpen] = useState(false)
 
     return (
         <section className="panel dashboard-experiment" id="recibos-dashboard-view">
@@ -105,7 +105,7 @@ export function RecibosDashboards({
                                 <Maximize2 size={15} />
                                 Expandir dashboard
                             </button>
-                            <button className="subtle-btn" type="button" onClick={() => setIsExportOpen(true)}>
+                            <button className="subtle-btn" type="button" onClick={onOpenExport}>
                                 <Download size={15} />
                                 Exportar
                             </button>
@@ -292,24 +292,6 @@ export function RecibosDashboards({
                 </div>
             )}
 
-            <ExportComposer
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                moduleName="Dashboard Recibos"
-                columns={[
-                    { header: 'Registos Totais', key: 'registos', width: 15 },
-                    { header: 'Valor Emissão', key: 'valorEmissao', width: 20 },
-                    { header: 'Levantado c/ IVA', key: 'levantado', width: 20 },
-                ]}
-                data={dashboardSummary ? [{
-                    registos: dashboardSummary.totals.registos,
-                    valorEmissao: dashboardSummary.totals.valorEmissao,
-                    levantado: dashboardSummary.totals.levantadoComIva
-                }] : []}
-                dashboardElementId="recibos-dashboard-view"
-                themeColor="#be185d"
-                dashboardName={dashboardName}
-            />
         </section>
     )
 }
