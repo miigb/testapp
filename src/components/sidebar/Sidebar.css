@@ -772,6 +772,69 @@
   border-color: var(--brand);
 }
 
+/* ── Tools Panel ─────────────────────────────────────────────────── */
+
+.tools-panel {
+  padding: 16px 12px;
+}
+
+.tools-panel-header {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.tools-panel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tools-panel-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.tools-panel-card:hover {
+  background: var(--bg-alt);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.tools-panel-card.active {
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface));
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.tools-panel-card-label {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: left;
+}
+
+.tools-panel-card-shortcut {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-alt);
+  color: var(--ink-muted);
+  font-family: inherit;
+}
+
 /* ── Mobile sidebar ──────────────────────────────────────────────── */
 
 @media (max-width: 768px) {

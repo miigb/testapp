@@ -1,4 +1,4 @@
-import { Bell, CheckSquare, PanelRightClose, Trash2 } from 'lucide-react'
+import { Bell, Calculator, CheckSquare, PanelRightClose, StickyNote, SquareFunction, Trash2, Wrench } from 'lucide-react'
 import type { TodoItem, TodoFilters, TodoComment, NotificationItem, NotificationPreferences, UserSummary } from '../../types'
 import type { TrashEntry } from '../../hooks/useTrash'
 import { TodosPanel } from './TodosPanel'
@@ -6,7 +6,7 @@ import { NotificationsPanel } from './NotificationsPanel'
 import { TrashPanel } from './TrashPanel'
 import './Sidebar.css'
 
-export type SidebarTab = 'todos' | 'notifications' | 'trash'
+export type SidebarTab = 'todos' | 'notifications' | 'trash' | 'tools'
 
 export interface SidebarProps {
   open: boolean
@@ -54,6 +54,12 @@ export interface SidebarProps {
   onPermanentDelete?: (module: string, id: string) => Promise<void>
   onEmptyTrash?: (module?: 'recibos' | 'ds' | 'penhoras' | 'tarefas') => Promise<void>
   isAdmin?: boolean
+
+  // Tools
+  notesOpen: boolean
+  calculatorOpen: boolean
+  smartNotesOpen: boolean
+  onToggleQuickTool: (tool: 'notes' | 'calculator' | 'smart-notes') => void
 }
 
 export function Sidebar({
@@ -92,6 +98,10 @@ export function Sidebar({
   onPermanentDelete,
   onEmptyTrash,
   isAdmin,
+  notesOpen,
+  calculatorOpen,
+  smartNotesOpen,
+  onToggleQuickTool,
 }: SidebarProps) {
   return (
     <div className={`sidebar ${open ? 'open' : ''}`}>
@@ -131,6 +141,15 @@ export function Sidebar({
           {trashCount > 0 && (
             <span className="sidebar-tab-badge">{trashCount}</span>
           )}
+        </button>
+        <button
+          type="button"
+          className={`sidebar-tab-btn ${activeTab === 'tools' ? 'active' : ''}`}
+          onClick={() => onTabChange('tools')}
+          title="Ferramentas"
+          aria-label="Ferramentas"
+        >
+          <Wrench size={16} />
         </button>
         <button
           type="button"
@@ -187,6 +206,41 @@ export function Sidebar({
             onEmptyTrash={onEmptyTrash}
             isAdmin={isAdmin}
           />
+        )}
+
+        {activeTab === 'tools' && (
+          <div className="tools-panel">
+            <div className="tools-panel-header">Ferramentas</div>
+            <div className="tools-panel-grid">
+              <button
+                type="button"
+                className={`tools-panel-card ${notesOpen ? 'active' : ''}`}
+                onClick={() => onToggleQuickTool('notes')}
+              >
+                <StickyNote size={20} />
+                <span className="tools-panel-card-label">Notas Rápidas</span>
+                <kbd className="tools-panel-card-shortcut">Alt+N</kbd>
+              </button>
+              <button
+                type="button"
+                className={`tools-panel-card ${calculatorOpen ? 'active' : ''}`}
+                onClick={() => onToggleQuickTool('calculator')}
+              >
+                <Calculator size={20} />
+                <span className="tools-panel-card-label">Calculadora</span>
+                <kbd className="tools-panel-card-shortcut">Alt+C</kbd>
+              </button>
+              <button
+                type="button"
+                className={`tools-panel-card ${smartNotesOpen ? 'active' : ''}`}
+                onClick={() => onToggleQuickTool('smart-notes')}
+              >
+                <SquareFunction size={20} />
+                <span className="tools-panel-card-label">Notas com Cálculo</span>
+                <kbd className="tools-panel-card-shortcut">Alt+S</kbd>
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

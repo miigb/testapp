@@ -2,13 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   Bell,
-  Calculator,
   LogOut,
   Minimize2,
   Plus,
   ShieldCheck,
-  SquareFunction,
-  StickyNote,
   Undo2,
   Wrench,
   X,
@@ -364,8 +361,6 @@ function App() {
   })
 
   const {
-    toolsExpanded,
-    setToolsExpanded,
     notesOpen,
     setNotesOpen,
     calculatorOpen,
@@ -763,21 +758,18 @@ function App() {
       if (!event.altKey || event.ctrlKey || event.metaKey) return
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
-        setToolsExpanded(true)
         setNotesOpen(true)
         bringToolToFront('notes')
         return
       }
       if (event.key.toLowerCase() === 'c') {
         event.preventDefault()
-        setToolsExpanded(true)
         setCalculatorOpen(true)
         bringToolToFront('calculator')
         return
       }
       if (event.key.toLowerCase() === 's') {
         event.preventDefault()
-        setToolsExpanded(true)
         setSmartNotesOpen(true)
         bringToolToFront('smart-notes')
       }
@@ -1207,45 +1199,14 @@ function App() {
         <Undo2 size={15} />
       </button>
       <button
-        className={`subtle-btn icon-btn ${toolsExpanded ? 'active' : ''}`}
+        className="subtle-btn icon-btn"
         type="button"
-        onClick={() => setToolsExpanded((current) => !current)}
-        title={toolsExpanded ? 'Ocultar ferramentas' : 'Mostrar ferramentas'}
-        aria-label={toolsExpanded ? 'Ocultar ferramentas' : 'Mostrar ferramentas'}
+        onClick={() => { setSidebarOpen(true); setSidebarTab('tools') }}
+        title="Ferramentas (Alt+N/C/S)"
+        aria-label="Ferramentas"
       >
         <Wrench size={15} />
       </button>
-      {toolsExpanded && (
-        <div className="top-tools">
-          <button
-            className={`subtle-btn icon-btn micro ${notesOpen ? 'active' : ''}`}
-            type="button"
-            title="Notas rápidas (Alt+N)"
-            aria-label="Notas rápidas"
-            onClick={() => toggleQuickTool('notes')}
-          >
-            <StickyNote size={15} />
-          </button>
-          <button
-            className={`subtle-btn icon-btn micro ${calculatorOpen ? 'active' : ''}`}
-            type="button"
-            title="Calculadora (Alt+C)"
-            aria-label="Calculadora"
-            onClick={() => toggleQuickTool('calculator')}
-          >
-            <Calculator size={15} />
-          </button>
-          <button
-            className={`subtle-btn icon-btn micro ${smartNotesOpen ? 'active' : ''}`}
-            type="button"
-            title="Notas com cálculo (Alt+S)"
-            aria-label="Notas com cálculo"
-            onClick={() => toggleQuickTool('smart-notes')}
-          >
-            <SquareFunction size={15} />
-          </button>
-        </div>
-      )}
       {canWrite(activeModule) && (
         <button
           className="primary-btn icon-btn"
@@ -2086,6 +2047,10 @@ function App() {
         onEmptyTrash={emptyTrash}
         isAdmin={user.role === 'ADMIN'}
         onNotificationNavigate={handleNotificationNavigate}
+        notesOpen={notesOpen}
+        calculatorOpen={calculatorOpen}
+        smartNotesOpen={smartNotesOpen}
+        onToggleQuickTool={toggleQuickTool}
       />
       {adminPanelOpen && user.role === 'ADMIN' && (
         <UserManagement
