@@ -108,6 +108,29 @@ export type SavedView = {
   updatedAt: string
 }
 
+export type ReportTemplateSettings = {
+  includeDashboard: boolean
+  includeTable: boolean
+  maxRows: 50 | 100 | 250 | 'all'
+  format: 'pdf' | 'excel' | 'csv'
+  title: string
+  companyName?: string
+  orientation?: 'portrait' | 'landscape'
+  footerText?: string
+  selectedColumns: string[]
+  useAiSummary: boolean
+}
+
+export type ReportTemplate = {
+  id: string
+  name: string
+  module: string
+  settings: ReportTemplateSettings
+  createdById: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type BootstrapResponse = {
   statuses: StatusDefinition[]
   calculationSettings: CalculationSettings

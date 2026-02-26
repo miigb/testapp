@@ -21,6 +21,7 @@ import type {
   RecordsResponse,
   ReceiptRecord,
   RegisterData,
+  ReportTemplate,
   SavedView,
   StatusDefinition,
   TodoComment,
@@ -296,6 +297,32 @@ export const api = {
 
   deleteSavedView(id: string) {
     return request<{ ok: true }>(`/api/saved-views/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // Report Templates
+  getReportTemplates(module?: string) {
+    const query = module ? `?module=${encodeURIComponent(module)}` : ''
+    return request<ReportTemplate[]>(`/api/report-templates${query}`)
+  },
+
+  createReportTemplate(payload: Pick<ReportTemplate, 'name' | 'module' | 'settings'>) {
+    return request<ReportTemplate>('/api/report-templates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  updateReportTemplate(id: string, payload: Partial<Pick<ReportTemplate, 'name' | 'module' | 'settings'>>) {
+    return request<ReportTemplate>(`/api/report-templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  deleteReportTemplate(id: string) {
+    return request<{ ok: true }>(`/api/report-templates/${id}`, {
       method: 'DELETE',
     })
   },
