@@ -293,38 +293,42 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         currentY += summaryHeight + 20
     }
 
-    // Render dashboard summary cards
+    // Render dashboard summary cards (dynamic width based on column count)
     if (dashboardElementId && data.rows && data.rows.length === 1 && data.columns && data.columns.length > 0) {
-        const row = data.rows[0];
-        const cardWidth = 160;
-        const cardHeight = 50;
-        const spacing = 16;
-        let cx = 40;
+        const row = data.rows[0]
+        const numCols = data.columns.length
+        const availableWidth = pageWidth - 80 // 40pt margin each side
+        const spacing = 14
+        const cardWidth = (availableWidth - spacing * (numCols - 1)) / numCols
+        const cardHeight = 65
+        const cardPadding = 12
+        let cx = 40
 
         data.columns.forEach((col) => {
-            const val = row[col.key];
+            const val = String(row[col.key] ?? '')
 
-            // Draw box
-            pdf.setDrawColor('#e5e7eb') // border
-            pdf.setFillColor('#f9fafb') // bg
+            // Draw card background
+            pdf.setDrawColor('#e5e7eb')
+            pdf.setFillColor('#f9fafb')
             pdf.roundedRect(cx, currentY, cardWidth, cardHeight, 4, 4, 'FD')
 
             // Draw label
             pdf.setFont('helvetica', 'normal')
             pdf.setTextColor('#6b7280')
             pdf.setFontSize(8)
-            pdf.text(col.header.toUpperCase(), cx + 10, currentY + 20)
+            pdf.text(col.header.toUpperCase(), cx + cardPadding, currentY + 18)
 
-            // Draw value
+            // Draw value (with text wrapping)
             pdf.setFont('helvetica', 'bold')
             pdf.setTextColor('#111827')
-            pdf.setFontSize(16)
-            pdf.text(String(val), cx + 10, currentY + 40)
+            pdf.setFontSize(14)
+            const valLines = pdf.splitTextToSize(val, cardWidth - cardPadding * 2) as string[]
+            pdf.text(valLines.slice(0, 2), cx + cardPadding, currentY + 38)
 
             cx += cardWidth + spacing
-        });
+        })
 
-        currentY += cardHeight + 20;
+        currentY += cardHeight + 20
     }
 
     // Dashboard screenshot capture via html-to-image
@@ -370,9 +374,9 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         }
     }
 
-    // Render proper data table using autoTable when there are rows and no dashboard
-    if (effectiveRows.length > 0 && !dashboardElementId) {
-        if (currentY > pageHeight - 100) {
+    // Render data table (new page when following a dashboard)
+    if (effectiveRows.length > 0) {
+        if (dashboardElementId || currentY > pageHeight - 100) {
             pdf.addPage()
             currentY = 40
         }
