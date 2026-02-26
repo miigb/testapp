@@ -18,6 +18,7 @@ import { createSettingsRouter } from './routes/settings'
 import { createDataRouter } from './routes/data'
 import { createTodosRouter } from './routes/todos'
 import { createNotificationsRouter } from './routes/notifications'
+import { createReportTemplatesRouter } from './routes/reportTemplates'
 
 import { databaseSetupHint } from './services/shared'
 import { startPurgeScheduler } from './services/purge'
@@ -62,6 +63,7 @@ app.use('/api', requireAuth, createSettingsRouter(prisma))
 app.use('/api', requireAuth, createDataRouter(prisma))
 app.use('/api/todos', requireAuth, createTodosRouter(prisma))
 app.use('/api/notifications', requireAuth, createNotificationsRouter(prisma))
+app.use('/api/report-templates', requireAuth, createReportTemplatesRouter(prisma))
 
 // In production, serve the built frontend from dist/ under the same origin.
 // This avoids CORS complexity and keeps deployment simple (single Railway service).
