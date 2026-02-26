@@ -4,7 +4,7 @@ import type { DsRecord, DsRecordFilters, StatusDefinition, SavedView, SavedViewS
 import { api } from '../../api'
 import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { ExportComposer } from '../shared/ExportComposer'
-import type { ExportColumn } from '../../lib/exportGenerators'
+import { DS_TABLE_COLUMNS } from '../../constants/exportColumns'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
@@ -85,19 +85,7 @@ export function DsConsultaTabela({
     const [isExportOpen, setIsExportOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
-    const exportColumns: ExportColumn[] = [
-        { header: 'Proponentes', key: 'proponentes', width: 30 },
-        { header: 'Ref.', key: 'referencia', width: 15 },
-        { header: 'Gestor(a)', key: 'gestora', width: 25 },
-        { header: 'Produto', key: 'produto', width: 20 },
-        { header: 'Entidade Bancária', key: 'entidadeBancaria', width: 20 },
-        { header: 'Data Escritura', key: 'dataEscritura', width: 15 },
-        { header: 'Valor', key: 'valor', width: 15 },
-        { header: 'Comissão Loja', key: 'comissaoLoja', width: 15 },
-        { header: 'Comissão Gestor', key: 'comissaoGestor', width: 15 },
-        { header: 'Falta Recibo', key: 'faltaReciboGestora', width: 25 },
-        { header: 'Estado', key: 'estadoId', width: 25 },
-    ]
+    const exportColumns = DS_TABLE_COLUMNS
 
     const exportData = dsRecords.map(r => ({
         ...r,

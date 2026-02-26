@@ -12,7 +12,7 @@ import { getPrimaryRecordReference, getSecondaryRecordReference } from '../../li
 import { StatusPill, EntityIdentity } from '../shared/StatusComponents'
 import { LabeledSelect, AutocompleteInput } from '../shared/FormInputs'
 import { ExportComposer } from '../shared/ExportComposer'
-import type { ExportColumn } from '../../lib/exportGenerators'
+import { RECIBOS_TABLE_COLUMNS } from '../../constants/exportColumns'
 
 function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
     if (!statusId) return undefined
@@ -142,21 +142,7 @@ export function RecibosConsultaTabela({
     const [isExportOpen, setIsExportOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
-    const exportColumns: ExportColumn[] = [
-        { header: 'Tipo', key: 'tipo', width: 15 },
-        { header: 'Nº Recibo', key: 'reciboNumero', width: 15 },
-        { header: 'Processo', key: 'processo', width: 20 },
-        { header: 'PE', key: 'pe', width: 15 },
-        { header: 'Mês', key: 'mes', width: 12 },
-        { header: 'Ano', key: 'ano', width: 12 },
-        { header: 'Honorários', key: 'honorarios', width: 15 },
-        { header: 'Custas', key: 'custas', width: 15 },
-        { header: 'Iva', key: 'iva', width: 12 },
-        { header: 'Exequente', key: 'exequente', width: 25 },
-        { header: 'Executado', key: 'executado', width: 25 },
-        { header: 'Gestor(a)', key: 'gestor', width: 20 },
-        { header: 'Estado', key: 'estadoId', width: 20 },
-    ]
+    const exportColumns = RECIBOS_TABLE_COLUMNS
 
     const recordsToExport = selectedIds.length > 0 ? records.filter(r => selectedIds.includes(r.id)) : records
 

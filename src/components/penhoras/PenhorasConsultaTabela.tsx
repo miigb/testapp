@@ -4,7 +4,7 @@ import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition, SavedView
 import { api } from '../../api'
 import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { ExportComposer } from '../shared/ExportComposer'
-import type { ExportColumn } from '../../lib/exportGenerators'
+import { PENHORAS_TABLE_COLUMNS } from '../../constants/exportColumns'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
@@ -83,15 +83,7 @@ export function PenhorasConsultaTabela({
     const [isExportOpen, setIsExportOpen] = useState(false)
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
-    const exportColumns: ExportColumn[] = [
-        { header: 'PE', key: 'pe', width: 15 },
-        { header: 'Identificação', key: 'identificacao', width: 30 },
-        { header: 'Pedido', key: 'pedido', width: 30 },
-        { header: 'Gestor(a)', key: 'gestor', width: 20 },
-        { header: 'Acto', key: 'acto', width: 20 },
-        { header: 'Data do Pedido', key: 'dataPedido', width: 15 },
-        { header: 'Estado', key: 'estadoId', width: 25 },
-    ]
+    const exportColumns = PENHORAS_TABLE_COLUMNS
 
     const exportData = penhorasRecords.map(r => ({
         ...r,
