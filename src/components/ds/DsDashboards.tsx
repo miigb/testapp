@@ -50,7 +50,6 @@ export interface DsDashboardsProps {
     patchDsFilters: <K extends keyof DsRecordFilters>(key: K, value: DsRecordFilters[K]) => void
     dsRecordsLoading: boolean
     dsTotalRecords: number
-    dashboardName?: string
     onOpenExport: () => void
 }
 
@@ -90,7 +89,6 @@ export function DsDashboards({
     patchDsFilters,
     dsRecordsLoading,
     dsTotalRecords,
-    dashboardName,
     onOpenExport,
 }: DsDashboardsProps) {
 

@@ -94,6 +94,7 @@ import { resolveInitialQuickNotes } from './lib/localStorage'
 import { getInitialEntryForm, extractGpeSeFromIndicacoes } from './lib/recordHelpers'
 import { getInitialDsEntryForm } from './lib/dsHelpers'
 import { getInitialPenhorasEntryForm } from './lib/penhorasHelpers'
+import { api } from './api'
 import { ExportWizard } from './components/shared/ExportWizard'
 import {
   RECIBOS_TABLE_COLUMNS,
