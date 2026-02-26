@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { toPng } from 'html-to-image'
 
 export type ExportColumn = {
@@ -14,6 +15,22 @@ export type ExportData = {
     summaryText?: string
     title?: string
     themeColor?: string
+    companyName?: string
+    footerText?: string
+    moduleLogoSrc?: string
+    orientation?: 'portrait' | 'landscape'
+    maxRows?: number | 'all'
+    selectedColumns?: string[]  // if provided, filter columns to these keys
+}
+
+function getEffectiveColumns(data: ExportData): ExportColumn[] {
+    if (!data.selectedColumns || data.selectedColumns.length === 0) return data.columns
+    return data.columns.filter((c) => data.selectedColumns!.includes(c.key))
+}
+
+function getEffectiveRows(data: ExportData): Record<string, unknown>[] {
+    if (data.maxRows === undefined || data.maxRows === 'all') return data.rows
+    return data.rows.slice(0, data.maxRows)
 }
 
 function triggerDownload(blob: Blob, filename: string) {
@@ -26,9 +43,12 @@ function triggerDownload(blob: Blob, filename: string) {
 }
 
 export async function exportToCsv(data: ExportData, filename: string) {
-    const headers = data.columns.map((c) => `"${c.header.replace(/"/g, '""')}"`).join(',')
-    const rows = data.rows.map((row) =>
-        data.columns
+    const effectiveCols = getEffectiveColumns(data)
+    const effectiveRows = getEffectiveRows(data)
+
+    const headers = effectiveCols.map((c) => `"${c.header.replace(/"/g, '""')}"`).join(',')
+    const rows = effectiveRows.map((row) =>
+        effectiveCols
             .map((c) => {
                 const val = row[c.key]
                 if (val === null || val === undefined) return '""'
@@ -51,20 +71,38 @@ export async function exportToCsv(data: ExportData, filename: string) {
 export async function exportToExcel(data: ExportData, filename: string) {
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet(data.title || 'Dados')
+    const effectiveCols = getEffectiveColumns(data)
+    const effectiveRows = getEffectiveRows(data)
+
+    // Company name header
+    if (data.companyName) {
+        const companyRow = sheet.addRow([data.companyName])
+        companyRow.font = { bold: true, size: 16 }
+    }
+
+    // Report title header
+    if (data.title) {
+        const titleRow = sheet.addRow([data.title])
+        titleRow.font = { bold: true, size: 12 }
+    }
+
+    if (data.companyName || data.title) {
+        sheet.addRow([]) // empty spacer row
+    }
 
     if (data.summaryText) {
         sheet.addRow(['Resumo Executivo (IA)'])
-        sheet.getRow(1).font = { bold: true, size: 14 }
+        sheet.lastRow!.font = { bold: true, size: 14 }
         sheet.addRow([data.summaryText])
-        sheet.getRow(2).height = 100
-        sheet.getRow(2).alignment = { wrapText: true, vertical: 'top' }
-        sheet.mergeCells('A2:H2')
+        sheet.lastRow!.height = 100
+        sheet.lastRow!.alignment = { wrapText: true, vertical: 'top' }
+        const summaryRowNum = sheet.lastRow!.number
+        const endCol = Math.max(effectiveCols.length, 8)
+        sheet.mergeCells(summaryRowNum, 1, summaryRowNum, endCol)
         sheet.addRow([]) // empty row
     }
 
-
-
-    const headerRow = sheet.addRow(data.columns.map((c) => c.header))
+    const headerRow = sheet.addRow(effectiveCols.map((c) => c.header))
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     headerRow.fill = {
         type: 'pattern',
@@ -72,12 +110,12 @@ export async function exportToExcel(data: ExportData, filename: string) {
         fgColor: { argb: 'FFBE185D' }, // primary brand color
     }
 
-    data.columns.forEach((col, index) => {
+    effectiveCols.forEach((col, index) => {
         sheet.getColumn(index + 1).width = col.width || 20
     })
 
-    data.rows.forEach((row) => {
-        const rowValues = data.columns.map((c) => row[c.key])
+    effectiveRows.forEach((row) => {
+        const rowValues = effectiveCols.map((c) => row[c.key])
         sheet.addRow(rowValues)
     })
 
@@ -87,21 +125,33 @@ export async function exportToExcel(data: ExportData, filename: string) {
 }
 
 export async function exportToPdf(data: ExportData, filename: string, dashboardElementId?: string) {
-    // Using A4 portrait by default, or landscape if there's a dashboard
-    const orientation = dashboardElementId ? 'landscape' : 'portrait'
+    const effectiveCols = getEffectiveColumns(data)
+    const effectiveRows = getEffectiveRows(data)
+
+    // Using orientation from data, or fall back to landscape if dashboard, else portrait
+    const orientation = data.orientation || (dashboardElementId ? 'landscape' : 'portrait')
     const pdf = new jsPDF(orientation, 'pt', 'a4')
 
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
     let currentY = 40
 
-    // Draw header thick line
+    // Draw branded header: theme color strip at top of page
     if (data.themeColor) {
         pdf.setFillColor(data.themeColor)
         pdf.rect(0, 0, pageWidth, 12, 'F')
         currentY = 50
     }
 
+    // Company name right-aligned
+    if (data.companyName) {
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor('#6b7280')
+        pdf.text(data.companyName, pageWidth - 40, currentY, { align: 'right' })
+    }
+
+    // Title
     if (data.title) {
         if (data.themeColor) {
             pdf.setTextColor(data.themeColor)
@@ -110,9 +160,18 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         pdf.setFont('helvetica', 'bold')
         pdf.text(data.title, 40, currentY)
         pdf.setTextColor('#000000') // reset
-        currentY += 35
+        currentY += 25
+
+        // Date subtitle
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor('#9ca3af')
+        pdf.text(new Date().toLocaleDateString('pt-PT'), 40, currentY)
+        pdf.setTextColor('#000000')
+        currentY += 20
     }
 
+    // AI Summary
     if (data.summaryText) {
         pdf.setFontSize(12)
         pdf.setFont('helvetica', 'bold')
@@ -163,7 +222,7 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         currentY += cardHeight + 20;
     }
 
-
+    // Dashboard screenshot capture via html-to-image
     if (dashboardElementId) {
         const el = document.getElementById(dashboardElementId)
         if (el) {
@@ -206,21 +265,50 @@ export async function exportToPdf(data: ExportData, filename: string, dashboardE
         }
     }
 
-    // Draw simple table if rows exist and no dashboard was specified to take up the page
-    if (data.rows.length > 0 && !dashboardElementId) {
+    // Render proper data table using autoTable when there are rows and no dashboard
+    if (effectiveRows.length > 0 && !dashboardElementId) {
         if (currentY > pageHeight - 100) {
             pdf.addPage()
             currentY = 40
         }
 
-        // Auto Table would normally be used here (jspdf-autotable), but we can do a very simple 1-line fallback or just stick to exporting dashboard/summary for PDFs
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('Tabela de Dados Anexa', 40, currentY)
-        currentY += 20
-        pdf.setFontSize(10)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Nota: Foram selecionados ${data.rows.length} registos. Utilize a exportação CSV/Excel para análise detalhada em grelha.`, 40, currentY)
+        autoTable(pdf, {
+            startY: currentY,
+            head: [effectiveCols.map((c) => c.header)],
+            body: effectiveRows.map((row) =>
+                effectiveCols.map((c) => {
+                    const val = row[c.key]
+                    return val === null || val === undefined ? '' : String(val)
+                })
+            ),
+            headStyles: {
+                fillColor: data.themeColor || '#be185d',
+                textColor: '#ffffff',
+                fontStyle: 'bold',
+                fontSize: 9,
+            },
+            alternateRowStyles: {
+                fillColor: '#f9fafb',
+            },
+            styles: {
+                fontSize: 8,
+                cellPadding: 4,
+            },
+            margin: { left: 40, right: 40 },
+        })
+    }
+
+    // Render footer on every page
+    const totalPages = pdf.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setTextColor('#9ca3af')
+        if (data.footerText) {
+            pdf.text(data.footerText, 40, pageHeight - 20)
+        }
+        pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 20, { align: 'center' })
+        pdf.text(new Date().toLocaleDateString('pt-PT'), pageWidth - 40, pageHeight - 20, { align: 'right' })
     }
 
     pdf.save(`${filename}.pdf`)
