@@ -784,3 +784,19 @@
     height: 44px;
   }
 }
+
+/* ── Mobile sidebar backdrop ────────────────────────────────────── */
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 199; /* below sidebar (z-index: 200) */
+  }
+}

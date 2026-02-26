@@ -1942,6 +1942,7 @@ function App() {
         )}
       </main >
 
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         open={sidebarOpen}
         activeTab={sidebarTab}
