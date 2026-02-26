@@ -59,6 +59,7 @@ model User {
   deletedRecords         Record[]                @relation("RecordDeleter")
   deletedDsRecords       DsRecord[]              @relation("DsRecordDeleter")
   deletedPenhorasRecords PenhorasRecord[]        @relation("PenhorasRecordDeleter")
+  reportTemplates        ReportTemplate[]
 }
 
 enum TodoPriority {
@@ -267,6 +268,19 @@ model SavedView {
   updatedAt DateTime @updatedAt
 
   @@index([scope])
+}
+
+model ReportTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  module      String
+  settings    Json
+  createdById Int
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([module])
 }
 
 model DsStatus {
