@@ -37,7 +37,8 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
         orderBy: { position: 'asc' },
       })
       res.json(columns)
-    } catch {
+    } catch (err) {
+      console.error('[GET /columns] findMany failed:', err)
       // Table may not exist yet if migration hasn't been applied — return empty
       // so the client falls back to hardcoded defaults.
       res.json([])
@@ -65,7 +66,8 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
         orderBy: { position: 'asc' },
       })
       res.json(columns)
-    } catch {
+    } catch (err) {
+      console.error('[GET /admin/columns] findMany failed:', err)
       // Table may not exist yet if migration hasn't been applied — return empty
       // so the client falls back to hardcoded defaults.
       res.json([])

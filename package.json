@@ -9,7 +9,7 @@
     "dev:server": "tsx watch server/src/index.ts",
     "build": "tsc -b && vite build",
     "build:prod": "npm run prisma:generate && tsc -b && vite build",
-    "start:prod": "npm run prisma:deploy && tsx server/src/index.ts",
+    "start:prod": "tsx server/src/index.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "prisma:generate": "prisma generate",

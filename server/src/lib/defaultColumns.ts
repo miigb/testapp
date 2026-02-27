@@ -130,8 +130,9 @@ export async function ensureDefaultColumns(
       })),
       skipDuplicates: true,
     })
-  } catch {
+  } catch (err) {
     // Non-fatal — if the table doesn't exist yet or any other DB error,
     // the endpoint will return [] and the client falls back to defaults.
+    console.error('[ensureDefaultColumns] failed for', module, view, err)
   }
 }
