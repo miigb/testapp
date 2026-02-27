@@ -435,6 +435,7 @@ a {
 
 .module-brand-stack {
   position: relative;
+  width: 136px;
   min-height: 136px;
 }
 
@@ -463,7 +464,7 @@ a {
 }
 
 .module-brand-card.back {
-  transform: translate(12px, 10px) scale(0.965);
+  transform: translate(8px, 6px) scale(0.96);
   opacity: 0.84;
   filter: saturate(0.92);
   z-index: 1;
@@ -475,7 +476,7 @@ a {
 }
 
 .module-brand-stack.ds-active .module-brand-card.back {
-  transform: translate(-12px, 10px) scale(0.965);
+  transform: translate(-8px, 6px) scale(0.96);
 }
 
 .module-brand-card:hover {
