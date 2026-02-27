@@ -435,8 +435,8 @@ a {
 
 .module-brand-stack {
   position: relative;
-  width: 136px;
-  min-height: 136px;
+  aspect-ratio: 1;
+  min-height: 120px;
 }
 
 .module-brand-card {
