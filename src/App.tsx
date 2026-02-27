@@ -1583,6 +1583,7 @@ function App() {
             setFeedback={setFeedback}
             onRefresh={refreshDsRecords}
             onOpenExport={() => setExportWizardOpen({ module: 'ds', content: 'table' })}
+            isAdmin={user.role === 'ADMIN'}
           />
         )}
 
@@ -1697,6 +1698,7 @@ function App() {
             setFeedback={setFeedback}
             onRefresh={refreshPenhorasRecords}
             onOpenExport={() => setExportWizardOpen({ module: 'penhoras', content: 'table' })}
+            isAdmin={user.role === 'ADMIN'}
           />
         )}
 
@@ -1807,6 +1809,7 @@ function App() {
               setFeedback={setFeedback}
               onRefresh={refreshRecords}
               onOpenExport={() => setExportWizardOpen({ module: 'recibos', content: 'table' })}
+              isAdmin={user.role === 'ADMIN'}
             />
           )
         }

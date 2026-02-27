@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
+import { Eye, EyeOff, FilterX, Trash2, Download, Settings } from 'lucide-react'
 import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import { api } from '../../api'
 import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
@@ -10,6 +10,9 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
 import { PENHORAS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
 import type { ColumnType } from '../../constants/columnDefinitions'
+import { ColumnManager } from '../admin/ColumnManager'
+import { AdminColumnContextMenu } from '../shared/ColumnHeaderContextMenu'
+import type { ColumnContextMenuState } from '../shared/ColumnHeaderContextMenu'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -53,6 +56,7 @@ export interface PenhorasConsultaTabelaProps {
     setFeedback: (msg: string) => void
     onRefresh: () => void
     onOpenExport: () => void
+    isAdmin?: boolean
 }
 
 export function PenhorasConsultaTabela({
@@ -83,11 +87,14 @@ export function PenhorasConsultaTabela({
     setFeedback,
     onRefresh,
     onOpenExport,
+    isAdmin,
 }: PenhorasConsultaTabelaProps) {
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+    const [columnManagerOpen, setColumnManagerOpen] = useState(false)
+    const [contextMenu, setContextMenu] = useState<ColumnContextMenuState | null>(null)
 
     // ── Config-driven columns ──────────────────────────────────────
-    const { columns: configColumns } = useColumnConfig('penhoras', 'table')
+    const { columns: configColumns, refetch: refetchColumns } = useColumnConfig('penhoras', 'table')
     const fallbackColumns = useMemo(
         () => defaultsToColumnConfig('penhoras', 'table', PENHORAS_TABLE_DEFAULTS),
         [],
@@ -153,6 +160,11 @@ export function PenhorasConsultaTabela({
                         <Download size={15} />
                         Exportar
                     </button>
+                    {isAdmin && (
+                        <button className="subtle-btn icon-btn" type="button" onClick={() => setColumnManagerOpen(true)} title="Gerir colunas">
+                            <Settings size={15} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -255,7 +267,15 @@ export function PenhorasConsultaTabela({
                         <thead>
                             <tr>
                                 {dataColumns.map((col) => (
-                                    <th key={col.id}>{col.label}</th>
+                                    <th
+                                        key={col.id}
+                                        onContextMenu={isAdmin ? (e) => {
+                                            e.preventDefault()
+                                            setContextMenu({ column: col, position: { x: e.clientX, y: e.clientY } })
+                                        } : undefined}
+                                    >
+                                        {col.label}
+                                    </th>
                                 ))}
                                 {showStatusColumn && <th>Estado</th>}
                                 <th>Ações</th>
@@ -349,6 +369,19 @@ export function PenhorasConsultaTabela({
                     }
                 }}
             />
+
+            {isAdmin && (
+                <ColumnManager module="penhoras" open={columnManagerOpen} onClose={() => setColumnManagerOpen(false)} />
+            )}
+
+            {isAdmin && contextMenu && (
+                <AdminColumnContextMenu
+                    module="penhoras"
+                    state={contextMenu}
+                    onClose={() => setContextMenu(null)}
+                    onColumnsChanged={refetchColumns}
+                />
+            )}
         </section>
     )
 }

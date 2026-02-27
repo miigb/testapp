@@ -7,7 +7,9 @@ import {
   updateColumnBody,
   reorderColumnsBody,
   createCustomColumnBody,
+  discoverColumnsBody,
 } from '../schemas/columnConfig'
+import { discoverImportColumns } from '../lib/discoverImportColumns'
 
 export function createColumnsRouter(prisma: PrismaClient): Router {
   const router = Router()
@@ -51,6 +53,27 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     })
 
     res.json(columns)
+  })
+
+  /**
+   * POST /api/admin/columns/from-import — discover unmapped columns
+   * Accepts raw Excel header names, diffs against existing ColumnConfig
+   * keys for the module, returns headers that aren't yet tracked.
+   * IMPORTANT: Must be registered BEFORE /:id and /:module/:view routes.
+   */
+  router.post('/admin/columns/from-import', requireAdmin, async (req, res) => {
+    const parsed = discoverColumnsBody.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() })
+    }
+
+    const discoveredColumns = await discoverImportColumns(
+      prisma,
+      parsed.data.module,
+      parsed.data.headers,
+    )
+
+    res.json({ discoveredColumns })
   })
 
   /**

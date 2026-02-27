@@ -27,6 +27,7 @@ import {
   buildDsRecordWhere,
   mergeDsRecordWithPatch,
 } from '../services/ds'
+import { getCustomColumnKeys, extractCustomFields } from '../lib/discoverImportColumns'
 
 export function createDsRouter(prisma: PrismaClient): Router {
   const router = Router()
@@ -370,6 +371,8 @@ export function createDsRouter(prisma: PrismaClient): Router {
       ]),
     )
 
+    const customKeys = await getCustomColumnKeys(prisma, 'ds')
+
     let created = 0
     let updated = 0
     let skipped = 0
@@ -386,6 +389,8 @@ export function createDsRouter(prisma: PrismaClient): Router {
       input.statusId = resolveDsStatusId(input.statusId, defaults, fallbackStatusId, input)
       input.importBatchId = input.importBatchId || importBatchId
 
+      const customFields = extractCustomFields(raw as Record<string, unknown>, customKeys)
+
       let key = buildDsRecordKey(input)
       const existingId = existingByKey.get(key)
 
@@ -398,7 +403,10 @@ export function createDsRouter(prisma: PrismaClient): Router {
         if (parsed.data.strategy === 'update') {
           await prisma.dsRecord.update({
             where: { id: existingId },
-            data: toPrismaDsRecordData(input),
+            data: {
+              ...toPrismaDsRecordData(input),
+              ...(customFields ? { customFields } : {}),
+            },
           })
           updated += 1
           continue
@@ -415,7 +423,10 @@ export function createDsRouter(prisma: PrismaClient): Router {
       }
 
       const createdRow = await prisma.dsRecord.create({
-        data: toPrismaDsRecordData(input),
+        data: {
+          ...toPrismaDsRecordData(input),
+          ...(customFields ? { customFields } : {}),
+        },
         select: { id: true },
       })
       existingByKey.set(key, createdRow.id)

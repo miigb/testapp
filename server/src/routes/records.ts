@@ -33,6 +33,7 @@ import {
   asRecordInput,
   detectStatusIdFromColor,
 } from '../services/records'
+import { getCustomColumnKeys, extractCustomFields } from '../lib/discoverImportColumns'
 
 export function createRecordsRouter(prisma: PrismaClient): Router {
   const router = Router()
@@ -656,6 +657,8 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
 
     const existingByKey = new Map(existingRecords.map((record) => [buildUniqueRecordKey(record), record.id]))
 
+    const customKeys = await getCustomColumnKeys(prisma, 'recibos')
+
     let created = 0
     let updated = 0
     let skipped = 0
@@ -682,6 +685,8 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
         parsed.data.forceRecalculate === true,
       )
 
+      const customFields = extractCustomFields(raw as Record<string, unknown>, customKeys)
+
       let key = buildUniqueRecordKey(prepared)
       const existingId = existingByKey.get(key)
 
@@ -697,6 +702,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
             data: {
               ...toPrismaRecordData(prepared),
               statusId,
+              ...(customFields ? { customFields } : {}),
               history: {
                 create: {
                   message: 'Atualizado por importação.',
@@ -722,6 +728,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
             data: {
               ...toPrismaRecordData(candidate),
               statusId,
+              ...(customFields ? { customFields } : {}),
               history: {
                 create: {
                   message: 'Criado por importação (duplicado resolvido).',
@@ -744,6 +751,7 @@ export function createRecordsRouter(prisma: PrismaClient): Router {
           data: {
             ...toPrismaRecordData(prepared),
             statusId,
+            ...(customFields ? { customFields } : {}),
             history: {
               create: {
                 message: 'Criado por importação.',

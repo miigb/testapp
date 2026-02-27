@@ -34,4 +34,5 @@ export const createCustomColumnBody = z.object({
 
 export const discoverColumnsBody = z.object({
   module: moduleEnum,
+  headers: z.array(z.string().max(200)).min(1).max(500),
 })

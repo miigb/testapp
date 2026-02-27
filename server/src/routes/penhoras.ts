@@ -26,6 +26,7 @@ import {
   buildPenhorasRecordWhere,
   mergePenhorasRecordWithPatch,
 } from '../services/penhoras'
+import { getCustomColumnKeys, extractCustomFields } from '../lib/discoverImportColumns'
 
 export function createPenhorasRouter(prisma: PrismaClient): Router {
   const router = Router()
@@ -369,6 +370,8 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
       ]),
     )
 
+    const customKeys = await getCustomColumnKeys(prisma, 'penhoras')
+
     let created = 0
     let updated = 0
     let skipped = 0
@@ -385,6 +388,8 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
       input.statusId = resolvePenhorasStatusId(input.statusId, defaults, fallbackStatusId, input)
       input.importBatchId = input.importBatchId || importBatchId
 
+      const customFields = extractCustomFields(raw as Record<string, unknown>, customKeys)
+
       let key = buildPenhorasRecordKey(input)
       const existingId = existingByKey.get(key)
 
@@ -397,7 +402,10 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
         if (parsed.data.strategy === 'update') {
           await prisma.penhorasRecord.update({
             where: { id: existingId },
-            data: toPrismaPenhorasRecordData(input),
+            data: {
+              ...toPrismaPenhorasRecordData(input),
+              ...(customFields ? { customFields } : {}),
+            },
           })
           updated += 1
           continue
@@ -414,7 +422,10 @@ export function createPenhorasRouter(prisma: PrismaClient): Router {
       }
 
       const createdRow = await prisma.penhorasRecord.create({
-        data: toPrismaPenhorasRecordData(input),
+        data: {
+          ...toPrismaPenhorasRecordData(input),
+          ...(customFields ? { customFields } : {}),
+        },
         select: { id: true },
       })
       existingByKey.set(key, createdRow.id)
