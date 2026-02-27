@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="-30 -30 310 310" fill="none">
-  <rect x="-30" y="-30" width="310" height="310" fill="#2A1A0A"/>
+  <rect x="-30" y="-30" width="310" height="310" fill="#904401"/>
   <!-- House outline -->
-  <path d="M125,30 L200,110 L200,190 L50,190 L50,110 Z" fill="none" stroke="#E0B888" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M125,30 L200,110 L200,190 L50,190 L50,110 Z" fill="none" stroke="#FFECD2" stroke-width="7" stroke-linejoin="round"/>
   <!-- Door outline -->
-  <rect x="107" y="132" width="36" height="58" rx="3" fill="none" stroke="#E0B888" stroke-width="5"/>
+  <rect x="107" y="132" width="36" height="58" rx="3" fill="none" stroke="#FFECD2" stroke-width="5"/>
   <!-- Text -->
-  <text x="125" y="228" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#E0B888" letter-spacing="4">PENHORAS</text>
+  <text x="125" y="228" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#FFECD2" letter-spacing="4">PENHORAS</text>
 </svg>

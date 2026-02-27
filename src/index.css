@@ -391,13 +391,13 @@ a {
 
 .topbar {
   display: grid;
-  grid-template-columns: 320px 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: var(--space-3);
   align-items: center;
 }
 
 .topbar.unified {
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: auto 1fr;
   align-items: stretch;
   padding-inline: 16px;
 }

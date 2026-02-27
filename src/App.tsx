@@ -573,7 +573,7 @@ function App() {
   const dsDashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'ds-dashboard'), [savedViews])
   const penhorasTableViews = useMemo(() => savedViews.filter((view) => view.scope === 'penhoras-tabela'), [savedViews])
   const penhorasDashboardViews = useMemo(() => savedViews.filter((view) => view.scope === 'penhoras-dashboard'), [savedViews])
-  const logoCacheBust = '?v=5'
+  const logoCacheBust = '?v=6'
   const recibosLogoSrc = (isDarkLikeTheme(theme) ? '/mesa-de-recibos-logo-dark.svg' : '/mesa-de-recibos-logo.svg') + logoCacheBust
   const dsLogoSrc = (isDarkLikeTheme(theme) ? '/ds-logo-dark.svg' : '/ds-logo.svg') + logoCacheBust
   const penhorasLogoSrc = (isDarkLikeTheme(theme) ? '/penhoras-logo-dark.svg' : '/penhoras-logo.svg') + logoCacheBust
