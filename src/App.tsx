@@ -583,7 +583,7 @@ function App() {
         title: 'Mesa de Recibos',
         subtitle: 'Postgres + API · Entrada e consulta de recibos',
         logoSrc: recibosLogoSrc,
-        showSubtitle: true,
+        showSubtitle: false,
       },
       {
         id: 'ds' as ModuleId,

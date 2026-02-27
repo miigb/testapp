@@ -1,22 +1,14 @@
-<svg width="470" height="140" viewBox="0 0 470 140" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Penhoras Imóveis">
-  <defs>
-    <linearGradient id="penhorasCircle" x1="54" y1="18" x2="54" y2="122" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#D86A00"/>
-      <stop offset="1" stop-color="#9E4100"/>
-    </linearGradient>
-    <linearGradient id="penhorasRing" x1="4" y1="6" x2="110" y2="126" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#F7D6B7"/>
-    </linearGradient>
-  </defs>
-
-  <g transform="translate(0 8)">
-    <circle cx="54" cy="62" r="53" fill="url(#penhorasRing)" />
-    <circle cx="54" cy="62" r="50" fill="url(#penhorasCircle)" />
-    <path d="M27 61L54 40L81 61V84H67V68H41V84H27V61Z" fill="white"/>
-    <path d="M50 53H58V60H50V53Z" fill="#9E4100"/>
-    <path d="M23 62L54 36L85 62" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="130" y="50" fill="#7B3500" font-family="'Segoe UI', 'Arial', sans-serif" font-size="26" font-weight="800">Penhoras Imóveis</text>
-    <text x="130" y="79" fill="#5E2A00" font-family="'Segoe UI', 'Arial', sans-serif" font-size="16" font-weight="700">Módulo operacional dedicado</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="0 0 250 250" fill="none">
+  <rect width="250" height="250" fill="#303524"/>
+  <!-- Hexagon (flat-top) -->
+  <path d="M95,96 L155,96 L185,148 L155,200 L95,200 L65,148 Z"
+        fill="none" stroke="#C99A6B" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Roof -->
+  <path d="M73,96 L125,50 L177,96"
+        fill="none" stroke="#C99A6B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dollar sign S-curve -->
+  <path d="M138,128 C138,116 112,116 112,128 C112,142 138,142 138,156 C138,170 112,170 112,156"
+        fill="none" stroke="#C99A6B" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Dollar sign vertical bar -->
+  <line x1="125" y1="108" x2="125" y2="176" stroke="#C99A6B" stroke-width="4" stroke-linecap="round"/>
 </svg>

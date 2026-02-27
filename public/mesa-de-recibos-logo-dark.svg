@@ -1,26 +1,4 @@
-<svg width="760" height="200" viewBox="0 0 760 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="b-ring" x1="46" y1="26" x2="170" y2="170" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5C77FF"/>
-      <stop offset="1" stop-color="#4ED5F8"/>
-    </linearGradient>
-    <linearGradient id="b-core" x1="62" y1="40" x2="152" y2="156" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1A2F73"/>
-      <stop offset="1" stop-color="#23449C"/>
-    </linearGradient>
-  </defs>
-
-  <circle cx="100" cy="100" r="74" fill="url(#b-ring)"/>
-  <circle cx="100" cy="100" r="58" fill="url(#b-core)"/>
-  <path d="M70 68H130" stroke="#D9ECFF" stroke-width="7" stroke-linecap="round"/>
-  <path d="M70 86H118" stroke="#9CC8FF" stroke-width="7" stroke-linecap="round"/>
-  <path d="M70 104H123" stroke="#7FB4FF" stroke-width="7" stroke-linecap="round"/>
-  <path d="M72 132L84 144L128 98" stroke="#9FE8FF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-
-  <text x="194" y="92" font-family="Manrope, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="-0.6" fill="#E5EEFF">
-    Mesa de Recibos
-  </text>
-  <text x="196" y="128" font-family="Manrope, Arial, sans-serif" font-size="22" font-weight="600" fill="#AFC4E8">
-    gestao simples e profissional
-  </text>
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="67 4 200 200" fill="none">
+  <rect x="0" y="-50" width="300" height="350" fill="#0E1A30"/>
+  <path d="M 240.32,165.49 L 197.12,113.9 C 217.76,103.81 230.61,85.28 230.61,64.16 V 63.31 C 230.61,35.13 207.16,9.88 177.06,9.88 H 96.77 C 93.86,9.88 92.52,12.06 92.52,14.11 V 167.62 C 92.52,169.48 93.23,170.64 94.89,171.57 L 142.46,197.96 C 143.16,198.36 143.79,198.54 144.41,198.54 C 145.12,198.54 145.83,198.27 146.62,197.79 L 192.91,171.4 H 237.67 C 240.23,171.4 242.07,168.01 240.32,165.49 Z M 100.35,17.62 H 177.06 C 202.99,17.62 222.59,39.47 222.59,63.31 V 64.16 C 222.59,83.41 210.92,99.27 191.06,108.01 L 145.74,82.32 C 144.41,81.56 143.25,81.47 142.19,82.13 L 100.35,105.03 V 17.62 Z M 143.71,89.89 L 183.79,112.06 L 143.71,135.23 L 104.59,112.06 L 143.71,89.89 Z M 100.35,119.07 L 140.34,142.33 V 187.92 L 100.35,165.58 V 119.07 Z M 147.07,187.65 V 142.33 L 187.51,118.98 V 165.4 L 147.07,187.65 Z M 195.18,163.66 V 123.01 L 229.19,163.66 H 195.18 Z" fill="#1FFFFF"/>
 </svg>
