@@ -10,6 +10,7 @@ import {
   discoverColumnsBody,
 } from '../schemas/columnConfig'
 import { discoverImportColumns } from '../lib/discoverImportColumns'
+import { ensureDefaultColumns } from '../lib/defaultColumns'
 
 export function createColumnsRouter(prisma: PrismaClient): Router {
   const router = Router()
@@ -22,6 +23,9 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Parâmetros inválidos.', details: parsed.error.flatten() })
     }
+
+    // Auto-seed defaults if table is empty for this module/view
+    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
 
     const columns = await prisma.columnConfig.findMany({
       where: {
@@ -43,6 +47,9 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Parâmetros inválidos.', details: parsed.error.flatten() })
     }
+
+    // Auto-seed defaults if table is empty for this module/view
+    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
 
     const columns = await prisma.columnConfig.findMany({
       where: {
