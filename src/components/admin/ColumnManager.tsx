@@ -80,8 +80,8 @@ const MODULE_LABELS: Record<ModuleName, string> = {
 }
 
 const VIEW_LABELS: Record<ViewName, string> = {
-  table: 'Tabela',
-  detail: 'Detalhe',
+  table: 'Consulta',
+  detail: 'Tabela',
 }
 
 // ── Drag state ────────────────────────────────────────────────────
