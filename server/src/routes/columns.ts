@@ -25,7 +25,7 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     }
 
     // Auto-seed defaults if table is empty for this module/view
-    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
+    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.userId)
 
     try {
       const columns = await prisma.columnConfig.findMany({
@@ -55,7 +55,7 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     }
 
     // Auto-seed defaults if table is empty for this module/view
-    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
+    await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.userId)
 
     try {
       const columns = await prisma.columnConfig.findMany({
@@ -167,7 +167,7 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
         referenceConfig: bodyParsed.data.referenceConfig ?? undefined,
         visible: true,
         position: nextPosition,
-        createdById: req.user!.id,
+        createdById: req.user!.userId,
       },
     })
 
