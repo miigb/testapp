@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { PenhorasRecord, PenhorasRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import { api } from '../../api'
@@ -6,6 +6,10 @@ import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
+import { PENHORAS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
+import type { ColumnType } from '../../constants/columnDefinitions'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -81,6 +85,19 @@ export function PenhorasConsultaTabela({
     onOpenExport,
 }: PenhorasConsultaTabelaProps) {
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+    // ── Config-driven columns ──────────────────────────────────────
+    const { columns: configColumns } = useColumnConfig('penhoras', 'table')
+    const fallbackColumns = useMemo(
+        () => defaultsToColumnConfig('penhoras', 'table', PENHORAS_TABLE_DEFAULTS),
+        [],
+    )
+    const allColumns = configColumns.length > 0 ? configColumns : fallbackColumns
+    const dataColumns = useMemo(
+        () => allColumns.filter((col) => col.key !== 'estadoId'),
+        [allColumns],
+    )
+    const showStatusColumn = allColumns.some((col) => col.key === 'estadoId')
 
     return (
         <section className="panel ds-panel penhoras-panel penhoras-results-panel">
@@ -237,13 +254,10 @@ export function PenhorasConsultaTabela({
                     <table className="records-table ds-records-table">
                         <thead>
                             <tr>
-                                <th>PE</th>
-                                <th>Acto</th>
-                                <th>Data Pedido</th>
-                                <th>Identificação</th>
-                                <th>Pedido</th>
-                                <th>Gestor</th>
-                                <th>Estado</th>
+                                {dataColumns.map((col) => (
+                                    <th key={col.id}>{col.label}</th>
+                                ))}
+                                {showStatusColumn && <th>Estado</th>}
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -252,6 +266,7 @@ export function PenhorasConsultaTabela({
                                 const status = getStatus(penhorasStatuses, record.estadoId)
                                 const hasStatusOption = penhorasActiveStatuses.some((statusOption) => statusOption.id === record.estadoId)
                                 const statusValue = hasStatusOption ? record.estadoId : ''
+                                const rec = record as unknown as Record<string, unknown>
                                 return (
                                     <tr
                                         key={record.id}
@@ -262,26 +277,27 @@ export function PenhorasConsultaTabela({
                                             setSelectedPenhorasRecordId(record.id)
                                         }}
                                     >
-                                        <td>{record.pe || '-'}</td>
-                                        <td>{record.acto || '-'}</td>
-                                        <td>{record.dataPedido || '-'}</td>
-                                        <td>{record.identificacao || '-'}</td>
-                                        <td>{record.pedido || '-'}</td>
-                                        <td>{record.gestor || '-'}</td>
-                                        <td>
-                                            <select
-                                                className="ds-status-select"
-                                                value={statusValue}
-                                                onMouseDown={(event) => event.stopPropagation()}
-                                                onClick={(event) => event.stopPropagation()}
-                                                onChange={(event) => void updatePenhorasRecordStatus(record.id, event.target.value)}
-                                            >
-                                                {!hasStatusOption && <option value="">Selecionar estado...</option>}
-                                                {penhorasActiveStatuses.map((statusOption) => (
-                                                    <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                                                ))}
-                                            </select>
-                                        </td>
+                                        {dataColumns.map((col) => {
+                                            const value = getFieldValue(rec, col.key)
+                                            const render = getCellRenderer('penhoras', col.key, col.type as ColumnType)
+                                            return <td key={col.id}>{render(value, rec)}</td>
+                                        })}
+                                        {showStatusColumn && (
+                                            <td>
+                                                <select
+                                                    className="ds-status-select"
+                                                    value={statusValue}
+                                                    onMouseDown={(event) => event.stopPropagation()}
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    onChange={(event) => void updatePenhorasRecordStatus(record.id, event.target.value)}
+                                                >
+                                                    {!hasStatusOption && <option value="">Selecionar estado...</option>}
+                                                    {penhorasActiveStatuses.map((statusOption) => (
+                                                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                        )}
                                         <td>
                                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                                                 <button

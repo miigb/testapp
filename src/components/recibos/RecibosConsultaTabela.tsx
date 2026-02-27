@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Eye, EyeOff, FilterX, Trash2, Download } from 'lucide-react'
 import type { ReceiptRecord, RecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import { api } from '../../api'
@@ -11,6 +11,10 @@ import { colorWithAlpha } from '../../lib/formatters'
 import { getPrimaryRecordReference, getSecondaryRecordReference } from '../../lib/recordHelpers'
 import { StatusPill, EntityIdentity } from '../shared/StatusComponents'
 import { LabeledSelect, AutocompleteInput } from '../shared/FormInputs'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
+import { RECIBOS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
+import type { ColumnType } from '../../constants/columnDefinitions'
 
 function getStatus(statuses: StatusDefinition[], statusId?: string): StatusDefinition | undefined {
     if (!statusId) return undefined
@@ -140,6 +144,20 @@ export function RecibosConsultaTabela({
     onOpenExport,
 }: RecibosConsultaTabelaProps) {
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+    // ── Config-driven columns ──────────────────────────────────────
+    const { columns: configColumns } = useColumnConfig('recibos', 'table')
+    const fallbackColumns = useMemo(
+        () => defaultsToColumnConfig('recibos', 'table', RECIBOS_TABLE_DEFAULTS),
+        [],
+    )
+    // Data columns = everything except estadoId (status is rendered specially)
+    const allColumns = configColumns.length > 0 ? configColumns : fallbackColumns
+    const dataColumns = useMemo(
+        () => allColumns.filter((col) => col.key !== 'estadoId'),
+        [allColumns],
+    )
+    const showStatusColumn = allColumns.some((col) => col.key === 'estadoId')
 
     return (
         <section className="panel">
@@ -456,22 +474,16 @@ export function RecibosConsultaTabela({
                         <thead>
                             <tr>
                                 <th></th>
-                                <th>Tipo</th>
-                                <th>Ano/Mês</th>
-                                <th>PE</th>
-                                <th>Processo</th>
-                                <th>Recibo</th>
-                                <th>Gestor/Exequente</th>
-                                <th>Sem IVA</th>
-                                <th>IVA</th>
-                                <th>Retenção</th>
-                                <th>Meu 5%</th>
-                                <th>Estado</th>
+                                {dataColumns.map((col) => (
+                                    <th key={col.id}>{col.label}</th>
+                                ))}
+                                {showStatusColumn && <th>Estado</th>}
                             </tr>
                         </thead>
                         <tbody>
                             {records.map((record) => {
                                 const status = getStatus(statuses, record.estadoId)
+                                const rec = record as unknown as Record<string, unknown>
                                 return (
                                     <tr
                                         key={record.id}
@@ -486,54 +498,49 @@ export function RecibosConsultaTabela({
                                                 onChange={() => toggleSelectRecord(record.id)}
                                             />
                                         </td>
-                                        <td>{record.tipo === 'exequente' ? 'Exequente' : 'Executado'}</td>
-                                        <td>{record.ano}/{String(record.mes).padStart(2, '0')}</td>
-                                        <td>{record.pe || '-'}</td>
-                                        <td>{record.processo || '-'}</td>
-                                        <td>{record.reciboNumero || '-'}</td>
-                                        <td>
-                                            <EntityIdentity gestor={record.gestor} exequente={record.exequente} />
-                                        </td>
-                                        <td>{formatCurrency(record.valorSemIva)}</td>
-                                        <td>{formatCurrency(record.iva)}</td>
-                                        <td>{formatCurrency(record.retencao)}</td>
-                                        <td>{formatCurrency(record.meu5)}</td>
-                                        <td>
-                                            <div className="status-cell-actions">
-                                                <select
-                                                    value={record.estadoId}
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    onChange={(event) => void updateRecordStatus(record.id, event.target.value)}
-                                                >
-                                                    {orderedStatuses.map((statusOption) => (
-                                                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                                                    ))}
-                                                </select>
-                                                <button
-                                                    className="subtle-btn compact"
-                                                    type="button"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation()
-                                                        setSelectedRecordId(record.id)
-                                                        setIsRecordEditing(true)
-                                                    }}
-                                                >
-                                                    Editar
-                                                </button>
-                                                <button
-                                                    className="subtle-btn compact danger"
-                                                    type="button"
-                                                    title="Mover para lixeira"
-                                                    aria-label="Mover para lixeira"
-                                                    onClick={(event) => {
-                                                        event.stopPropagation()
-                                                        setDeleteTarget(record.id)
-                                                    }}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
+                                        {dataColumns.map((col) => {
+                                            const value = getFieldValue(rec, col.key)
+                                            const render = getCellRenderer('recibos', col.key, col.type as ColumnType)
+                                            return <td key={col.id}>{render(value, rec)}</td>
+                                        })}
+                                        {showStatusColumn && (
+                                            <td>
+                                                <div className="status-cell-actions">
+                                                    <select
+                                                        value={record.estadoId}
+                                                        onClick={(event) => event.stopPropagation()}
+                                                        onChange={(event) => void updateRecordStatus(record.id, event.target.value)}
+                                                    >
+                                                        {orderedStatuses.map((statusOption) => (
+                                                            <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        className="subtle-btn compact"
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            setSelectedRecordId(record.id)
+                                                            setIsRecordEditing(true)
+                                                        }}
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        className="subtle-btn compact danger"
+                                                        type="button"
+                                                        title="Mover para lixeira"
+                                                        aria-label="Mover para lixeira"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            setDeleteTarget(record.id)
+                                                        }}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        )}
                                     </tr>
                                 )
                             })}

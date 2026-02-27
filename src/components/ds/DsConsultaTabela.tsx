@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Eye, EyeOff, FilterX, Trash2, AlertTriangle, Download } from 'lucide-react'
 import type { DsRecord, DsRecordFilters, StatusDefinition, SavedView, SavedViewScope, TabId } from '../../types'
 import { api } from '../../api'
@@ -6,6 +6,10 @@ import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
+import { DS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
+import type { ColumnType } from '../../constants/columnDefinitions'
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
@@ -83,6 +87,19 @@ export function DsConsultaTabela({
     onOpenExport,
 }: DsConsultaTabelaProps) {
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
+    // ── Config-driven columns ──────────────────────────────────────
+    const { columns: configColumns } = useColumnConfig('ds', 'table')
+    const fallbackColumns = useMemo(
+        () => defaultsToColumnConfig('ds', 'table', DS_TABLE_DEFAULTS),
+        [],
+    )
+    const allColumns = configColumns.length > 0 ? configColumns : fallbackColumns
+    const dataColumns = useMemo(
+        () => allColumns.filter((col) => col.key !== 'estadoId'),
+        [allColumns],
+    )
+    const showStatusColumn = allColumns.some((col) => col.key === 'estadoId')
 
     return (
         <section className="panel ds-panel ds-results-panel">
@@ -259,41 +276,42 @@ export function DsConsultaTabela({
                     <table className="records-table ds-records-table">
                         <thead>
                             <tr>
-                                <th>Gestor/a</th>
-                                <th>Proponentes</th>
-                                <th>Valor</th>
-                                <th>Data Escritura</th>
-                                <th>Comissão Loja</th>
-                                <th>Estado</th>
+                                {dataColumns.map((col) => (
+                                    <th key={col.id}>{col.label}</th>
+                                ))}
+                                {showStatusColumn && <th>Estado</th>}
                                 <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {dsRecords.map((record) => {
                                 const status = getStatus(dsStatuses, record.estadoId)
+                                const rec = record as unknown as Record<string, unknown>
                                 return (
                                     <tr
                                         key={record.id}
                                         style={{ backgroundColor: status ? colorWithAlpha(status.color, '1F') : undefined }}
                                         onClick={() => setSelectedDsRecordId(record.id)}
                                     >
-                                        <td>{record.gestora || '-'}</td>
-                                        <td>{record.proponentes || '-'}</td>
-                                        <td>{formatCurrency(record.valor)}</td>
-                                        <td>{record.dataEscritura || '-'}</td>
-                                        <td>{formatCurrency(record.comissaoLoja)}</td>
-                                        <td>
-                                            <select
-                                                className="ds-status-select"
-                                                value={record.estadoId}
-                                                onClick={(event) => event.stopPropagation()}
-                                                onChange={(event) => void updateDsRecordStatus(record.id, event.target.value)}
-                                            >
-                                                {dsOrderedStatuses.map((statusOption) => (
-                                                    <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
-                                                ))}
-                                            </select>
-                                        </td>
+                                        {dataColumns.map((col) => {
+                                            const value = getFieldValue(rec, col.key)
+                                            const render = getCellRenderer('ds', col.key, col.type as ColumnType)
+                                            return <td key={col.id}>{render(value, rec)}</td>
+                                        })}
+                                        {showStatusColumn && (
+                                            <td>
+                                                <select
+                                                    className="ds-status-select"
+                                                    value={record.estadoId}
+                                                    onClick={(event) => event.stopPropagation()}
+                                                    onChange={(event) => void updateDsRecordStatus(record.id, event.target.value)}
+                                                >
+                                                    {dsOrderedStatuses.map((statusOption) => (
+                                                        <option key={statusOption.id} value={statusOption.id}>{statusOption.label}</option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                        )}
                                         <td>
                                             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                                                 <button
