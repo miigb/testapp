@@ -6,7 +6,7 @@ import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig, useColumnTransition } from '../../hooks/useColumnConfig'
 import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
 import { DS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
 import type { ColumnType } from '../../constants/columnDefinitions'
@@ -97,6 +97,7 @@ export function DsConsultaTabela({
 
     // ── Config-driven columns ──────────────────────────────────────
     const { columns: configColumns, refetch: refetchColumns } = useColumnConfig('ds', 'table')
+    const columnsUpdated = useColumnTransition(configColumns)
     const fallbackColumns = useMemo(
         () => defaultsToColumnConfig('ds', 'table', DS_TABLE_DEFAULTS),
         [],
@@ -284,7 +285,7 @@ export function DsConsultaTabela({
                     })}
                 </div>
             ) : (
-                <div className="table-wrapper ds-table-wrapper">
+                <div className={`table-wrapper ds-table-wrapper${columnsUpdated ? ' columns-updated' : ''}`}>
                     <table className="records-table ds-records-table">
                         <thead>
                             <tr>

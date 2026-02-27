@@ -29,12 +29,25 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-// ── Cache ────────────────────────────────────────────────────────────
+// ── Cache + invalidation ─────────────────────────────────────────────
 
 const columnsCache = new Map<string, ColumnConfig[]>()
+const COLUMN_INVALIDATE_EVENT = 'column-config:invalidate'
 
 function cacheKey(module: string, view: string): string {
   return `${module}::${view}`
+}
+
+/** Clear cached column config and notify all active useColumnConfig hooks. */
+export function invalidateColumnCache(module?: string, view?: string): void {
+  if (module && view) {
+    columnsCache.delete(cacheKey(module, view))
+  } else {
+    columnsCache.clear()
+  }
+  window.dispatchEvent(
+    new CustomEvent(COLUMN_INVALIDATE_EVENT, { detail: { module, view } }),
+  )
 }
 
 // ── useColumnConfig ──────────────────────────────────────────────────
@@ -83,6 +96,18 @@ export function useColumnConfig(module: string, view: string): UseColumnConfigRe
       cancelledRef.current = true
     }
   }, [fetchColumns])
+
+  // Re-fetch when admin invalidates the cache
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ module?: string; view?: string }>).detail
+      if (!detail.module || !detail.view || (detail.module === module && detail.view === view)) {
+        fetchColumns()
+      }
+    }
+    window.addEventListener(COLUMN_INVALIDATE_EVENT, handler)
+    return () => window.removeEventListener(COLUMN_INVALIDATE_EVENT, handler)
+  }, [module, view, fetchColumns])
 
   const refetch = useCallback(() => {
     fetchColumns()
@@ -161,8 +186,9 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
         },
       )
       await fetchColumns()
+      invalidateColumnCache(module, view)
     },
-    [fetchColumns],
+    [module, view, fetchColumns],
   )
 
   const reorderColumns = useCallback(
@@ -175,6 +201,7 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
         },
       )
       await fetchColumns()
+      invalidateColumnCache(module, view)
     },
     [module, view, fetchColumns],
   )
@@ -189,8 +216,9 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
         },
       )
       await fetchColumns()
+      invalidateColumnCache(module, view)
     },
-    [fetchColumns],
+    [module, view, fetchColumns],
   )
 
   const renameColumn = useCallback(
@@ -203,8 +231,9 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
         },
       )
       await fetchColumns()
+      invalidateColumnCache(module, view)
     },
-    [fetchColumns],
+    [module, view, fetchColumns],
   )
 
   const createCustomColumn = useCallback(
@@ -223,6 +252,7 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
         },
       )
       await fetchColumns()
+      invalidateColumnCache(module, view)
     },
     [module, view, fetchColumns],
   )
@@ -238,4 +268,40 @@ export function useAdminColumnConfig(module: string, view: string): UseAdminColu
     renameColumn,
     createCustomColumn,
   }
+}
+
+// ── useColumnTransition ──────────────────────────────────────────────
+
+/**
+ * Returns `true` for a brief period when the visible column set changes,
+ * allowing the table wrapper to play a subtle refresh animation.
+ * Uses during-render state adjustment (React 19 pattern) to avoid
+ * synchronous setState inside useEffect.
+ */
+export function useColumnTransition(columns: ColumnConfig[]): boolean {
+  const [animating, setAnimating] = useState(false)
+  const [prevFingerprint, setPrevFingerprint] = useState('')
+
+  const fp = columns
+    .filter((c) => c.visible)
+    .map((c) => `${c.id}:${c.position}:${c.label}`)
+    .join('|')
+
+  // During-render adjustment: detect fingerprint change synchronously
+  if (fp !== prevFingerprint) {
+    const hadPrev = prevFingerprint !== ''
+    setPrevFingerprint(fp)
+    if (hadPrev) {
+      setAnimating(true)
+    }
+  }
+
+  // Clear the animation flag after a short delay
+  useEffect(() => {
+    if (!animating) return
+    const timer = setTimeout(() => setAnimating(false), 350)
+    return () => clearTimeout(timer)
+  }, [animating])
+
+  return animating
 }

@@ -11,7 +11,7 @@ import { colorWithAlpha } from '../../lib/formatters'
 import { getPrimaryRecordReference, getSecondaryRecordReference } from '../../lib/recordHelpers'
 import { StatusPill, EntityIdentity } from '../shared/StatusComponents'
 import { LabeledSelect, AutocompleteInput } from '../shared/FormInputs'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig, useColumnTransition } from '../../hooks/useColumnConfig'
 import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
 import { RECIBOS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
 import type { ColumnType } from '../../constants/columnDefinitions'
@@ -154,6 +154,7 @@ export function RecibosConsultaTabela({
 
     // ── Config-driven columns ──────────────────────────────────────
     const { columns: configColumns, refetch: refetchColumns } = useColumnConfig('recibos', 'table')
+    const columnsUpdated = useColumnTransition(configColumns)
     const fallbackColumns = useMemo(
         () => defaultsToColumnConfig('recibos', 'table', RECIBOS_TABLE_DEFAULTS),
         [],
@@ -481,7 +482,7 @@ export function RecibosConsultaTabela({
                     })}
                 </div>
             ) : (
-                <div className="table-wrapper">
+                <div className={`table-wrapper${columnsUpdated ? ' columns-updated' : ''}`}>
                     <table className="records-table">
                         <thead>
                             <tr>

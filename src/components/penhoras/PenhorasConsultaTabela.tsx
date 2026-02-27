@@ -6,7 +6,7 @@ import { ConfirmDeleteModal } from '../shared/ConfirmDeleteModal'
 import { colorWithAlpha } from '../../lib/formatters'
 import { StatusPill } from '../shared/StatusComponents'
 import { LabeledSelect } from '../shared/FormInputs'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig, useColumnTransition } from '../../hooks/useColumnConfig'
 import { getCellRenderer, getFieldValue, defaultsToColumnConfig } from '../shared/cellRenderers'
 import { PENHORAS_TABLE_DEFAULTS } from '../../constants/columnDefinitions'
 import type { ColumnType } from '../../constants/columnDefinitions'
@@ -95,6 +95,7 @@ export function PenhorasConsultaTabela({
 
     // ── Config-driven columns ──────────────────────────────────────
     const { columns: configColumns, refetch: refetchColumns } = useColumnConfig('penhoras', 'table')
+    const columnsUpdated = useColumnTransition(configColumns)
     const fallbackColumns = useMemo(
         () => defaultsToColumnConfig('penhoras', 'table', PENHORAS_TABLE_DEFAULTS),
         [],
@@ -262,7 +263,7 @@ export function PenhorasConsultaTabela({
                     })}
                 </div>
             ) : (
-                <div className="table-wrapper ds-table-wrapper">
+                <div className={`table-wrapper ds-table-wrapper${columnsUpdated ? ' columns-updated' : ''}`}>
                     <table className="records-table ds-records-table">
                         <thead>
                             <tr>
