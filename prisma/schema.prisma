@@ -60,6 +60,7 @@ model User {
   deletedDsRecords       DsRecord[]              @relation("DsRecordDeleter")
   deletedPenhorasRecords PenhorasRecord[]        @relation("PenhorasRecordDeleter")
   reportTemplates        ReportTemplate[]
+  columnConfigs          ColumnConfig[]          @relation("ColumnConfigCreator")
 }
 
 enum TodoPriority {
@@ -204,6 +205,7 @@ model Record {
   indicacoes      String?
   sourceColor     String?
   sourceSheet     String?
+  customFields    Json?     @default("{}")
 
   statusId String
   status   Status @relation(fields: [statusId], references: [id], onDelete: Restrict)
@@ -330,6 +332,7 @@ model DsRecord {
   sourceRowNumber            Int?
   importBatchId              String?
   rawPayload                 Json?
+  customFields               Json?     @default("{}")
 
   statusId String
   status   DsStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
@@ -376,6 +379,7 @@ model PenhorasRecord {
   sourceRowNumber Int?
   importBatchId String?
   rawPayload   Json?
+  customFields Json?     @default("{}")
 
   statusId String
   status   PenhorasStatus @relation(fields: [statusId], references: [id], onDelete: Restrict)
@@ -393,4 +397,25 @@ model PenhorasRecord {
   @@index([acto])
   @@index([dataPedido])
   @@index([deletedAt])
+}
+
+model ColumnConfig {
+  id              String   @id @default(cuid())
+  module          String
+  view            String
+  key             String
+  label           String
+  type            String
+  visible         Boolean  @default(true)
+  position        Int
+  isCustom        Boolean  @default(false)
+  isReference     Boolean  @default(false)
+  referenceConfig Json?
+  createdById     Int
+  createdBy       User     @relation("ColumnConfigCreator", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([module, view, key])
+  @@index([module, view])
 }
