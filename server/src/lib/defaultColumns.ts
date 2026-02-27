@@ -96,36 +96,42 @@ const ALL_DEFAULTS: Record<string, Record<string, DefaultColumnDef[]>> = {
 /**
  * Ensures default column configs exist for a module/view.
  * If no rows exist in the DB, inserts the hardcoded defaults.
- * Returns the final list of columns (from DB after possible seeding).
+ * Non-fatal: silently catches errors (e.g. missing migration) so
+ * the columns endpoint still works with client-side fallback.
  */
 export async function ensureDefaultColumns(
   prisma: PrismaClient,
   module: string,
   view: string,
-  createdById: string,
+  createdById: number,
 ): Promise<void> {
-  const count = await prisma.columnConfig.count({
-    where: { module, view },
-  })
+  try {
+    const count = await prisma.columnConfig.count({
+      where: { module, view },
+    })
 
-  if (count > 0) return
+    if (count > 0) return
 
-  const defaults = ALL_DEFAULTS[module]?.[view]
-  if (!defaults) return
+    const defaults = ALL_DEFAULTS[module]?.[view]
+    if (!defaults) return
 
-  await prisma.columnConfig.createMany({
-    data: defaults.map((col) => ({
-      module,
-      view,
-      key: col.key,
-      label: col.label,
-      type: col.type,
-      visible: true,
-      position: col.position,
-      isCustom: false,
-      isReference: false,
-      createdById,
-    })),
-    skipDuplicates: true,
-  })
+    await prisma.columnConfig.createMany({
+      data: defaults.map((col) => ({
+        module,
+        view,
+        key: col.key,
+        label: col.label,
+        type: col.type,
+        visible: true,
+        position: col.position,
+        isCustom: false,
+        isReference: false,
+        createdById,
+      })),
+      skipDuplicates: true,
+    })
+  } catch {
+    // Non-fatal — if the table doesn't exist yet or any other DB error,
+    // the endpoint will return [] and the client falls back to defaults.
+  }
 }

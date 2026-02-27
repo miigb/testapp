@@ -27,16 +27,21 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     // Auto-seed defaults if table is empty for this module/view
     await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
 
-    const columns = await prisma.columnConfig.findMany({
-      where: {
-        module: parsed.data.module,
-        view: parsed.data.view,
-        visible: true,
-      },
-      orderBy: { position: 'asc' },
-    })
-
-    res.json(columns)
+    try {
+      const columns = await prisma.columnConfig.findMany({
+        where: {
+          module: parsed.data.module,
+          view: parsed.data.view,
+          visible: true,
+        },
+        orderBy: { position: 'asc' },
+      })
+      res.json(columns)
+    } catch {
+      // Table may not exist yet if migration hasn't been applied — return empty
+      // so the client falls back to hardcoded defaults.
+      res.json([])
+    }
   })
 
   // ─── Admin routes ────────────────────────────────────────────────────
@@ -51,15 +56,20 @@ export function createColumnsRouter(prisma: PrismaClient): Router {
     // Auto-seed defaults if table is empty for this module/view
     await ensureDefaultColumns(prisma, parsed.data.module, parsed.data.view, req.user!.id)
 
-    const columns = await prisma.columnConfig.findMany({
-      where: {
-        module: parsed.data.module,
-        view: parsed.data.view,
-      },
-      orderBy: { position: 'asc' },
-    })
-
-    res.json(columns)
+    try {
+      const columns = await prisma.columnConfig.findMany({
+        where: {
+          module: parsed.data.module,
+          view: parsed.data.view,
+        },
+        orderBy: { position: 'asc' },
+      })
+      res.json(columns)
+    } catch {
+      // Table may not exist yet if migration hasn't been applied — return empty
+      // so the client falls back to hardcoded defaults.
+      res.json([])
+    }
   })
 
   /**
