@@ -1,9 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="250" height="250" viewBox="-30 -30 310 310" fill="none">
-  <rect x="-30" y="-30" width="310" height="310" fill="#904401"/>
-  <!-- House outline -->
-  <path d="M125,30 L200,110 L200,190 L50,190 L50,110 Z" fill="none" stroke="white" stroke-width="7" stroke-linejoin="round"/>
-  <!-- Door outline -->
-  <rect x="107" y="132" width="36" height="58" rx="3" fill="none" stroke="white" stroke-width="5"/>
+  <rect x="-30" y="-30" width="310" height="310" fill="#FDF3E7"/>
+  <!-- Circular badge -->
+  <circle cx="125" cy="100" r="70" fill="#C4853C"/>
+  <circle cx="125" cy="100" r="60" fill="#B5742D"/>
+  <!-- House filled -->
+  <path d="M125,50 L175,95 L175,145 L75,145 L75,95 Z" fill="white" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Door -->
+  <rect x="112" y="110" width="26" height="35" rx="2" fill="#B5742D"/>
+  <!-- Window -->
+  <rect x="137" y="100" width="14" height="14" rx="1" fill="#B5742D"/>
   <!-- Text -->
-  <text x="125" y="228" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="white" letter-spacing="4">PENHORAS</text>
+  <text x="125" y="200" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#6B3A10" letter-spacing="2">PENHORAS</text>
+  <text x="125" y="228" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="600" fill="#904401" letter-spacing="1.5">IMÓVEIS</text>
 </svg>
